@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import re
 import sys
 
 from .config import (
@@ -218,14 +220,14 @@ class MissionRuntime:
                 permissions=permissions,
             )
             host_path.parent.mkdir(parents=True, exist_ok=True)
-            host_path.write_text(str(item.get("content", "")), encoding="utf-8")
+            _write_private_workspace_file(host_path, str(item.get("content", "")))
             changed_files.append(rel)
 
         if decision_notes:
             decisions_path = workspace_root / "Missions" / mission.id / "DECISIONS.md"
             existing = decisions_path.read_text(encoding="utf-8") if decisions_path.exists() else "# Decisions\n\n"
             appended = "\n".join(f"- {note}" for note in decision_notes)
-            decisions_path.write_text(existing.rstrip() + "\n\n" + appended + "\n", encoding="utf-8")
+            _write_private_workspace_file(decisions_path, existing.rstrip() + "\n\n" + appended + "\n")
             changed_files.append(str(decisions_path.relative_to(workspace_root)))
 
         result.run_record.changed_files = changed_files
@@ -235,7 +237,9 @@ class MissionRuntime:
 
     @staticmethod
     def _target_workdir(mission: MissionDefinition, workspace_root: Path) -> Path:
-        slug = mission.title.strip().replace(" ", "_")
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "_", mission.title.strip()).strip("._-")
+        if not slug:
+            slug = mission.id
         return workspace_root / "Projects" / slug
 
     @staticmethod
@@ -285,3 +289,12 @@ def _is_relative_to(path: Path, base: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _write_private_workspace_file(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass

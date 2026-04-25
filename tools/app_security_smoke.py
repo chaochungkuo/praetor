@@ -11,6 +11,7 @@ import urllib.request
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "apps" / "api"))
 STATE_DIR = pathlib.Path("/tmp/praetor-app-security-smoke-state")
 PORT = 9746
 BASE_URL = f"http://127.0.0.1:{PORT}"
@@ -65,6 +66,35 @@ def onboarding_payload() -> dict:
 
 def main() -> int:
     global CSRF_TOKEN
+    from praetor_api.security import validate_runtime_security
+    from praetor_api.storage import FilesystemStore
+
+    old_env = {key: os.environ.get(key) for key in ["PRAETOR_ENV", "PRAETOR_SESSION_SECRET", "PRAETOR_SETUP_TOKEN"]}
+    os.environ["PRAETOR_ENV"] = "production"
+    os.environ["PRAETOR_SESSION_SECRET"] = "change-me"
+    os.environ["PRAETOR_SETUP_TOKEN"] = "change-me"
+    try:
+        try:
+            validate_runtime_security()
+            raise AssertionError("weak production secrets were accepted")
+        except RuntimeError:
+            pass
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    try:
+        FilesystemStore(pathlib.Path("/tmp/praetor-storage-security-state")).mission_dir(
+            pathlib.Path("/tmp/praetor-security-workspace"),
+            "../escape",
+        )
+        raise AssertionError("unsafe mission_id was accepted")
+    except ValueError:
+        pass
+
     if STATE_DIR.exists():
         subprocess.run(["rm", "-rf", str(STATE_DIR)], check=True)
 

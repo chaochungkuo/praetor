@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 import threading
 import uuid
 from pathlib import Path
@@ -134,6 +135,7 @@ class RunStore:
             return
         path = self._log_dir / f"{record.run_id}.json"
         path.write_text(record.model_dump_json(indent=2), encoding="utf-8")
+        self._chmod_private(path)
 
     def _persist_event(self, run_id: str, event: RunEvent) -> None:
         if not self._persist_run_logs or self._log_dir is None:
@@ -142,3 +144,11 @@ class RunStore:
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(event.model_dump(mode="json"), ensure_ascii=True))
             f.write("\n")
+        self._chmod_private(path)
+
+    @staticmethod
+    def _chmod_private(path: Path) -> None:
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass

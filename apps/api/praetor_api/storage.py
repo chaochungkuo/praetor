@@ -4,11 +4,21 @@ from contextlib import contextmanager
 from datetime import datetime
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Iterator
 
 from .models import AppSettings, ApprovalRequest, MeetingRecord, MissionDefinition, OwnerAuthRecord, TaskDefinition
+
+
+SAFE_ID_RE = re.compile(r"^[a-z][a-z0-9_]*_[a-f0-9]{12}$")
+
+
+def validate_safe_id(value: str, *, label: str = "id") -> str:
+    if not SAFE_ID_RE.fullmatch(value):
+        raise ValueError(f"Invalid {label}.")
+    return value
 
 
 class SQLiteIndex:
@@ -134,6 +144,7 @@ class FilesystemStore:
         return OwnerAuthRecord.model_validate_json(self.auth_path.read_text(encoding="utf-8"))
 
     def mission_dir(self, workspace_root: Path, mission_id: str) -> Path:
+        validate_safe_id(mission_id, label="mission_id")
         return workspace_root / "Missions" / mission_id
 
     def meeting_dir(self, workspace_root: Path, mission_id: str) -> Path:
@@ -145,24 +156,24 @@ class FilesystemStore:
         mission_dir.mkdir(parents=True, exist_ok=True)
         logs_dir.mkdir(parents=True, exist_ok=True)
 
-        (mission_dir / "mission.json").write_text(
+        _write_workspace_text(
+            mission_dir / "mission.json",
             mission.model_dump_json(indent=2),
-            encoding="utf-8",
         )
-        (mission_dir / "MISSION.md").write_text(
+        _write_workspace_text(
+            mission_dir / "MISSION.md",
             f"# {mission.title}\n\nStatus: {mission.status}\n\n"
             f"Summary: {mission.summary or ''}\n",
-            encoding="utf-8",
         )
-        (mission_dir / "STATUS.md").write_text(
+        _write_workspace_text(
+            mission_dir / "STATUS.md",
             f"# Status\n\n- status: {mission.status}\n- priority: {mission.priority}\n",
-            encoding="utf-8",
         )
-        (mission_dir / "TASKS.md").write_text("# Tasks\n\n", encoding="utf-8")
-        (mission_dir / "DECISIONS.md").write_text("# Decisions\n\n", encoding="utf-8")
-        (mission_dir / "CONTEXT.md").write_text("# Context\n\n", encoding="utf-8")
-        (mission_dir / "PM_REPORT.md").write_text("# PM Report\n\n", encoding="utf-8")
-        (mission_dir / "REPORT.md").write_text("# Report\n\n", encoding="utf-8")
+        _write_workspace_text(mission_dir / "TASKS.md", "# Tasks\n\n")
+        _write_workspace_text(mission_dir / "DECISIONS.md", "# Decisions\n\n")
+        _write_workspace_text(mission_dir / "CONTEXT.md", "# Context\n\n")
+        _write_workspace_text(mission_dir / "PM_REPORT.md", "# PM Report\n\n")
+        _write_workspace_text(mission_dir / "REPORT.md", "# Report\n\n")
         return mission_dir
 
     def save_task(self, workspace_root: Path, task: TaskDefinition) -> Path:
@@ -171,7 +182,8 @@ class FilesystemStore:
         tasks_dir = mission_dir / "logs"
         tasks_dir.mkdir(parents=True, exist_ok=True)
         path = tasks_dir / f"{task.id}.task.json"
-        path.write_text(task.model_dump_json(indent=2), encoding="utf-8")
+        validate_safe_id(task.id, label="task_id")
+        _write_workspace_text(path, task.model_dump_json(indent=2))
         return path
 
     def append_report(
@@ -183,7 +195,7 @@ class FilesystemStore:
         mission_dir = self.mission_dir(workspace_root, mission_id)
         report = mission_dir / "REPORT.md"
         existing = report.read_text(encoding="utf-8") if report.exists() else "# Report\n\n"
-        report.write_text(existing.rstrip() + "\n\n" + text.strip() + "\n", encoding="utf-8")
+        _write_workspace_text(report, existing.rstrip() + "\n\n" + text.strip() + "\n")
 
     def append_pm_report(
         self,
@@ -194,7 +206,7 @@ class FilesystemStore:
         mission_dir = self.mission_dir(workspace_root, mission_id)
         report = mission_dir / "PM_REPORT.md"
         existing = report.read_text(encoding="utf-8") if report.exists() else "# PM Report\n\n"
-        report.write_text(existing.rstrip() + "\n\n" + text.strip() + "\n", encoding="utf-8")
+        _write_workspace_text(report, existing.rstrip() + "\n\n" + text.strip() + "\n")
 
     def load_mission(self, workspace_root: Path, mission_id: str) -> MissionDefinition | None:
         path = self.mission_dir(workspace_root, mission_id) / "mission.json"
@@ -227,8 +239,9 @@ class FilesystemStore:
         logs_dir = mission_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         run_id = payload.get("run_id", "unknown")
+        validate_safe_id(str(run_id), label="run_id")
         path = logs_dir / f"{run_id}.bridge.json"
-        path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
+        _write_workspace_text(path, json.dumps(payload, indent=2, ensure_ascii=True))
         return path
 
     def list_bridge_runs(self, workspace_root: Path, mission_id: str) -> list[dict]:
@@ -325,9 +338,11 @@ class FilesystemStore:
         meetings_dir = self.meeting_dir(workspace_root, meeting.mission_id)
         meetings_dir.mkdir(parents=True, exist_ok=True)
         path = meetings_dir / f"{meeting.id}.meeting.json"
-        path.write_text(meeting.model_dump_json(indent=2), encoding="utf-8")
+        validate_safe_id(meeting.id, label="meeting_id")
+        _write_workspace_text(path, meeting.model_dump_json(indent=2))
         markdown = meetings_dir / f"{meeting.id}.md"
-        markdown.write_text(
+        _write_workspace_text(
+            markdown,
             "\n".join(
                 [
                     f"# Meeting {meeting.id}",
@@ -343,7 +358,6 @@ class FilesystemStore:
                     "",
                 ]
             ),
-            encoding="utf-8",
         )
         return path
 
@@ -463,6 +477,15 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def _write_private_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _write_workspace_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     try:

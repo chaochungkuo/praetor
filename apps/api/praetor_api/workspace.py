@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -30,8 +31,17 @@ DEFAULT_WIKI_PAGES = {
 
 def bootstrap_workspace(root: Path) -> None:
     for rel in DEFAULT_WORKSPACE_DIRS:
-        root.joinpath(rel).mkdir(parents=True, exist_ok=True)
+        path = root.joinpath(rel)
+        path.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            pass
     for rel, content in DEFAULT_WIKI_PAGES.items():
         path = root / rel
         if not path.exists():
             path.write_text(content, encoding="utf-8")
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass

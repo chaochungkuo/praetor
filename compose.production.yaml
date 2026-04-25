@@ -3,7 +3,7 @@ services:
   # It does not add Codex or Claude Code containers on purpose.
   web:
     environment:
-      PRAETOR_APP_URL: ${PRAETOR_APP_URL}
+      PRAETOR_APP_URL: ${PRAETOR_APP_URL:-}
 
   api:
     environment:
@@ -47,16 +47,17 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      PRAETOR_DOMAIN: ${PRAETOR_DOMAIN}
-      PRAETOR_UPSTREAM: web:3000
+      PRAETOR_DOMAIN: ${PRAETOR_DOMAIN:-}
+      PRAETOR_UPSTREAM: ${PRAETOR_UPSTREAM:-web:3000}
     command:
       - /bin/sh
       - -lc
       - |
+        test -n "$${PRAETOR_DOMAIN}" || { echo "PRAETOR_DOMAIN is required for production proxy." >&2; exit 1; }
         cat >/etc/caddy/Caddyfile <<EOF
-        ${PRAETOR_DOMAIN} {
+        $${PRAETOR_DOMAIN} {
           encode zstd gzip
-          reverse_proxy ${PRAETOR_UPSTREAM}
+          reverse_proxy $${PRAETOR_UPSTREAM}
         }
         EOF
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

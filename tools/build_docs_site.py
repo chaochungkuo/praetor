@@ -17,6 +17,9 @@ PAGES = [
     ("CONTRIBUTING.md", "Contributing"),
     ("docs/INDEX.zh-TW.md", "Docs Index"),
     ("docs/PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md", "Open Source Success"),
+    ("docs/PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md", "Public Security Review"),
+    ("docs/PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md", "Privacy Boundaries"),
+    ("docs/INSTALL_CHECKLIST.md", "Install Checklist"),
     ("docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md", "Deployment Security"),
     ("docs/PRAETOR_LOCAL_DEPLOY.md", "Local Deploy"),
     ("docs/PRAETOR_REMOTE_PRIVATE_DEPLOY.md", "Remote Private Deploy"),
@@ -36,23 +39,21 @@ def slug_for(path: str) -> str:
 
 def inline_markdown(text: str) -> str:
     escaped = html.escape(text)
+    escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", _link_repl, escaped)
     escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
     escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
     return escaped
 
 
-def linkify(line: str) -> str:
-    def repl(match: re.Match[str]) -> str:
-        label = html.escape(match.group(1))
-        target = match.group(2)
-        if target.startswith(("http://", "https://", "#")):
-            href = html.escape(target)
-        else:
-            normalized = target.lstrip("./")
-            href = html.escape(slug_for(normalized) if normalized.endswith(".md") else target)
-        return f'<a href="{href}">{label}</a>'
-
-    return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", repl, line)
+def _link_repl(match: re.Match[str]) -> str:
+    label = match.group(1)
+    target = html.unescape(match.group(2))
+    if target.startswith(("http://", "https://", "#")):
+        href = html.escape(target)
+    else:
+        normalized = target.lstrip("./")
+        href = html.escape(slug_for(normalized) if normalized.endswith(".md") else target)
+    return f'<a href="{href}">{label}</a>'
 
 
 def markdown_to_html(markdown: str) -> str:
@@ -88,19 +89,19 @@ def markdown_to_html(markdown: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             level = len(heading.group(1))
-            html_lines.append(f"<h{level}>{inline_markdown(linkify(heading.group(2)))}</h{level}>")
+            html_lines.append(f"<h{level}>{inline_markdown(heading.group(2))}</h{level}>")
             continue
         item = re.match(r"^-\s+(.+)$", line)
         if item:
             if not in_list:
                 html_lines.append("<ul>")
                 in_list = True
-            html_lines.append(f"<li>{inline_markdown(linkify(item.group(1)))}</li>")
+            html_lines.append(f"<li>{inline_markdown(item.group(1))}</li>")
             continue
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<p>{inline_markdown(linkify(line))}</p>")
+        html_lines.append(f"<p>{inline_markdown(line)}</p>")
 
     if in_code:
         html_lines.append("<pre><code>" + html.escape("\n".join(code_buffer)) + "</code></pre>")

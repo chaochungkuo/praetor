@@ -36,6 +36,9 @@ This is still an active build-stage repo, not a finished product release.
 
 - [GitHub Pages documentation site](https://chaochungkuo.github.io/praetor/)
 - [GitHub repository setup](docs/GITHUB_SETUP.md)
+- [Public security review](docs/PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md)
+- [Privacy boundaries](docs/PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md)
+- [Install checklist](docs/INSTALL_CHECKLIST.md)
 
 ## Official development baseline
 

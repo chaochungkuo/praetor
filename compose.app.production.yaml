@@ -1,6 +1,7 @@
 services:
   app:
     environment:
+      PRAETOR_ENV: production
       PRAETOR_SESSION_SECRET: ""
       PRAETOR_SETUP_TOKEN: ""
       PRAETOR_BRIDGE_TOKEN: ""
@@ -8,6 +9,7 @@ services:
       ANTHROPIC_API_KEY: ""
       PRAETOR_REQUIRE_LOGIN: ${PRAETOR_REQUIRE_LOGIN:-true}
       PRAETOR_SECURE_COOKIE: ${PRAETOR_SECURE_COOKIE:-true}
+      PRAETOR_RATE_LIMIT_ENABLED: ${PRAETOR_RATE_LIMIT_ENABLED:-true}
       PRAETOR_SESSION_SECRET_FILE: /run/secrets/praetor_session_secret
       PRAETOR_SETUP_TOKEN_FILE: /run/secrets/praetor_setup_token
       PRAETOR_BRIDGE_TOKEN_FILE: /run/secrets/praetor_bridge_token

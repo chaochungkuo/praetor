@@ -79,6 +79,18 @@ async def http_exception_handler(_, exc: HTTPException):
     )
 
 
+@app.exception_handler(ValueError)
+async def value_error_handler(_, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content=ApiEnvelope(
+            ok=False,
+            data=None,
+            error={"code": "invalid_request", "message": str(exc)},
+        ).model_dump(),
+    )
+
+
 def _is_authenticated(request: Request) -> bool:
     return bool(request.session.get("authenticated"))
 
