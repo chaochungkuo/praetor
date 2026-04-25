@@ -8,13 +8,15 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   scorecard:
     name: Run OpenSSF Scorecard
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
