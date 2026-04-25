@@ -128,8 +128,8 @@ Praetor 的 UI 應和這個 logo 對齊：
 
 接下來建議正式整理出三種 repo 資產：
 
-1. [branding/praetor-logo-dark.svg](/Users/jovesus/glasrocks/praetor/branding/praetor-logo-dark.svg)
-2. [branding/praetor-monogram-dark.svg](/Users/jovesus/glasrocks/praetor/branding/praetor-monogram-dark.svg)
+1. [branding/praetor-logo-dark.svg](branding/praetor-logo-dark.svg)
+2. [branding/praetor-monogram-dark.svg](branding/praetor-monogram-dark.svg)
 3. 後續再補 PNG 導出版
 
 如果未來要做網站與 favicon，應從這個版本導出，而不是重新畫一個不同的 mark。

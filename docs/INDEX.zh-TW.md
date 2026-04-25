@@ -4,18 +4,19 @@
 
 建議閱讀順序：
 
-1. [ROADMAP.md](/Users/jovesus/glasrocks/praetor/ROADMAP.md)
-2. [PRAETOR_PRODUCT_BRIEF.zh-TW.md](/Users/jovesus/glasrocks/praetor/PRAETOR_PRODUCT_BRIEF.zh-TW.md)
-3. [PRAETOR_SYSTEM_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_SYSTEM_SPEC.zh-TW.md)
-4. [PRAETOR_UI_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_UI_SPEC.zh-TW.md)
-5. [PRAETOR_SURFACES_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_SURFACES_SPEC.zh-TW.md)
-6. [PRAETOR_REPO_ARCHITECTURE.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_REPO_ARCHITECTURE.zh-TW.md)
-7. [DEPLOYMENT_SECURITY_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md)
-8. [PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md)
-9. [PRAETOR_BRAND_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_BRAND_SPEC.zh-TW.md)
-10. [PRAETOR_LOCAL_DEPLOY.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_LOCAL_DEPLOY.md)
-11. [PRAETOR_REMOTE_PRIVATE_DEPLOY.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_REMOTE_PRIVATE_DEPLOY.md)
-12. [PRAETOR_BACKUP_RESTORE.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_BACKUP_RESTORE.md)
+1. [ROADMAP.md](ROADMAP.md)
+2. [PRAETOR_PRODUCT_BRIEF.zh-TW.md](PRAETOR_PRODUCT_BRIEF.zh-TW.md)
+3. [PRAETOR_SYSTEM_SPEC.zh-TW.md](docs/PRAETOR_SYSTEM_SPEC.zh-TW.md)
+4. [PRAETOR_UI_SPEC.zh-TW.md](docs/PRAETOR_UI_SPEC.zh-TW.md)
+5. [PRAETOR_SURFACES_SPEC.zh-TW.md](docs/PRAETOR_SURFACES_SPEC.zh-TW.md)
+6. [PRAETOR_REPO_ARCHITECTURE.zh-TW.md](docs/PRAETOR_REPO_ARCHITECTURE.zh-TW.md)
+7. [DEPLOYMENT_SECURITY_SPEC.zh-TW.md](docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md)
+8. [PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](docs/PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md)
+9. [PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md](docs/PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md)
+10. [PRAETOR_BRAND_SPEC.zh-TW.md](docs/PRAETOR_BRAND_SPEC.zh-TW.md)
+11. [PRAETOR_LOCAL_DEPLOY.md](docs/PRAETOR_LOCAL_DEPLOY.md)
+12. [PRAETOR_REMOTE_PRIVATE_DEPLOY.md](docs/PRAETOR_REMOTE_PRIVATE_DEPLOY.md)
+13. [PRAETOR_BACKUP_RESTORE.md](docs/PRAETOR_BACKUP_RESTORE.md)
 
 文件角色：
 
@@ -42,6 +43,9 @@
 
 - `PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md`
   - `praetor-execd` 的責任邊界、API contract、事件模型、狀態機、path mapping、安全規則、與 Praetor worker 的整合
+
+- `PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md`
+  - 目前 codebase 現況、記憶與使用者流程盤點、開源定位落差、產品化與行銷執行規格
 
 - `PRAETOR_BRAND_SPEC.zh-TW.md`
   - 官方 logo、品牌語氣、色彩方向、產品內的使用原則

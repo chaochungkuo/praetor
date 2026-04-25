@@ -8,7 +8,7 @@ Praetor's important state is in:
 
 The current repo includes a simple backup script:
 
-- [scripts/backup_praetor.sh](/Users/jovesus/glasrocks/praetor/scripts/backup_praetor.sh)
+- [scripts/backup_praetor.sh](scripts/backup_praetor.sh)
 
 ## Create a backup
 

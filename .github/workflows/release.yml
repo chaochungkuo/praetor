@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Build source archive
+        run: |
+          git archive --format=tar.gz --prefix="praetor-${GITHUB_REF_NAME}/" --output="praetor-${GITHUB_REF_NAME}.tar.gz" HEAD
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "praetor-${GITHUB_REF_NAME}.tar.gz" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Praetor ${GITHUB_REF_NAME}" \
+            --generate-notes

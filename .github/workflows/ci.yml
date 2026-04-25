@@ -30,6 +30,9 @@ jobs:
       - name: Import and compile checks
         run: pixi run check
 
+      - name: Documentation site build
+        run: pixi run docs-site
+
       - name: Security smoke test
         run: pixi run app-security-smoke
 

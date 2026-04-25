@@ -32,4 +32,5 @@ ollama/
 # Build outputs
 dist/
 build/
+public/
 *.egg-info/

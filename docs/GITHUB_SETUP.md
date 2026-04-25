@@ -36,12 +36,14 @@ This repository is configured for a modern GitHub workflow.
 - `CI`: Pixi import/compile checks plus security, auth, API, fallback, stack, and bridge smoke tests.
 - `Docker Build`: builds API, web, and worker images.
 - `CodeQL`: Python static security analysis on push, PR, and weekly schedule.
+- `Pages`: builds and deploys the static documentation site from `README.md` and selected `docs/` files.
+- `Release`: creates a GitHub Release with generated notes when a `v*.*.*` tag is pushed.
+- `Scorecard`: runs OpenSSF Scorecard on a weekly schedule and uploads SARIF results.
 - `Dependabot`: weekly GitHub Actions dependency updates.
 
 ## Recommended Next Steps
 
-- Add release automation once versioning and packaging are stable.
-- Add OpenSSF Scorecard after the repository has a few normal PR cycles.
-- Add a dedicated documentation site when user-facing docs outgrow `README.md`.
 - Add signed release artifacts before publishing downloadable binaries or installers.
 - Turn on code owner review once the maintainer model expands beyond a single owner.
+- Add package/container publishing once versioning and deployment targets are stable.
+- Add preview deployments for pull requests if the documentation site starts changing frequently.
