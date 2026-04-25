@@ -150,6 +150,7 @@ pixi run app-fallback-smoke
 pixi run stack-smoke
 pixi run web-build
 pixi run office-smoke
+pixi run planner-smoke
 ```
 
 `app-smoke` verifies the backend vertical slice:
@@ -213,6 +214,13 @@ pixi run office-smoke
 - reads the mission timeline and agent message thread
 - verifies the React Office entrypoint is served
 
+`planner-smoke` verifies the CEO planner contract:
+
+- confirms the deterministic planner emits mission draft, approval request, and memory update actions
+- starts a fake OpenAI-compatible planner endpoint
+- runs the Office conversation API in `PRAETOR_CEO_PLANNER_MODE=llm`
+- verifies LLM planner actions are validated, applied, and written to mission/memory state
+
 ## Key tasks
 
 ```bash
@@ -231,11 +239,31 @@ pixi run app-fallback-smoke
 pixi run stack-smoke
 pixi run web-build
 pixi run office-smoke
+pixi run planner-smoke
 pixi run bridge-smoke
 pixi run bridge-import-check
 pixi run runtime-import-check
 pixi run py-compile
 ```
+
+## CEO planner modes
+
+Praetor Office routes chairman messages through a replaceable CEO planner interface. The default is deterministic so local development and CI do not require paid API access.
+
+```bash
+PRAETOR_CEO_PLANNER_MODE=deterministic
+```
+
+To try an LLM-backed planner, provide API credentials and switch the mode:
+
+```bash
+PRAETOR_CEO_PLANNER_MODE=llm
+PRAETOR_CEO_PLANNER_PROVIDER=openai
+PRAETOR_CEO_PLANNER_MODEL=gpt-4.1-mini
+OPENAI_API_KEY=...
+```
+
+The planner may emit four action types: `mission_draft`, `approval_request`, `memory_update`, and `briefing`. LLM output is parsed as JSON, validated against the planner schema, sanitized before side effects, and falls back to the deterministic planner if the provider is unavailable or returns invalid output.
 
 ## Development workflow
 

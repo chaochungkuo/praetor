@@ -21,6 +21,44 @@ class Handler(BaseHTTPRequestHandler):
         payload = json.loads(raw)
         messages = payload.get("messages") or []
         prompt = messages[-1].get("content", "") if messages else ""
+        if "Praetor CEO planner" in prompt:
+            planner_payload = {
+                "intent": "mission_draft",
+                "response": "Planner created a mission draft, memory update, and decision checkpoint.",
+                "actions": [
+                    {
+                        "type": "mission_draft",
+                        "title": "LLM planner smoke mission",
+                        "body": "Validate that the LLM planner can return structured actions.",
+                        "metadata": {"domains": ["operations"], "priority": "high", "requested_outputs": []},
+                    },
+                    {
+                        "type": "memory_update",
+                        "title": "Planner memory",
+                        "body": "LLM planner smoke memory.",
+                        "metadata": {"page": "CEO Memory.md"},
+                    },
+                ],
+            }
+            body = {
+                "id": "chatcmpl_fake_planner",
+                "object": "chat.completion",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": json.dumps(planner_payload)},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 123, "completion_tokens": 45},
+            }
+            encoded = json.dumps(body).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
         match = OUTPUT_RE.search(prompt)
         output_path = match.group(1) if match else "/workspace/Projects/Fake/PROJECT.md"
         body = {

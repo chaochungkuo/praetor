@@ -22,6 +22,9 @@ DEBUG_ROUTES_ENV = "PRAETOR_DEBUG_ROUTES"
 RATE_LIMIT_ENABLED_ENV = "PRAETOR_RATE_LIMIT_ENABLED"
 LOGIN_MAX_ATTEMPTS_ENV = "PRAETOR_LOGIN_MAX_ATTEMPTS"
 LOGIN_WINDOW_SECONDS_ENV = "PRAETOR_LOGIN_WINDOW_SECONDS"
+CEO_PLANNER_MODE_ENV = "PRAETOR_CEO_PLANNER_MODE"
+CEO_PLANNER_PROVIDER_ENV = "PRAETOR_CEO_PLANNER_PROVIDER"
+CEO_PLANNER_MODEL_ENV = "PRAETOR_CEO_PLANNER_MODEL"
 
 
 def get_state_dir() -> Path:
@@ -112,3 +115,15 @@ def get_login_max_attempts() -> int:
 
 def get_login_window_seconds() -> int:
     return int(os.getenv(LOGIN_WINDOW_SECONDS_ENV, "300"))
+
+
+def get_ceo_planner_mode() -> str:
+    return os.getenv(CEO_PLANNER_MODE_ENV, "deterministic").lower()
+
+
+def get_ceo_planner_provider() -> str:
+    return os.getenv(CEO_PLANNER_PROVIDER_ENV, "openai").lower()
+
+
+def get_ceo_planner_model() -> str:
+    return os.getenv(CEO_PLANNER_MODEL_ENV, "gpt-4.1-mini")

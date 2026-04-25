@@ -148,6 +148,14 @@ def _anthropic_messages(model: str, prompt: str) -> tuple[str, UsageSummary]:
     )
 
 
+def generate_json_response(*, provider: str, model: str, prompt: str) -> tuple[str, UsageSummary]:
+    if provider == "openai":
+        return _openai_chat_completion(model, prompt)
+    if provider == "anthropic":
+        return _anthropic_messages(model, prompt)
+    raise ApiProviderError(f"Unsupported API provider: {provider}")
+
+
 def run_api_mission(
     *,
     mission: MissionDefinition,
@@ -157,12 +165,7 @@ def run_api_mission(
 ) -> tuple[dict[str, Any], ApiMissionResult]:
     preview, contents = collect_retrieval_preview(workspace_root)
     prompt = build_generation_prompt(mission=mission, retrieval_contents=contents)
-    if provider == "openai":
-        response_text, usage = _openai_chat_completion(model, prompt)
-    elif provider == "anthropic":
-        response_text, usage = _anthropic_messages(model, prompt)
-    else:
-        raise ApiProviderError(f"Unsupported API provider: {provider}")
+    response_text, usage = generate_json_response(provider=provider, model=model, prompt=prompt)
     payload = parse_generation_payload(response_text)
     run_record = RunRecord(
         run_id=generate_id("run"),

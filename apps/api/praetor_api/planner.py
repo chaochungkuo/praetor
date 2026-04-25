@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Protocol
 
 from .models import PlannerAction, PlannerPlan
+from .config import get_ceo_planner_mode, get_ceo_planner_model, get_ceo_planner_provider
+from .providers import ApiProviderError, generate_json_response, parse_generation_payload
 
 
 @dataclass(frozen=True)
@@ -147,6 +150,130 @@ class DeterministicCEOPlanner:
         return "收到。我會用 briefing action 保留這段脈絡，並在需要任務、記憶或批准時轉成明確 action。"
 
 
-def default_ceo_planner() -> CEOPlanner:
-    return DeterministicCEOPlanner()
+class LLMCEOPlanner:
+    def __init__(self, *, provider: str, model: str, fallback: CEOPlanner | None = None) -> None:
+        self.provider = provider
+        self.model = model
+        self.fallback = fallback or DeterministicCEOPlanner()
 
+    def plan(self, context: CEOPlannerContext) -> PlannerPlan:
+        prompt = self._build_prompt(context)
+        try:
+            response_text, _ = generate_json_response(provider=self.provider, model=self.model, prompt=prompt)
+            raw = parse_generation_payload(response_text)
+            plan = PlannerPlan.model_validate(raw)
+            return self._sanitize_plan(plan)
+        except (ApiProviderError, json.JSONDecodeError, ValueError, KeyError) as exc:
+            fallback = self.fallback.plan(context)
+            fallback.actions.append(
+                PlannerAction(
+                    type="briefing",
+                    status="applied",
+                    title="Planner fallback",
+                    body=f"LLM planner unavailable or invalid; deterministic planner used. Reason: {type(exc).__name__}",
+                    metadata={"provider": self.provider, "model": self.model},
+                )
+            )
+            return fallback
+
+    @staticmethod
+    def _build_prompt(context: CEOPlannerContext) -> str:
+        return "\n".join(
+            [
+                "You are the Praetor CEO planner.",
+                "Return valid JSON only. Do not include markdown.",
+                "Your job is to convert the chairman instruction into explicit planner actions.",
+                "",
+                "Allowed action types:",
+                "- mission_draft: create a planned mission for execution.",
+                "- approval_request: request a chairman decision checkpoint. Requires an existing mission_id.",
+                "- memory_update: write durable company memory.",
+                "- briefing: record status or context without side effects.",
+                "",
+                "Required JSON shape:",
+                "{",
+                '  "intent": "mission_draft|approval_request|memory_update|briefing",',
+                '  "response": "short CEO response to the chairman",',
+                '  "actions": [',
+                "    {",
+                '      "type": "mission_draft|approval_request|memory_update|briefing",',
+                '      "title": "short title",',
+                '      "body": "details",',
+                '      "mission_id": "optional existing mission id",',
+                '      "metadata": {}',
+                "    }",
+                "  ]",
+                "}",
+                "",
+                "Action metadata rules:",
+                '- mission_draft metadata may include "domains", "priority", "requested_outputs".',
+                '- approval_request metadata may include "category"; default category is "change_strategy".',
+                '- memory_update metadata may include "page"; default page is "CEO Memory.md".',
+                "",
+                f"Existing mission count: {context.mission_count}",
+                f"Pending approvals: {context.pending_approvals}",
+                f"Related mission id: {context.related_mission_id or 'none'}",
+                "",
+                "Chairman instruction:",
+                context.instruction,
+            ]
+        )
+
+    @staticmethod
+    def _sanitize_plan(plan: PlannerPlan) -> PlannerPlan:
+        actions: list[PlannerAction] = []
+        for action in plan.actions[:6]:
+            metadata = dict(action.metadata)
+            title = LLMCEOPlanner._clean_text(action.title, limit=120) or action.type.replace("_", " ").title()
+            body = LLMCEOPlanner._clean_text(action.body, limit=2000) if action.body else None
+            if action.type == "mission_draft":
+                domains = LLMCEOPlanner._clean_string_list(metadata.get("domains"), limit=6) or ["operations"]
+                priority = metadata.get("priority") or "normal"
+                if priority not in {"normal", "high", "critical"}:
+                    priority = "normal"
+                outputs = [
+                    item
+                    for item in LLMCEOPlanner._clean_string_list(metadata.get("requested_outputs"), limit=8)
+                    if LLMCEOPlanner._is_workspace_output(item)
+                ]
+                metadata.update({"domains": domains, "priority": priority, "requested_outputs": outputs})
+            elif action.type == "approval_request":
+                category = metadata.get("category") or "change_strategy"
+                allowed = {"delete_files", "overwrite_important_files", "external_communication", "spending_money", "change_strategy", "shell_commands"}
+                if category not in allowed:
+                    category = "change_strategy"
+                metadata["category"] = category
+            elif action.type == "memory_update":
+                page = str(metadata.get("page") or "CEO Memory.md").replace("/", "-").replace("\\", "-")
+                metadata["page"] = page or "CEO Memory.md"
+            actions.append(action.model_copy(update={"title": title, "body": body, "metadata": metadata}))
+        if not actions:
+            actions = [PlannerAction(type="briefing", title="Planner produced no action", body=plan.response)]
+        return plan.model_copy(update={"actions": actions})
+
+    @staticmethod
+    def _clean_text(value: str | None, *, limit: int) -> str:
+        return " ".join(str(value or "").split())[:limit]
+
+    @staticmethod
+    def _clean_string_list(value: object, *, limit: int) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        cleaned = []
+        for item in value[:limit]:
+            text = LLMCEOPlanner._clean_text(str(item), limit=240)
+            if text:
+                cleaned.append(text)
+        return cleaned
+
+    @staticmethod
+    def _is_workspace_output(path: str) -> bool:
+        if ".." in path or path.startswith(("/", "~")) and not path.startswith("/workspace/"):
+            return False
+        return bool(path)
+
+
+def default_ceo_planner() -> CEOPlanner:
+    if get_ceo_planner_mode() == "llm":
+        return LLMCEOPlanner(provider=get_ceo_planner_provider(), model=get_ceo_planner_model())
+    return DeterministicCEOPlanner()

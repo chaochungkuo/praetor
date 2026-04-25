@@ -54,6 +54,9 @@ jobs:
       - name: Office v2 smoke test
         run: pixi run office-smoke
 
+      - name: CEO planner smoke test
+        run: pixi run planner-smoke
+
       - name: Bridge smoke test
         run: pixi run bridge-smoke
 
