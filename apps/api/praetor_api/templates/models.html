@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="grid two">
+    <section class="panel">
+      <h3>Runtime health</h3>
+      <ul class="compact-list">
+        <li>Mode: {{ runtime_health.mode }}</li>
+        <li>Configured: {{ runtime_health.configured }}</li>
+        <li>Healthy: {{ runtime_health.healthy }}</li>
+        <li>Error: {{ runtime_health.error or 'none' }}</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h3>Usage by executor</h3>
+      {% if usage_summary.by_executor %}
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Executor</th>
+              <th>Runs</th>
+              <th>Input</th>
+              <th>Output</th>
+              <th>Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in usage_summary.by_executor %}
+              <tr>
+                <td>{{ item.executor }}</td>
+                <td>{{ item.runs }}</td>
+                <td>{{ item.input_tokens }}</td>
+                <td>{{ item.output_tokens }}</td>
+                <td>{{ '%.4f'|format(item.estimated_cost) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted">No usage records yet.</p>
+      {% endif %}
+    </section>
+  </section>
+  <section class="panel">
+    <h3>Recent runs</h3>
+    {% if usage_summary.runs %}
+      <div class="list">
+        {% for run in usage_summary.runs %}
+          <div class="list-row">
+            <div>
+              <strong>{{ run.executor }}</strong>
+              <div class="muted">{{ run.changed_files|join(', ') or 'no changed files recorded' }}</div>
+            </div>
+            <span class="status">{{ run.normalized_status }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No runs recorded yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

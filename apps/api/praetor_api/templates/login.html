@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel hero">
+    <h2>{{ t("owner_login") }}</h2>
+    <p>{{ t("owner_login_desc") }}</p>
+  </section>
+  <form class="panel form-grid" method="post" action="/app/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="next_path" value="{{ next_path }}" />
+    <label class="full">
+      <span>{{ t("password") }}</span>
+      <input type="password" name="password" required autofocus />
+    </label>
+    <div class="full actions">
+      <a class="small-button" href="/app/welcome">{{ t("back_to_welcome") }}</a>
+      <button type="submit">{{ t("login") }}</button>
+    </div>
+  </form>
+{% endblock %}

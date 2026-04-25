@@ -1,0 +1,36 @@
+services:
+  app:
+    environment:
+      PRAETOR_SESSION_SECRET: ""
+      PRAETOR_SETUP_TOKEN: ""
+      PRAETOR_BRIDGE_TOKEN: ""
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      PRAETOR_REQUIRE_LOGIN: ${PRAETOR_REQUIRE_LOGIN:-true}
+      PRAETOR_SECURE_COOKIE: ${PRAETOR_SECURE_COOKIE:-true}
+      PRAETOR_SESSION_SECRET_FILE: /run/secrets/praetor_session_secret
+      PRAETOR_SETUP_TOKEN_FILE: /run/secrets/praetor_setup_token
+      PRAETOR_BRIDGE_TOKEN_FILE: /run/secrets/praetor_bridge_token
+      PRAETOR_DEBUG_ROUTES: ${PRAETOR_DEBUG_ROUTES:-false}
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+    secrets:
+      - praetor_session_secret
+      - praetor_setup_token
+      - praetor_bridge_token
+      - openai_api_key
+      - anthropic_api_key
+    ports:
+      - "${PRAETOR_APP_BIND_HOST:-127.0.0.1}:${PRAETOR_APP_PORT:-9741}:8000"
+
+secrets:
+  praetor_session_secret:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_session_secret.txt
+  praetor_setup_token:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_setup_token.txt
+  praetor_bridge_token:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_bridge_token.txt
+  openai_api_key:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/openai_api_key.txt
+  anthropic_api_key:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/anthropic_api_key.txt

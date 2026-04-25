@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Pixi checks and smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@v0.9.0
+        with:
+          pixi-version: v0.41.4
+          cache: true
+
+      - name: Import and compile checks
+        run: pixi run check
+
+      - name: Security smoke test
+        run: pixi run app-security-smoke
+
+      - name: Auth smoke test
+        run: pixi run app-auth-smoke
+
+      - name: API mode smoke test
+        run: pixi run app-api-smoke
+
+      - name: Fallback runtime smoke test
+        run: pixi run app-fallback-smoke
+
+      - name: Split stack smoke test
+        run: pixi run stack-smoke
+
+      - name: Bridge smoke test
+        run: pixi run bridge-smoke
+
+      - name: Bridge e2e test
+        run: pixi run bridge-e2e

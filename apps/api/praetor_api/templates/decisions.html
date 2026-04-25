@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="grid two">
+    <section class="panel">
+      <h3>Decision items</h3>
+      {% if decision_items %}
+        <div class="list">
+          {% for item in decision_items %}
+            <div class="list-row">
+              <div>
+                <strong>{{ item.mission_title }}</strong>
+                <div class="muted">{{ item.text }}</div>
+              </div>
+              <a class="status" href="/app/missions/{{ item.mission_id }}">Open</a>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No structured decisions recorded yet.</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>Audit trail</h3>
+      {% if audit_events %}
+        <div class="list">
+          {% for event in audit_events %}
+            <div class="list-row">
+              <div>
+                <strong>{{ event.type }}</strong>
+                <div class="muted">{{ event.payload }}</div>
+              </div>
+              <span class="status">{{ event.ts }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No audit events recorded yet.</p>
+      {% endif %}
+    </section>
+  </section>
+{% endblock %}

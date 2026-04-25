@@ -1,0 +1,35 @@
+# Local environments and caches
+.pixi/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+
+# Local runtime state and private data
+workspace/
+data/
+config/
+secrets/
+backups/
+ollama/
+*.sqlite3
+*.db
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+*.egg-info/

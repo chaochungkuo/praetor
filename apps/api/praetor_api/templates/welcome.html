@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel hero">
+    <h2>{{ t("welcome_title") }}</h2>
+    <p>{{ t("welcome_desc") }}</p>
+  </section>
+
+  <section class="grid two">
+    <section class="panel">
+      <h3>{{ t("language_switch") }}</h3>
+      <div class="language-grid">
+        {% for code, label in language_options.items() %}
+          <a class="small-button {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next=%2Fapp%2Fwelcome">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      {% if not settings_initialized %}
+        <h3>{{ t("first_time_setup") }}</h3>
+        <p>{{ t("company_not_initialized") }}</p>
+        <div class="actions">
+          <a class="small-button" href="/app/praetor">{{ t("start_onboarding") }}</a>
+        </div>
+      {% else %}
+        <h3>{{ t("returning_owner") }}</h3>
+        <p>{{ t("owner_login_desc") }}</p>
+        <div class="actions">
+          <a class="small-button" href="/app/login">{{ t("go_to_login") }}</a>
+        </div>
+      {% endif %}
+    </section>
+  </section>
+{% endblock %}

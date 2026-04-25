@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://praetor.local/schemas/create_run_request.schema.json",
+  "title": "CreateRunRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string" },
+    "mission_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "executor": {
+      "type": "string",
+      "enum": ["codex", "claude_code"]
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "path_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "container_workspace_root": { "type": "string" },
+        "host_workspace_root": { "type": "string" },
+        "target_workdir": { "type": "string" }
+      },
+      "required": [
+        "container_workspace_root",
+        "host_workspace_root",
+        "target_workdir"
+      ]
+    },
+    "task_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "instructions": { "type": "string" },
+        "input_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expected_outputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "approval_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow_destructive_write": { "type": "boolean" },
+            "allow_shell": { "type": "boolean" }
+          },
+          "required": ["allow_destructive_write", "allow_shell"]
+        }
+      },
+      "required": [
+        "title",
+        "instructions",
+        "input_files",
+        "expected_outputs",
+        "approval_policy"
+      ]
+    }
+  },
+  "required": [
+    "request_id",
+    "mission_id",
+    "task_id",
+    "executor",
+    "timeout_seconds",
+    "path_mapping",
+    "task_spec"
+  ]
+}

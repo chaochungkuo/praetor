@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="grid two">
+    <section class="panel">
+      <h3>Recent execution runs</h3>
+      {% if recent_runs %}
+        <div class="list">
+          {% for run in recent_runs %}
+            <div class="list-row">
+              <div>
+                <strong>{{ run.executor }}</strong>
+                <div class="muted">{{ run.changed_files|join(', ') or 'no changed files recorded' }}</div>
+                <div class="muted">{{ run.stdout_tail or 'no stdout summary' }}</div>
+              </div>
+              <span class="status">{{ run.normalized_status }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No execution runs recorded yet.</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>Audit stream</h3>
+      {% if audit_events %}
+        <div class="list">
+          {% for event in audit_events %}
+            <div class="list-row">
+              <div>
+                <strong>{{ event.type }}</strong>
+                <div class="muted">{{ event.payload }}</div>
+              </div>
+              <span class="status">{{ event.ts }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No audit events recorded yet.</p>
+      {% endif %}
+    </section>
+  </section>
+{% endblock %}

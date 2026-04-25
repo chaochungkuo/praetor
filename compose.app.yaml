@@ -1,0 +1,35 @@
+name: praetor-app
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PRAETOR_APP_BIND_HOST:-127.0.0.1}:${PRAETOR_APP_PORT:-9741}:8000"
+    environment:
+      PRAETOR_STATE_DIR: /app/data/state
+      PRAETOR_REQUIRE_LOGIN: ${PRAETOR_REQUIRE_LOGIN:-true}
+      PRAETOR_SECURE_COOKIE: ${PRAETOR_SECURE_COOKIE:-false}
+      PRAETOR_SESSION_SECRET: ${PRAETOR_SESSION_SECRET:-praetor-dev-session-secret}
+      PRAETOR_SETUP_TOKEN: ${PRAETOR_SETUP_TOKEN:-}
+      PRAETOR_DEBUG_ROUTES: ${PRAETOR_DEBUG_ROUTES:-true}
+      PRAETOR_BRIDGE_BASE_URL: ${PRAETOR_BRIDGE_BASE_URL:-}
+      PRAETOR_BRIDGE_TOKEN: ${PRAETOR_BRIDGE_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PRAETOR_OPENAI_BASE_URL: ${PRAETOR_OPENAI_BASE_URL:-}
+      PRAETOR_ANTHROPIC_BASE_URL: ${PRAETOR_ANTHROPIC_BASE_URL:-}
+    volumes:
+      - type: bind
+        source: ${PRAETOR_WORKSPACE_DIR:-./workspace}
+        target: /app/workspace
+      - type: bind
+        source: ${PRAETOR_DATA_DIR:-./data}
+        target: /app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

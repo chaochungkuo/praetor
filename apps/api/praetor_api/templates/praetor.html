@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if not settings %}
+    <section class="panel hero">
+      <h2>{{ t("onboarding_meeting") }}</h2>
+      <p>{{ t("onboarding_desc") }}</p>
+    </section>
+    <section class="grid two">
+      <form class="panel onboarding-wizard" id="onboarding-wizard" method="post" action="/app/onboarding">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="setup_token" value="{{ setup_token }}" />
+        <div class="wizard-header">
+          <div>
+            <h3>{{ t("founder_to_praetor") }}</h3>
+            <p>{{ t("wizard_desc") }}</p>
+          </div>
+          <div class="wizard-meta">
+            <div class="pill">6 {{ t("steps") }}</div>
+            <div class="language-grid compact">
+              {% for code, label in language_options.items() %}
+                <a class="small-button {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next=%2Fapp%2Fpraetor">{{ label }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <section class="wizard-step active" data-step="1">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step1_prompt") }}</p>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>{{ t("owner_name") }}</span>
+              <input type="text" name="owner_name" value="{{ onboarding_defaults.owner_name }}" required />
+            </label>
+            <label>
+              <span>{{ t("owner_email") }}</span>
+              <input type="email" name="owner_email" value="{{ onboarding_defaults.owner_email }}" />
+            </label>
+            <label>
+              <span>{{ t("owner_password") }}</span>
+              <input type="password" name="owner_password" value="{{ onboarding_defaults.owner_password }}" required minlength="10" />
+            </label>
+            <label>
+              <span>{{ t("confirm_password") }}</span>
+              <input type="password" name="owner_password_confirm" value="{{ onboarding_defaults.owner_password_confirm }}" required minlength="10" />
+            </label>
+            <label class="full">
+              <span>{{ t("company_language") }}</span>
+              <select name="language" id="company-language-select">
+                <option value="en" {{ 'selected' if ui_language == 'en' else '' }}>English</option>
+                <option value="zh-TW" {{ 'selected' if ui_language == 'zh-TW' else '' }}>中文（繁體）</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="2">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step2_prompt") }}</p>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>{{ t("leadership") }}</span>
+              <select name="leadership_style">
+                <option value="strategic">{{ t("opt_strategic") }}</option>
+                <option value="hands_on">{{ t("opt_hands_on") }}</option>
+                <option value="delegator">{{ t("opt_delegator") }}</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ t("decision_style") }}</span>
+              <select name="decision_style">
+                <option value="balanced">{{ t("opt_balanced") }}</option>
+                <option value="careful">{{ t("opt_careful") }}</option>
+                <option value="fast">{{ t("opt_fast") }}</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ t("organization_style") }}</span>
+              <select name="organization_style">
+                <option value="lean">{{ t("opt_lean") }}</option>
+                <option value="structured">{{ t("opt_structured") }}</option>
+                <option value="flexible">{{ t("opt_flexible") }}</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ t("autonomy") }}</span>
+              <select name="autonomy_mode">
+                <option value="hybrid">{{ t("opt_hybrid") }}</option>
+                <option value="strict">{{ t("opt_strict") }}</option>
+                <option value="autonomous">{{ t("opt_autonomous") }}</option>
+              </select>
+            </label>
+            <label class="full">
+              <span>{{ t("risk_priority") }}</span>
+              <select name="risk_priority">
+                <option value="avoid_wrong_decisions">Avoid wrong decisions</option>
+                <option value="avoid_being_slow">Avoid being slow</option>
+                <option value="avoid_losing_information">Avoid losing information</option>
+                <option value="avoid_acting_without_approval">Avoid acting without approval</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="3">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step3_prompt") }}</p>
+          </div>
+          <div class="form-grid">
+            <label class="full">
+              <span>{{ t("workspace_root") }}</span>
+              <input type="text" name="workspace_root" value="{{ onboarding_defaults.workspace_root }}" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="4">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step4_prompt") }}</p>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>{{ t("runtime_mode") }}</span>
+              <select name="runtime_mode">
+                <option value="api">{{ t("opt_api") }}</option>
+                <option value="subscription_executor">{{ t("opt_subscription_executor") }}</option>
+                <option value="local_model">{{ t("opt_local_model") }}</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ t("provider") }}</span>
+              <select name="runtime_provider">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ t("model") }}</span>
+              <input type="text" name="runtime_model" value="{{ onboarding_defaults.runtime_model }}" />
+            </label>
+            <label>
+              <span>{{ t("executor") }}</span>
+              <select name="runtime_executor">
+                <option value="codex">Codex</option>
+                <option value="claude_code">Claude Code</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="5">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step5_prompt") }}</p>
+          </div>
+          <fieldset class="full">
+            <legend>{{ t("always_require_approval") }}</legend>
+            <div class="checkbox-grid">
+              {% for item in onboarding_defaults.require_approval %}
+                <label class="check">
+                  <input type="checkbox" name="require_approval" value="{{ item }}" checked />
+                  <span>{{ item }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="wizard-step" data-step="6">
+          <div class="message praetor-message">
+            <strong>Praetor</strong>
+            <p>{{ t("step6_prompt") }}</p>
+          </div>
+          <div class="wizard-summary">
+            <div><span>{{ t("summary_language") }}</span><strong data-summary="language">{{ ui_language }}</strong></div>
+            <div><span>{{ t("summary_leadership") }}</span><strong data-summary="leadership_style">strategic</strong></div>
+            <div><span>{{ t("summary_decision_style") }}</span><strong data-summary="decision_style">balanced</strong></div>
+            <div><span>{{ t("summary_organization") }}</span><strong data-summary="organization_style">lean</strong></div>
+            <div><span>{{ t("summary_autonomy") }}</span><strong data-summary="autonomy_mode">hybrid</strong></div>
+            <div><span>{{ t("summary_runtime") }}</span><strong data-summary="runtime_mode">api</strong></div>
+            <div><span>{{ t("summary_provider") }}</span><strong data-summary="runtime_provider">openai</strong></div>
+            <div><span>{{ t("summary_executor") }}</span><strong data-summary="runtime_executor">codex</strong></div>
+          </div>
+        </section>
+
+        <div class="wizard-actions">
+          <button type="button" id="wizard-back" class="secondary" disabled>{{ t("wizard_back") }}</button>
+          <button type="button" id="wizard-next">{{ t("wizard_next") }}</button>
+          <button type="submit" id="wizard-submit" class="hidden">{{ t("wizard_submit") }}</button>
+        </div>
+      </form>
+
+      <section class="panel">
+        <h3>{{ t("praetor_recommendation") }}</h3>
+        <div class="message founder-message">
+          <strong>{{ t("founder_label") }}</strong>
+          <p>{{ t("founder_statement") }}</p>
+        </div>
+        <div class="message praetor-message">
+          <strong>Praetor</strong>
+          <p>{{ t("praetor_statement") }}</p>
+        </div>
+        <ul class="compact-list">
+          <li>{{ t("principle_1") }}</li>
+          <li>{{ t("principle_2") }}</li>
+          <li>{{ t("principle_3") }}</li>
+          <li>{{ t("principle_4") }}</li>
+        </ul>
+      </section>
+    </section>
+    <script>
+      (() => {
+        const wizard = document.getElementById("onboarding-wizard");
+        if (!wizard) return;
+        const languageSelect = document.getElementById("company-language-select");
+        const steps = Array.from(wizard.querySelectorAll(".wizard-step"));
+        const back = document.getElementById("wizard-back");
+        const next = document.getElementById("wizard-next");
+        const submit = document.getElementById("wizard-submit");
+        const summaryKeys = [
+          "language",
+          "leadership_style",
+          "decision_style",
+          "organization_style",
+          "autonomy_mode",
+          "runtime_mode",
+          "runtime_provider",
+          "runtime_executor",
+        ];
+        let index = 0;
+
+        function updateSummary() {
+          for (const key of summaryKeys) {
+            const target = wizard.querySelector(`[data-summary="${key}"]`);
+            const source = wizard.elements.namedItem(key);
+            if (!target || !source) continue;
+            target.textContent = source.value || "-";
+          }
+        }
+
+        function render() {
+          steps.forEach((step, stepIndex) => step.classList.toggle("active", stepIndex === index));
+          back.disabled = index === 0;
+          next.classList.toggle("hidden", index === steps.length - 1);
+          submit.classList.toggle("hidden", index !== steps.length - 1);
+          updateSummary();
+        }
+
+        back.addEventListener("click", () => {
+          if (index > 0) {
+            index -= 1;
+            render();
+          }
+        });
+        next.addEventListener("click", () => {
+          if (index < steps.length - 1) {
+            index += 1;
+            render();
+          }
+        });
+
+        wizard.addEventListener("change", updateSummary);
+        languageSelect?.addEventListener("change", (event) => {
+          const selected = event.target.value;
+          window.location.href = `/app/set-language/${selected}?next=%2Fapp%2Fpraetor`;
+        });
+        render();
+      })();
+    </script>
+  {% else %}
+    <section class="panel hero">
+      <h2>Praetor briefing</h2>
+      <p>You define direction and approval boundaries. Praetor manages execution, memory, and reporting.</p>
+    </section>
+    <section class="grid two">
+      <section class="panel">
+        <h3>Create mission</h3>
+        <form class="form-grid" method="post" action="/app/missions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <label class="full">
+            <span>Mission title</span>
+            <input type="text" name="title" placeholder="Create first project" required />
+          </label>
+          <label class="full">
+            <span>Summary</span>
+            <textarea name="summary" rows="4" placeholder="Bootstrap a first project workspace and initial plan."></textarea>
+          </label>
+          <label>
+            <span>Domain</span>
+            <select name="domain">
+              <option value="operations">Operations</option>
+              <option value="development">Development</option>
+              <option value="finance">Finance</option>
+            </select>
+          </label>
+          <label>
+            <span>Priority</span>
+            <select name="priority">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </label>
+          <label class="full">
+            <span>Requested outputs (one per line)</span>
+            <textarea name="requested_outputs" rows="4" placeholder="/workspace/Projects/Alpha/PROJECT.md"></textarea>
+          </label>
+          <div class="full actions">
+            <button type="submit">Create mission</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <h3>Company DNA</h3>
+        <ul class="compact-list">
+          <li>Language: {{ settings.company_dna.language }}</li>
+          <li>Leadership: {{ settings.company_dna.leadership_style }}</li>
+          <li>Decision style: {{ settings.company_dna.decision_style }}</li>
+          <li>Organization: {{ settings.company_dna.organization_style }}</li>
+          <li>Autonomy: {{ settings.company_dna.autonomy_mode }}</li>
+        </ul>
+      </section>
+    </section>
+    <section class="panel">
+      <h3>Suggested first tasks</h3>
+      <div class="grid two">
+        {% for starter in starter_missions %}
+          <form class="panel" method="post" action="/app/missions">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <h4>{{ starter.title }}</h4>
+            <p>{{ starter.summary }}</p>
+            <input type="hidden" name="title" value="{{ starter.title }}" />
+            <input type="hidden" name="summary" value="{{ starter.summary }}" />
+            <input type="hidden" name="domain" value="{{ starter.domain }}" />
+            <input type="hidden" name="priority" value="{{ starter.priority }}" />
+            <input type="hidden" name="requested_outputs" value="{{ starter.requested_outputs }}" />
+            <div class="actions">
+              <button type="submit" class="secondary">Create starter mission</button>
+            </div>
+          </form>
+        {% endfor %}
+      </div>
+    </section>
+    <section class="panel">
+      <h3>Recent missions</h3>
+      {% if missions %}
+        <div class="list">
+          {% for mission in missions %}
+            <a class="list-row" href="/app/missions/{{ mission.id }}">
+              <div>
+                <strong>{{ mission.title }}</strong>
+                <div class="muted">{{ mission.summary or 'No summary yet.' }}</div>
+              </div>
+              <span class="status">{{ mission.status }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No missions yet. Create the first one above.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

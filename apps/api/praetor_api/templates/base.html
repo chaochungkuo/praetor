@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="{{ ui_language }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title }} · Praetor</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">P</div>
+          <div>
+            <div class="brand-name">Praetor</div>
+            <div class="brand-tag">{{ t("brand_tag") }}</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="{{ 'active' if current_page == 'praetor' else '' }}" href="/app/praetor">{{ t("nav_praetor") }}</a>
+          <a class="{{ 'active' if current_page == 'overview' else '' }}" href="/app/overview">{{ t("nav_overview") }}</a>
+          <a class="{{ 'active' if current_page == 'tasks' else '' }}" href="/app/tasks">{{ t("nav_tasks") }}</a>
+          <a class="{{ 'active' if current_page == 'activity' else '' }}" href="/app/activity">{{ t("nav_activity") }}</a>
+          <a class="{{ 'active' if current_page == 'memory' else '' }}" href="/app/memory">{{ t("nav_memory") }}</a>
+          <a class="{{ 'active' if current_page == 'decisions' else '' }}" href="/app/decisions">{{ t("nav_decisions") }}</a>
+          <a class="{{ 'active' if current_page == 'models' else '' }}" href="/app/models">{{ t("nav_models") }}</a>
+          <a class="{{ 'active' if current_page == 'meetings' else '' }}" href="/app/meetings">{{ t("nav_meetings") }}</a>
+          <a class="{{ 'active' if current_page == 'settings' else '' }}" href="/app/settings">{{ t("nav_settings") }}</a>
+        </nav>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>{{ page_title }}</h1>
+            {% if settings %}
+              <p>{{ settings.owner.name }} · {{ settings.company_dna.organization_style|replace('_', ' ') }} company</p>
+            {% else %}
+              <p>{{ t("founder_command_center") }}</p>
+            {% endif %}
+          </div>
+          <div class="status-pills">
+            <div class="language-switch">
+              {% for code, label in language_options.items() %}
+                <a class="small-button {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next={{ current_url_quoted }}">{{ label }}</a>
+              {% endfor %}
+            </div>
+            {% if authenticated %}
+              <span class="pill">{{ session_owner or t("owner") }}</span>
+              <form method="post" action="/app/logout">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button type="submit" class="small secondary">{{ t("logout") }}</button>
+              </form>
+            {% elif settings_initialized %}
+              <a class="small-button" href="/app/login">{{ t("login") }}</a>
+            {% endif %}
+            <span class="pill {{ 'ok' if runtime_ready else 'warn' }}">
+              {{ t("runtime_ready") if runtime_ready else t("runtime_not_configured") }}
+            </span>
+            {% if settings %}
+              <span class="pill">{{ settings.runtime.mode }}</span>
+              <span class="pill">{{ settings.runtime.executor or settings.runtime.provider or settings.runtime.model or 'default' }}</span>
+            {% endif %}
+          </div>
+        </header>
+
+        {% if flash %}
+          <section class="flash flash-{{ flash_level }}">{{ flash }}</section>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+      </main>
+      <aside class="rail">
+        <section class="panel">
+          <h3>{{ t("executive_rail") }}</h3>
+          {% if briefing %}
+            <ul class="metric-list">
+              <li><span>{{ t("active_missions") }}</span><strong>{{ briefing.active_missions }}</strong></li>
+              <li><span>{{ t("paused_missions") }}</span><strong>{{ briefing.paused_missions }}</strong></li>
+              <li><span>{{ t("approvals_pending") }}</span><strong>{{ briefing.approvals_pending }}</strong></li>
+            </ul>
+          {% else %}
+            <p class="muted">{{ t("complete_onboarding_notice") }}</p>
+          {% endif %}
+        </section>
+        <section class="panel">
+          <h3>{{ t("pending_approvals") }}</h3>
+          {% if approvals %}
+            <div class="list">
+              {% for approval in approvals[:5] %}
+                <div class="list-row">
+                  <div>
+                    <strong>{{ approval.category }}</strong>
+                    <div class="muted">{{ approval.reason }}</div>
+                  </div>
+                  <div class="inline-actions">
+                    <form method="post" action="/app/approvals/{{ approval.id }}/approved">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                      <button type="submit" class="small">{{ t("approve") }}</button>
+                    </form>
+                    <form method="post" action="/app/approvals/{{ approval.id }}/rejected">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                      <button type="submit" class="small secondary">{{ t("reject") }}</button>
+                    </form>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">{{ t("no_pending_approvals") }}</p>
+          {% endif %}
+        </section>
+        <section class="panel">
+          <h3>{{ t("runtime") }}</h3>
+          <ul class="metric-list">
+            <li><span>{{ t("bridge_url") }}</span><strong>{{ bridge_base_url or 'not set' }}</strong></li>
+            <li><span>{{ t("mode") }}</span><strong>{{ settings.runtime.mode if settings else 'n/a' }}</strong></li>
+          </ul>
+        </section>
+        <section class="panel">
+          <h3>{{ t("principles") }}</h3>
+          {% if settings %}
+            <ul class="compact-list">
+              {% for principle in settings.company_dna.operating_principles[:5] %}
+                <li>{{ principle }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted">{{ t("principles_notice") }}</p>
+          {% endif %}
+        </section>
+      </aside>
+    </div>
+  </body>
+</html>

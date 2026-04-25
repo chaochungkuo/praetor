@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile Briefing · Praetor</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}" />
+  </head>
+  <body class="mobile-body">
+    <main class="mobile-shell">
+      <section class="panel hero">
+        <h1>Praetor mobile briefing</h1>
+        <p>{{ settings.owner.name }} · quick executive view</p>
+      </section>
+
+      {% if flash %}
+        <section class="flash flash-{{ flash_level }}">{{ flash }}</section>
+      {% endif %}
+
+      <section class="panel">
+        <h2>Today</h2>
+        <ul class="metric-list">
+          <li><span>Active missions</span><strong>{{ briefing.active_missions if briefing else 0 }}</strong></li>
+          <li><span>Paused missions</span><strong>{{ briefing.paused_missions if briefing else 0 }}</strong></li>
+          <li><span>Pending approvals</span><strong>{{ briefing.approvals_pending if briefing else 0 }}</strong></li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Pending approvals</h2>
+        {% if approvals %}
+          <div class="list">
+            {% for approval in approvals[:5] %}
+              <div class="list-row">
+                <div>
+                  <strong>{{ approval.category }}</strong>
+                  <div class="muted">{{ approval.reason }}</div>
+                </div>
+                <div class="inline-actions">
+                  <form method="post" action="/app/approvals/{{ approval.id }}/approved">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <button type="submit" class="small">Approve</button>
+                  </form>
+                  <form method="post" action="/app/approvals/{{ approval.id }}/rejected">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <button type="submit" class="small secondary">Reject</button>
+                  </form>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No approvals waiting.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Mission briefing</h2>
+        {% if missions %}
+          <div class="list">
+            {% for mission in missions %}
+              <a class="list-row" href="/app/missions/{{ mission.id }}">
+                <div>
+                  <strong>{{ mission.title }}</strong>
+                  <div class="muted">{{ mission.summary or 'No summary yet.' }}</div>
+                </div>
+                <span class="status">{{ mission.status }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No missions yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Quick links</h2>
+        <div class="mobile-actions">
+          <a class="small-button" href="/app/praetor">Praetor</a>
+          <a class="small-button" href="/app/tasks">Tasks</a>
+          <a class="small-button" href="/app/models">Models</a>
+          <form method="post" action="/app/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="small secondary">Logout</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

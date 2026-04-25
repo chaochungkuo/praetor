@@ -1,0 +1,461 @@
+openapi: 3.1.0
+info:
+  title: praetor-execd API
+  version: 0.1.0
+  description: Host-side executor bridge for Praetor subscription executor mode.
+servers:
+  - url: http://127.0.0.1:9417
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Bridge health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Health response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+  /executors:
+    get:
+      summary: Executor registry and health summary
+      operationId: getExecutors
+      responses:
+        "200":
+          description: Executor summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutorsEnvelope"
+  /runs:
+    post:
+      summary: Create a new run
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
+      responses:
+        "200":
+          description: Accepted run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateRunEnvelope"
+        "400":
+          description: Validation or permission error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /runs/{run_id}:
+    get:
+      summary: Get run status
+      operationId: getRun
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /runs/{run_id}/events:
+    get:
+      summary: Get run events
+      operationId: getRunEvents
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after_seq
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Run events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEventsEnvelope"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /runs/{run_id}/cancel:
+    post:
+      summary: Cancel a run
+      operationId: cancelRun
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancellation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelRunEnvelope"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    EnvelopeError:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: false
+        data:
+          type: "null"
+        error:
+          $ref: "#/components/schemas/EnvelopeError"
+      required: [ok, data, error]
+    PathMapping:
+      type: object
+      additionalProperties: false
+      properties:
+        container_workspace_root:
+          type: string
+        host_workspace_root:
+          type: string
+        target_workdir:
+          type: string
+      required: [container_workspace_root, host_workspace_root, target_workdir]
+    ApprovalPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        allow_destructive_write:
+          type: boolean
+        allow_shell:
+          type: boolean
+      required: [allow_destructive_write, allow_shell]
+    TaskSpec:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+        instructions:
+          type: string
+        input_files:
+          type: array
+          items:
+            type: string
+        expected_outputs:
+          type: array
+          items:
+            type: string
+        approval_policy:
+          $ref: "#/components/schemas/ApprovalPolicy"
+      required: [title, instructions, input_files, expected_outputs, approval_policy]
+    CreateRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+        mission_id:
+          type: string
+        task_id:
+          type: string
+        executor:
+          type: string
+          enum: [codex, claude_code]
+        timeout_seconds:
+          type: integer
+          minimum: 1
+        path_mapping:
+          $ref: "#/components/schemas/PathMapping"
+        task_spec:
+          $ref: "#/components/schemas/TaskSpec"
+      required:
+        - request_id
+        - mission_id
+        - task_id
+        - executor
+        - timeout_seconds
+        - path_mapping
+        - task_spec
+    UsageSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        duration_ms:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        estimated_cost:
+          type: number
+        usage_available:
+          type: boolean
+      required: [duration_ms, usage_available]
+    RunEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        seq:
+          type: integer
+          minimum: 1
+        type:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        run_id:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+      required: [seq, type, ts, run_id, data]
+    RunRecord:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id:
+          type: string
+        request_id:
+          type: string
+        mission_id:
+          type: string
+        task_id:
+          type: string
+        executor:
+          type: string
+        status:
+          type: string
+        normalized_status:
+          type: [string, "null"]
+        requires_owner_action:
+          type: boolean
+        pause_reason:
+          type: [string, "null"]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+        exit_code:
+          type: [integer, "null"]
+        host_workdir:
+          type: string
+        changed_files:
+          type: array
+          items:
+            type: string
+        stdout_tail:
+          type: [string, "null"]
+        stderr_tail:
+          type: [string, "null"]
+        usage:
+          $ref: "#/components/schemas/UsageSummary"
+      required:
+        - run_id
+        - request_id
+        - mission_id
+        - task_id
+        - executor
+        - status
+        - normalized_status
+        - requires_owner_action
+        - pause_reason
+        - started_at
+        - finished_at
+        - exit_code
+        - host_workdir
+        - changed_files
+        - stdout_tail
+        - stderr_tail
+        - usage
+    HealthEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            status:
+              type: string
+            version:
+              type: string
+            uptime_seconds:
+              type: number
+            configured_executors:
+              type: array
+              items:
+                type: string
+          required: [status, version, uptime_seconds, configured_executors]
+        error:
+          type: "null"
+      required: [ok, data, error]
+    ExecutorSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        binary_found:
+          type: boolean
+        login_state:
+          type: string
+        supports_noninteractive_batch:
+          type: boolean
+        supports_cancel:
+          type: boolean
+      required:
+        - name
+        - enabled
+        - binary_found
+        - login_state
+        - supports_noninteractive_batch
+        - supports_cancel
+    ExecutorsEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            executors:
+              type: array
+              items:
+                $ref: "#/components/schemas/ExecutorSummary"
+          required: [executors]
+        error:
+          type: "null"
+      required: [ok, data, error]
+    CreateRunEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            run_id:
+              type: string
+            status:
+              type: string
+            executor:
+              type: string
+          required: [run_id, status, executor]
+        error:
+          type: "null"
+      required: [ok, data, error]
+    RunEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/RunRecord"
+        error:
+          type: "null"
+      required: [ok, data, error]
+    RunEventsEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            events:
+              type: array
+              items:
+                $ref: "#/components/schemas/RunEvent"
+            next_seq:
+              type: integer
+              minimum: 1
+          required: [events, next_seq]
+        error:
+          type: "null"
+      required: [ok, data, error]
+    CancelRunEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            run_id:
+              type: string
+            status:
+              type: string
+            accepted:
+              type: boolean
+          required: [run_id, status, accepted]
+        error:
+          type: "null"
+      required: [ok, data, error]

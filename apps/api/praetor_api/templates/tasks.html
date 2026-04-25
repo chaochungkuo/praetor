@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h2>Mission board</h2>
+    {% if missions %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Mission</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Domains</th>
+            <th>Updated</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mission in missions %}
+            <tr>
+              <td>
+                <a href="/app/missions/{{ mission.id }}"><strong>{{ mission.title }}</strong></a>
+                <div class="muted">{{ mission.summary or '' }}</div>
+              </td>
+              <td><span class="status">{{ mission.status }}</span></td>
+              <td>{{ mission.priority }}</td>
+              <td>{{ mission.domains|join(', ') }}</td>
+              <td>{{ mission.updated_at }}</td>
+              <td class="table-actions">
+                <form method="post" action="/app/missions/{{ mission.id }}/run">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <button type="submit">Run</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">No missions available.</p>
+    {% endif %}
+  </section>
+{% endblock %}

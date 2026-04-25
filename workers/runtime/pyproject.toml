@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "praetor-runtime"
+version = "0.1.0"
+description = "Praetor worker-side runtime helpers"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "httpx>=0.27.0,<1.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["praetor_runtime*"]

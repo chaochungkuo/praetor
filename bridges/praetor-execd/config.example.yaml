@@ -1,0 +1,38 @@
+server:
+  host: 127.0.0.1
+  port: 9417
+  auth_token: env:PRAETOR_EXECUTOR_BRIDGE_TOKEN
+
+paths:
+  host_workspace_root: /absolute/path/to/praetor/workspace
+  allowed_roots:
+    - /absolute/path/to/praetor/workspace
+  deny_roots:
+    - /absolute/path/to/praetor/workspace/Archive
+    - /absolute/path/to/praetor/workspace/.praetor/secrets
+
+executors:
+  codex:
+    enabled: true
+    command: codex
+    args: []
+    healthcheck: ["codex", "exec", "--help"]
+    requires_login: true
+    supports_noninteractive_batch: true
+    supports_cancel: true
+
+  claude_code:
+    enabled: true
+    command: claude
+    args: []
+    healthcheck: ["claude", "--help"]
+    requires_login: true
+    supports_noninteractive_batch: true
+    supports_cancel: true
+
+runtime:
+  max_concurrent_runs: 2
+  default_timeout_seconds: 1800
+  max_event_buffer: 5000
+  persist_run_logs: true
+  log_dir: /absolute/path/to/praetor/workspace/.praetor/bridge-logs

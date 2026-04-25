@@ -1,0 +1,822 @@
+from __future__ import annotations
+
+from pathlib import Path
+from urllib.parse import quote
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from .config import get_bridge_base_url
+from .models import (
+    ApprovalCreateRequest,
+    LoginRequest,
+    MissionContinueRequest,
+    MissionCreateRequest,
+    MissionPauseRequest,
+    MissionStopRequest,
+    OnboardingAnswers,
+)
+from .security import csrf_token, login_rate_limiter, require_csrf, require_setup_token
+
+
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+router = APIRouter(include_in_schema=False)
+
+UI_COOKIE_NAME = "praetor_ui_lang"
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "zh-TW": "中文（繁體）",
+}
+TRANSLATIONS = {
+    "en": {
+        "nav_praetor": "Praetor",
+        "nav_overview": "Overview",
+        "nav_tasks": "Tasks",
+        "nav_activity": "Activity",
+        "nav_memory": "Memory",
+        "nav_decisions": "Decisions",
+        "nav_models": "Models",
+        "nav_meetings": "Meetings",
+        "nav_settings": "Settings",
+        "brand_tag": "Run your company with an AI CEO",
+        "founder_command_center": "Founder command center",
+        "runtime_ready": "Runtime ready",
+        "runtime_not_configured": "Runtime not configured",
+        "login": "Login",
+        "logout": "Logout",
+        "owner": "Owner",
+        "executive_rail": "Executive Rail",
+        "active_missions": "Active missions",
+        "paused_missions": "Paused missions",
+        "approvals_pending": "Approvals pending",
+        "complete_onboarding_notice": "Complete onboarding to activate company controls.",
+        "pending_approvals": "Pending approvals",
+        "no_pending_approvals": "No pending approvals.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "runtime": "Runtime",
+        "bridge_url": "Bridge URL",
+        "mode": "Mode",
+        "principles": "Principles",
+        "principles_notice": "Praetor will derive company DNA during onboarding.",
+        "owner_login": "Owner login",
+        "owner_login_desc": "Praetor protects the company workspace behind the owner account. Sign in to continue.",
+        "password": "Password",
+        "welcome_title": "Welcome to Praetor",
+        "welcome_desc": "Choose your language first. Then either initialize the company or sign in as the returning owner.",
+        "first_time_setup": "First-time setup",
+        "continue_setup": "Continue setup",
+        "returning_owner": "Returning owner login",
+        "company_not_initialized": "This company is not initialized yet. Start with first-time setup.",
+        "language_switch": "Language",
+        "start_onboarding": "Start onboarding",
+        "go_to_login": "Go to login",
+        "back_to_welcome": "Back to welcome",
+        "onboarding_meeting": "Praetor onboarding meeting",
+        "onboarding_desc": "Praetor will help define your company step by step. You answer as the founder. Praetor translates that into company DNA, governance, roles, and runtime configuration.",
+        "founder_to_praetor": "Founder to Praetor",
+        "wizard_desc": "We will define language, leadership, authority, memory, and runtime in six short steps.",
+        "steps": "steps",
+        "owner_name": "Owner name",
+        "owner_email": "Owner email",
+        "owner_password": "Owner password",
+        "confirm_password": "Confirm password",
+        "company_language": "Company language",
+        "leadership": "Leadership",
+        "decision_style": "Decision style",
+        "organization_style": "Organization style",
+        "autonomy": "Autonomy",
+        "risk_priority": "Risk priority",
+        "workspace_root": "Workspace root",
+        "runtime_mode": "Runtime mode",
+        "provider": "Provider",
+        "model": "Model",
+        "executor": "Executor",
+        "always_require_approval": "Always require approval",
+        "wizard_next": "Next",
+        "wizard_back": "Back",
+        "wizard_submit": "Initialize Praetor",
+        "praetor_recommendation": "Praetor recommendation",
+        "step1_prompt": "First, tell me who owns this company and how I should address its working language.",
+        "step2_prompt": "How do you want to lead? This determines how often I interrupt you and how much authority I hold by default.",
+        "step3_prompt": "Where should this company work? I will only read and write inside the approved workspace.",
+        "step4_prompt": "Choose how this company should think and execute: API models, your existing subscription tools, or local models.",
+        "step5_prompt": "Define the boundaries that always require your approval. These become the core governance rules for your AI company.",
+        "step6_prompt": "I’m ready to initialize the company. Review the operating model, then create your workspace and founder account.",
+        "summary_language": "Language",
+        "summary_leadership": "Leadership",
+        "summary_decision_style": "Decision style",
+        "summary_organization": "Organization",
+        "summary_autonomy": "Autonomy",
+        "summary_runtime": "Runtime",
+        "summary_provider": "Provider",
+        "summary_executor": "Executor",
+        "founder_statement": "I want a company where AI agents can manage other AI agents with clear goals, responsibilities, and authority.",
+        "praetor_statement": "I will translate your answers into company DNA, role boundaries, approval rules, and a runtime that can safely delegate work downward while escalating decisions upward.",
+        "founder_label": "Founder",
+        "opt_strategic": "Strategic",
+        "opt_hands_on": "Hands-on",
+        "opt_delegator": "Delegator",
+        "opt_balanced": "Balanced",
+        "opt_careful": "Careful",
+        "opt_fast": "Fast",
+        "opt_lean": "Lean",
+        "opt_structured": "Structured",
+        "opt_flexible": "Flexible",
+        "opt_hybrid": "Hybrid",
+        "opt_strict": "Strict",
+        "opt_autonomous": "Autonomous",
+        "opt_api": "API",
+        "opt_subscription_executor": "Subscription executor",
+        "opt_local_model": "Local model",
+        "principle_1": "Execution flows downward.",
+        "principle_2": "Decisions escalate upward.",
+        "principle_3": "Memory belongs to the company, not individual agents.",
+        "principle_4": "Praetor manages roles and hierarchy, not equal-agent debate.",
+    },
+    "zh-TW": {
+        "nav_praetor": "Praetor",
+        "nav_overview": "總覽",
+        "nav_tasks": "任務",
+        "nav_activity": "動態",
+        "nav_memory": "記憶",
+        "nav_decisions": "決策",
+        "nav_models": "模型",
+        "nav_meetings": "會議",
+        "nav_settings": "設定",
+        "brand_tag": "用 AI CEO 經營你的公司",
+        "founder_command_center": "創辦人控制台",
+        "runtime_ready": "執行環境已就緒",
+        "runtime_not_configured": "執行環境尚未設定",
+        "login": "登入",
+        "logout": "登出",
+        "owner": "擁有者",
+        "executive_rail": "董事長欄",
+        "active_missions": "進行中任務",
+        "paused_missions": "暫停任務",
+        "approvals_pending": "待核准事項",
+        "complete_onboarding_notice": "完成初始化後即可啟動公司控制台。",
+        "pending_approvals": "待核准事項",
+        "no_pending_approvals": "目前沒有待核准事項。",
+        "approve": "批准",
+        "reject": "拒絕",
+        "runtime": "執行環境",
+        "bridge_url": "Bridge 位址",
+        "mode": "模式",
+        "principles": "運作原則",
+        "principles_notice": "Praetor 會在初始化過程中建立公司 DNA。",
+        "owner_login": "擁有者登入",
+        "owner_login_desc": "Praetor 會用擁有者帳號保護整個公司工作區。登入後再繼續。",
+        "password": "密碼",
+        "welcome_title": "歡迎使用 Praetor",
+        "welcome_desc": "請先選擇語言，再決定要首次初始化公司，或以回訪擁有者身份登入。",
+        "first_time_setup": "首次設定",
+        "continue_setup": "繼續設定",
+        "returning_owner": "回訪擁有者登入",
+        "company_not_initialized": "這家公司尚未初始化，請先完成首次設定。",
+        "language_switch": "語言",
+        "start_onboarding": "開始初始化",
+        "go_to_login": "前往登入",
+        "back_to_welcome": "回到首頁",
+        "onboarding_meeting": "Praetor 初始化會議",
+        "onboarding_desc": "Praetor 會一步一步協助你定義公司。你用創辦人的角度回答，Praetor 會把答案整理成公司 DNA、治理規則、角色結構與執行環境設定。",
+        "founder_to_praetor": "創辦人對 Praetor",
+        "wizard_desc": "我們會用六個簡短步驟定義語言、領導風格、權責邊界、記憶架構與執行環境。",
+        "steps": "步",
+        "owner_name": "擁有者名稱",
+        "owner_email": "擁有者 Email",
+        "owner_password": "擁有者密碼",
+        "confirm_password": "確認密碼",
+        "company_language": "公司語言",
+        "leadership": "領導方式",
+        "decision_style": "決策風格",
+        "organization_style": "組織風格",
+        "autonomy": "自主程度",
+        "risk_priority": "風險優先",
+        "workspace_root": "工作區路徑",
+        "runtime_mode": "執行模式",
+        "provider": "模型供應商",
+        "model": "模型",
+        "executor": "執行器",
+        "always_require_approval": "這些行為一定要先經過你的批准",
+        "wizard_next": "下一步",
+        "wizard_back": "上一步",
+        "wizard_submit": "初始化 Praetor",
+        "praetor_recommendation": "Praetor 建議",
+        "step1_prompt": "先告訴我這家公司由誰擁有，以及整體要使用什麼語言運作。",
+        "step2_prompt": "你希望怎麼領導這家公司？這會影響我打擾你的頻率，以及我預設可持有多少主權。",
+        "step3_prompt": "這家公司應該在哪裡工作？我只會在你批准的工作區裡讀寫。",
+        "step4_prompt": "選擇公司要如何思考與執行：API 模型、你現有的訂閱工具，或本地模型。",
+        "step5_prompt": "定義哪些事情一定要先問你。這些會成為 AI 公司的核心治理規則。",
+        "step6_prompt": "我已經準備好初始化公司。請確認這套運作模型，然後建立工作區與擁有者帳號。",
+        "summary_language": "語言",
+        "summary_leadership": "領導方式",
+        "summary_decision_style": "決策風格",
+        "summary_organization": "組織風格",
+        "summary_autonomy": "自主程度",
+        "summary_runtime": "執行模式",
+        "summary_provider": "供應商",
+        "summary_executor": "執行器",
+        "founder_statement": "我想要一間公司，裡面的 AI agent 可以管理其他 AI agent，而且要有明確的目標、責任和權限階層。",
+        "praetor_statement": "我會把你的答案轉換成公司 DNA、角色邊界、批准規則，以及一套可以安全向下委派、向上升級決策的執行架構。",
+        "founder_label": "創辦人",
+        "opt_strategic": "策略型",
+        "opt_hands_on": "親自參與",
+        "opt_delegator": "授權型",
+        "opt_balanced": "平衡",
+        "opt_careful": "謹慎",
+        "opt_fast": "快速",
+        "opt_lean": "精簡",
+        "opt_structured": "結構化",
+        "opt_flexible": "彈性",
+        "opt_hybrid": "混合",
+        "opt_strict": "嚴格",
+        "opt_autonomous": "自主",
+        "opt_api": "API",
+        "opt_subscription_executor": "訂閱執行器",
+        "opt_local_model": "本地模型",
+        "principle_1": "執行向下流動。",
+        "principle_2": "決策向上升級。",
+        "principle_3": "記憶屬於公司，不屬於個別 agent。",
+        "principle_4": "Praetor 管理的是角色與階層，不是讓平等 agent 無限討論。",
+    },
+}
+
+
+def install_ui(app) -> None:
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.include_router(router)
+
+
+def _flash(request: Request) -> tuple[str | None, str]:
+    return request.query_params.get("flash"), request.query_params.get("level", "info")
+
+
+def _redirect(path: str, flash: str | None = None, level: str = "info") -> RedirectResponse:
+    if flash:
+        sep = "&" if "?" in path else "?"
+        path = f"{path}{sep}flash={quote(flash)}&level={quote(level)}"
+    return RedirectResponse(url=path, status_code=303)
+
+
+def _ui_language(request: Request, initialized_settings) -> str:
+    requested = request.query_params.get("lang")
+    if requested in SUPPORTED_LANGUAGES:
+        return requested
+    cookie_value = request.cookies.get(UI_COOKIE_NAME)
+    if cookie_value in SUPPORTED_LANGUAGES:
+        return cookie_value
+    if initialized_settings is not None and initialized_settings.owner.preferred_language in SUPPORTED_LANGUAGES:
+        return initialized_settings.owner.preferred_language
+    return "en"
+
+
+def _translator(language: str):
+    bundle = TRANSLATIONS.get(language, TRANSLATIONS["en"])
+    fallback = TRANSLATIONS["en"]
+
+    def translate(key: str) -> str:
+        return bundle.get(key, fallback.get(key, key))
+
+    return translate
+
+
+def _base_context(request: Request, current_page: str, page_title: str) -> dict:
+    service = request.app.state.ctx.service
+    initialized_settings = service.get_settings()
+    ui_language = _ui_language(request, initialized_settings)
+    t = _translator(ui_language)
+    authenticated = bool(getattr(request.state, "authenticated", False))
+    settings = initialized_settings if authenticated or initialized_settings is None else None
+    briefing = None
+    runtime_health = None
+    if initialized_settings is not None and authenticated:
+        briefing = service.praetor_briefing()
+        runtime_health = service.runtime_health()
+    approvals = service.list_approvals(status="pending") if initialized_settings is not None and authenticated else []
+    flash, flash_level = _flash(request)
+    return {
+        "request": request,
+        "current_url": f"{request.url.path}{'?' + request.url.query if request.url.query else ''}",
+        "current_url_quoted": quote(f"{request.url.path}{'?' + request.url.query if request.url.query else ''}", safe=""),
+        "page_title": page_title,
+        "current_page": current_page,
+        "ui_language": ui_language,
+        "t": t,
+        "language_options": SUPPORTED_LANGUAGES,
+        "settings": settings,
+        "settings_initialized": initialized_settings is not None,
+        "briefing": briefing,
+        "flash": flash,
+        "flash_level": flash_level,
+        "approvals": approvals,
+        "runtime_ready": bool(runtime_health and runtime_health.get("healthy")),
+        "runtime_health": runtime_health,
+        "bridge_base_url": get_bridge_base_url(),
+        "authenticated": authenticated,
+        "session_owner": getattr(request.state, "session_owner", None),
+        "csrf_token": csrf_token(request),
+        "setup_token": request.query_params.get("setup_token", ""),
+    }
+
+
+def _validate_form_csrf(request: Request, form) -> None:
+    require_csrf(request, str(form.get("csrf_token", "")))
+
+
+def _default_onboarding() -> dict:
+    return {
+        "owner_name": "Founder",
+        "owner_email": "",
+        "owner_password": "",
+        "owner_password_confirm": "",
+        "language": "en",
+        "leadership_style": "strategic",
+        "decision_style": "balanced",
+        "organization_style": "lean",
+        "autonomy_mode": "hybrid",
+        "risk_priority": "avoid_wrong_decisions",
+        "workspace_root": "/tmp/praetor-workspace",
+        "runtime_mode": "api",
+        "runtime_provider": "openai",
+        "runtime_model": "gpt-4.1-mini",
+        "runtime_executor": "codex",
+        "require_approval": [
+            "delete_files",
+            "overwrite_important_files",
+            "external_communication",
+            "spending_money",
+            "change_strategy",
+            "shell_commands",
+        ],
+    }
+
+
+def _starter_missions() -> list[dict[str, str]]:
+    return [
+        {
+            "title": "Create first project",
+            "summary": "Set up a first project workspace and initial status files.",
+            "domain": "operations",
+            "priority": "high",
+            "requested_outputs": "/workspace/Projects/Alpha/PROJECT.md\n/workspace/Projects/Alpha/STATUS.md",
+        },
+        {
+            "title": "Build company wiki",
+            "summary": "Summarize the current company operating context into wiki pages.",
+            "domain": "operations",
+            "priority": "normal",
+            "requested_outputs": "/workspace/Wiki/Company.md\n/workspace/Wiki/Strategy.md",
+        },
+        {
+            "title": "Review inbox",
+            "summary": "Review the Inbox folder and prepare a concise summary.",
+            "domain": "operations",
+            "priority": "normal",
+            "requested_outputs": "/workspace/Inbox/INBOX_SUMMARY.md",
+        },
+    ]
+
+
+def _require_initialized(request: Request):
+    settings = request.app.state.ctx.service.get_settings()
+    if settings is None:
+        return None
+    return settings
+
+
+@router.get("/app/set-language/{language_code}")
+def set_language(request: Request, language_code: str):
+    if language_code not in SUPPORTED_LANGUAGES:
+        language_code = "en"
+    next_path = request.query_params.get("next", "/app/welcome")
+    response = RedirectResponse(url=next_path, status_code=303)
+    response.set_cookie(
+        UI_COOKIE_NAME,
+        language_code,
+        max_age=60 * 60 * 24 * 365,
+        httponly=False,
+        samesite="lax",
+    )
+    return response
+
+
+@router.get("/app/welcome", response_class=HTMLResponse)
+def welcome_page(request: Request):
+    ctx = _base_context(request, "welcome", "Welcome")
+    if getattr(request.state, "authenticated", False):
+        return _redirect("/app/praetor")
+    return templates.TemplateResponse(
+        request=request,
+        name="welcome.html",
+        context=ctx,
+    )
+
+
+@router.get("/app/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    if getattr(request.state, "authenticated", False):
+        return _redirect("/app/praetor")
+    ctx = _base_context(
+        request,
+        "login",
+        _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))("owner_login"),
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            **ctx,
+            "next_path": request.query_params.get("next", "/app/praetor"),
+        },
+    )
+
+
+@router.get("/", response_class=HTMLResponse)
+def root():
+    return RedirectResponse(url="/app/welcome", status_code=303)
+
+
+@router.get("/app", response_class=HTMLResponse)
+def app_root():
+    return RedirectResponse(url="/app/welcome", status_code=303)
+
+
+@router.get("/app/praetor", response_class=HTMLResponse)
+def praetor_page(request: Request):
+    ctx = _base_context(request, "praetor", "Praetor")
+    service = request.app.state.ctx.service
+    settings = ctx["settings"]
+    missions = service.list_missions() if settings is not None else []
+    return templates.TemplateResponse(
+        request=request,
+        name="praetor.html",
+        context={
+            **ctx,
+            "missions": missions[:8],
+            "onboarding_defaults": _default_onboarding(),
+            "starter_missions": _starter_missions(),
+        },
+    )
+
+
+@router.get("/app/overview", response_class=HTMLResponse)
+def overview_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    missions = service.list_missions()
+    status_counts: dict[str, int] = {}
+    for mission in missions:
+        status_counts[mission.status] = status_counts.get(mission.status, 0) + 1
+    return templates.TemplateResponse(
+        request=request,
+        name="overview.html",
+        context={
+            **_base_context(request, "overview", "Overview"),
+            "missions": missions[:12],
+            "status_counts": status_counts,
+            "audit_events": service.list_audit_events(limit=12),
+        },
+    )
+
+
+@router.get("/app/tasks", response_class=HTMLResponse)
+def tasks_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    missions = service.list_missions()
+    return templates.TemplateResponse(
+        request=request,
+        name="tasks.html",
+        context={
+            **_base_context(request, "tasks", "Tasks"),
+            "missions": missions,
+        },
+    )
+
+
+@router.get("/app/activity", response_class=HTMLResponse)
+def activity_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="activity.html",
+        context={
+            **_base_context(request, "activity", "Activity"),
+            "recent_runs": service.list_recent_runs(limit=20),
+            "audit_events": service.list_audit_events(limit=30),
+        },
+    )
+
+
+@router.get("/app/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    runtime_health = request.app.state.ctx.service.runtime_health()
+    return templates.TemplateResponse(
+        request=request,
+        name="settings.html",
+        context={
+            **_base_context(request, "settings", "Settings"),
+            "runtime_health": runtime_health,
+        },
+    )
+
+
+@router.get("/app/memory", response_class=HTMLResponse)
+def memory_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="memory.html",
+        context={
+            **_base_context(request, "memory", "Memory"),
+            "wiki_pages": service.list_wiki_pages(),
+            "recent_runs": service.list_recent_runs(limit=10),
+        },
+    )
+
+
+@router.get("/app/decisions", response_class=HTMLResponse)
+def decisions_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="decisions.html",
+        context={
+            **_base_context(request, "decisions", "Decisions"),
+            "decision_items": service.list_decision_items(),
+            "audit_events": service.list_audit_events(limit=25),
+        },
+    )
+
+
+@router.get("/app/models", response_class=HTMLResponse)
+def models_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="models.html",
+        context={
+            **_base_context(request, "models", "Models"),
+            "usage_summary": service.usage_summary(),
+            "runtime_health": service.runtime_health(),
+        },
+    )
+
+
+@router.get("/app/meetings", response_class=HTMLResponse)
+def meetings_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="meetings.html",
+        context={
+            **_base_context(request, "meetings", "Meetings"),
+            "meetings": service.list_meetings(),
+        },
+    )
+
+
+@router.get("/m/briefing", response_class=HTMLResponse)
+def mobile_briefing_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    missions = service.list_missions()
+    return templates.TemplateResponse(
+        request=request,
+        name="mobile_briefing.html",
+        context={
+            **_base_context(request, "mobile", "Mobile Briefing"),
+            "missions": missions[:8],
+        },
+    )
+
+
+@router.get("/app/missions/{mission_id}", response_class=HTMLResponse)
+def mission_detail_page(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    try:
+        mission = service.get_mission(mission_id)
+    except KeyError:
+        return _redirect("/app/tasks", f"Mission not found: {mission_id}", "error")
+    tasks = service.list_mission_tasks(mission_id)
+    texts = service.read_mission_texts(mission_id)
+    runs = service.list_mission_runs(mission_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="mission_detail.html",
+        context={
+            **_base_context(request, "tasks", mission.title),
+            "mission": mission,
+            "tasks": tasks,
+            "texts": texts,
+            "runs": runs,
+        },
+    )
+
+
+@router.post("/app/onboarding")
+async def onboarding_submit(request: Request):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    require_setup_token(request, str(form.get("setup_token", "")) or None)
+    require_approval = form.getlist("require_approval")
+    answers = OnboardingAnswers(
+        owner_name=str(form.get("owner_name", "Founder")),
+        owner_email=str(form.get("owner_email", "")) or None,
+        owner_password=str(form.get("owner_password", "")).strip() or None,
+        language=str(form.get("language", "en")),
+        leadership_style=str(form.get("leadership_style", "strategic")),
+        decision_style=str(form.get("decision_style", "balanced")),
+        organization_style=str(form.get("organization_style", "lean")),
+        autonomy_mode=str(form.get("autonomy_mode", "hybrid")),
+        risk_priority=str(form.get("risk_priority", "avoid_wrong_decisions")),
+        workspace_root=str(form.get("workspace_root", "/tmp/praetor-workspace")),
+        runtime={
+            "mode": str(form.get("runtime_mode", "subscription_executor")),
+            "provider": str(form.get("runtime_provider", "")).strip() or None,
+            "model": str(form.get("runtime_model", "")).strip() or None,
+            "executor": str(form.get("runtime_executor", "codex")),
+        },
+        require_approval=[str(item) for item in require_approval],
+    )
+    password_confirm = str(form.get("owner_password_confirm", "")).strip()
+    if answers.owner_password != password_confirm:
+        return _redirect("/app/praetor", "Password confirmation does not match.", "error")
+    try:
+        settings = request.app.state.ctx.service.complete_onboarding(answers)
+    except Exception as exc:
+        return _redirect("/app/praetor", str(exc), "error")
+    request.session["authenticated"] = True
+    request.session["owner_name"] = settings.owner.name
+    request.session["owner_email"] = settings.owner.email
+    return _redirect("/app/praetor", "Praetor is initialized.", "success")
+
+
+@router.post("/app/login")
+async def login_submit(request: Request):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    password = str(form.get("password", "")).strip()
+    next_path = str(form.get("next_path", "/app/praetor")).strip() or "/app/praetor"
+    rate_key = request.client.host if request.client else "unknown"
+    login_rate_limiter.check(rate_key)
+    try:
+        settings = request.app.state.ctx.service.authenticate_owner(LoginRequest(password=password))
+    except Exception as exc:
+        login_rate_limiter.record_failure(rate_key)
+        return _redirect("/app/login", str(exc), "error")
+    login_rate_limiter.reset(rate_key)
+    request.session["authenticated"] = True
+    request.session["owner_name"] = settings.owner.name
+    request.session["owner_email"] = settings.owner.email
+    csrf_token(request)
+    return _redirect(next_path, "Login successful.", "success")
+
+
+@router.post("/app/logout")
+async def logout_submit(request: Request):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    request.session.clear()
+    return _redirect("/app/login", "Logged out.", "success")
+
+
+@router.post("/app/missions")
+async def create_mission_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    title = str(form.get("title", "")).strip()
+    if not title:
+        return _redirect("/app/praetor", "Mission title is required.", "error")
+    requested_outputs_raw = str(form.get("requested_outputs", "")).strip()
+    requested_outputs = [line.strip() for line in requested_outputs_raw.splitlines() if line.strip()]
+    mission = request.app.state.ctx.service.create_mission(
+        MissionCreateRequest(
+            title=title,
+            summary=str(form.get("summary", "")).strip() or None,
+            domains=[str(form.get("domain", "operations"))],
+            priority=str(form.get("priority", "normal")),
+            requested_outputs=requested_outputs,
+        )
+    )
+    return _redirect(f"/app/missions/{mission.id}", "Mission created.", "success")
+
+
+@router.post("/app/missions/{mission_id}/run")
+async def run_mission_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.run_mission(mission_id)
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", "Mission run completed.", "success")
+
+
+@router.post("/app/missions/{mission_id}/pause")
+async def pause_mission_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.pause_mission(mission_id, MissionPauseRequest())
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", "Mission paused.", "success")
+
+
+@router.post("/app/missions/{mission_id}/continue")
+async def continue_mission_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.continue_mission(mission_id, MissionContinueRequest())
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", "Mission resumed.", "success")
+
+
+@router.post("/app/missions/{mission_id}/stop")
+async def stop_mission_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.stop_mission(mission_id, MissionStopRequest())
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", "Mission stopped.", "success")
+
+
+@router.post("/app/missions/{mission_id}/meeting")
+async def create_meeting_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        meeting = request.app.state.ctx.service.create_review_meeting(mission_id)
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect("/app/meetings", f"Meeting created: {meeting.id}", "success")
+
+
+@router.post("/app/missions/{mission_id}/approval")
+async def create_approval_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.create_approval(
+            ApprovalCreateRequest(
+                mission_id=mission_id,
+                category=str(form.get("category", "change_strategy")),
+                reason=str(form.get("reason", "Manual checkpoint requested by owner.")),
+            )
+        )
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", "Approval checkpoint created.", "success")
+
+
+@router.post("/app/approvals/{approval_id}/{status}")
+async def resolve_approval_submit(request: Request, approval_id: str, status: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        request.app.state.ctx.service.resolve_approval(approval_id, status)
+    except Exception as exc:
+        return _redirect("/app/overview", str(exc), "error")
+    return _redirect("/app/overview", f"Approval {status}.", "success")

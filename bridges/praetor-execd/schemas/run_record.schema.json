@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://praetor.local/schemas/run_record.schema.json",
+  "title": "RunRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+    "request_id": { "type": "string" },
+    "mission_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "executor": { "type": "string" },
+    "status": { "type": "string" },
+    "normalized_status": {
+      "type": ["string", "null"]
+    },
+    "requires_owner_action": { "type": "boolean" },
+    "pause_reason": { "type": ["string", "null"] },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": ["string", "null"], "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "host_workdir": { "type": "string" },
+    "changed_files": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "stdout_tail": { "type": ["string", "null"] },
+    "stderr_tail": { "type": ["string", "null"] },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": { "type": "integer" },
+        "input_tokens": { "type": "integer" },
+        "output_tokens": { "type": "integer" },
+        "estimated_cost": { "type": "number" },
+        "usage_available": { "type": "boolean" }
+      },
+      "required": ["duration_ms", "usage_available"]
+    }
+  },
+  "required": [
+    "run_id",
+    "request_id",
+    "mission_id",
+    "task_id",
+    "executor",
+    "status",
+    "normalized_status",
+    "requires_owner_action",
+    "pause_reason",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "host_workdir",
+    "changed_files",
+    "stdout_tail",
+    "stderr_tail",
+    "usage"
+  ]
+}

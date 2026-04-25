@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="grid two">
+    <section class="panel">
+      <h3>Owner</h3>
+      <ul class="compact-list">
+        <li>Name: {{ settings.owner.name }}</li>
+        <li>Email: {{ settings.owner.email or 'n/a' }}</li>
+        <li>Language: {{ settings.owner.preferred_language }}</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h3>Runtime</h3>
+      <ul class="compact-list">
+        <li>Mode: {{ settings.runtime.mode }}</li>
+        <li>Executor: {{ settings.runtime.executor or 'n/a' }}</li>
+        <li>Provider: {{ settings.runtime.provider or 'n/a' }}</li>
+        <li>Model: {{ settings.runtime.model or 'n/a' }}</li>
+      </ul>
+    </section>
+  </section>
+  <section class="grid two">
+    <section class="panel">
+      <h3>Workspace</h3>
+      <ul class="compact-list">
+        <li>Root: {{ settings.workspace.root }}</li>
+        <li>Allow read: {{ settings.workspace.permissions.allow_read|length }}</li>
+        <li>Allow write: {{ settings.workspace.permissions.allow_write|length }}</li>
+        <li>Deny write: {{ settings.workspace.permissions.deny_write|length }}</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h3>Governance</h3>
+      <ul class="compact-list">
+        <li>Autonomy: {{ settings.governance.autonomy_mode }}</li>
+        <li>Require approval: {{ settings.governance.require_approval|join(', ') or 'none' }}</li>
+        <li>Auto execute: {{ settings.governance.auto_execute|join(', ') or 'none' }}</li>
+        <li>Never allow: {{ settings.governance.never_allow|join(', ') or 'none' }}</li>
+      </ul>
+    </section>
+  </section>
+  <section class="panel">
+    <h3>Roles</h3>
+    <div class="list">
+      {% for role in settings.roles %}
+        <div class="list-row">
+          <div>
+            <strong>{{ role.name }}</strong>
+            <div class="muted">{{ role.responsibilities|join(', ') }}</div>
+          </div>
+          <span class="status">{{ 'auto' if role.auto_created else 'manual' }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="panel">
+    <h3>Executor health</h3>
+    {% if runtime_health.configured %}
+      <ul class="compact-list">
+        <li>Mode: {{ runtime_health.mode }}</li>
+        <li>Bridge URL: {{ runtime_health.bridge_url }}</li>
+        <li>Healthy: {{ runtime_health.healthy }}</li>
+        <li>Error: {{ runtime_health.error or 'none' }}</li>
+      </ul>
+      {% if runtime_health.executors %}
+        <div class="list">
+          {% for executor in runtime_health.executors %}
+            <div class="list-row">
+              <div>
+                <strong>{{ executor.id or executor.name }}</strong>
+                <div class="muted">
+                  {% if executor.command is defined %}
+                    {{ executor.command }} {{ executor.args|join(' ') }}
+                  {% else %}
+                    model={{ executor.model or 'n/a' }}
+                  {% endif %}
+                </div>
+              </div>
+              <span class="status">{{ 'enabled' if executor.enabled else 'disabled' }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No executors reported by the bridge.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">{{ runtime_health.error }}</p>
+    {% endif %}
+  </section>
+{% endblock %}

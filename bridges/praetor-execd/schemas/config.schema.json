@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://praetor.local/schemas/config.schema.json",
+  "title": "PraetorExecdConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "auth_token": { "type": "string" }
+      },
+      "required": ["host", "port", "auth_token"]
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host_workspace_root": { "type": "string" },
+        "allowed_roots": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "deny_roots": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["host_workspace_root", "allowed_roots", "deny_roots"]
+    },
+    "executors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "command": { "type": "string" },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "healthcheck": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "requires_login": { "type": "boolean" },
+          "supports_noninteractive_batch": { "type": "boolean" },
+          "supports_cancel": { "type": "boolean" }
+        },
+        "required": [
+          "enabled",
+          "command",
+          "args",
+          "healthcheck",
+          "requires_login",
+          "supports_noninteractive_batch",
+          "supports_cancel"
+        ]
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_concurrent_runs": { "type": "integer", "minimum": 1 },
+        "default_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "max_event_buffer": { "type": "integer", "minimum": 1 },
+        "persist_run_logs": { "type": "boolean" },
+        "log_dir": { "type": "string" }
+      },
+      "required": [
+        "max_concurrent_runs",
+        "default_timeout_seconds",
+        "max_event_buffer",
+        "persist_run_logs",
+        "log_dir"
+      ]
+    }
+  },
+  "required": ["server", "paths", "executors", "runtime"]
+}

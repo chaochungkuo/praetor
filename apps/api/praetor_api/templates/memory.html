@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h2>Company memory</h2>
+    <p>Shared wiki pages and the retrieval context Praetor can use during missions.</p>
+  </section>
+  <section class="grid two">
+    <section class="panel">
+      <h3>Wiki pages</h3>
+      {% if wiki_pages %}
+        <div class="list">
+          {% for page in wiki_pages %}
+            <details class="panel">
+              <summary><strong>{{ page.path }}</strong></summary>
+              <pre>{{ page.content }}</pre>
+            </details>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No wiki pages found.</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>Recent retrieval previews</h3>
+      {% if recent_runs %}
+        <div class="list">
+          {% for run in recent_runs %}
+            <div class="list-row">
+              <div>
+                <strong>{{ run.executor }}</strong>
+                <div class="muted">{{ run.retrieval_preview|join(', ') or 'No retrieval preview recorded.' }}</div>
+              </div>
+              <span class="status">{{ run.normalized_status }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No runs yet.</p>
+      {% endif %}
+    </section>
+  </section>
+{% endblock %}

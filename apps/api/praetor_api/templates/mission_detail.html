@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel hero">
+    <div class="hero-row">
+      <div>
+        <h2>{{ mission.title }}</h2>
+        <p>{{ mission.summary or 'No summary provided.' }}</p>
+      </div>
+      <div class="hero-actions">
+        <form method="post" action="/app/missions/{{ mission.id }}/run">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit">Run mission</button>
+        </form>
+        <form method="post" action="/app/missions/{{ mission.id }}/pause">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">Pause</button>
+        </form>
+        <form method="post" action="/app/missions/{{ mission.id }}/continue">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">Continue</button>
+        </form>
+        <form method="post" action="/app/missions/{{ mission.id }}/stop">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">Stop</button>
+        </form>
+        <form method="post" action="/app/missions/{{ mission.id }}/meeting">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">Create review</button>
+        </form>
+      </div>
+    </div>
+    <ul class="compact-list">
+      <li>Status: {{ mission.status }}</li>
+      <li>Priority: {{ mission.priority }}</li>
+      <li>Domains: {{ mission.domains|join(', ') }}</li>
+      <li>Manager layer: {{ mission.manager_layer }}</li>
+      <li>Complexity score: {{ mission.complexity_score }}</li>
+      <li>PM required: {{ mission.pm_required }}</li>
+      <li>Escalation reason: {{ mission.escalation_reason or 'none' }}</li>
+      <li>Requested outputs: {{ mission.requested_outputs|join(', ') or 'none' }}</li>
+    </ul>
+  </section>
+
+  <section class="grid two">
+    <section class="panel">
+      <h3>Tasks</h3>
+      {% if tasks %}
+        <div class="list">
+          {% for task in tasks %}
+            <div class="list-row">
+              <div>
+                <strong>{{ task.title }}</strong>
+                <div class="muted">Executor: {{ task.current_executor or 'n/a' }}</div>
+              </div>
+              <span class="status">{{ task.status }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No task logs yet.</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>Report</h3>
+      <pre>{{ texts["REPORT.md"] }}</pre>
+    </section>
+  </section>
+
+  <section class="panel">
+    <h3>Run budget</h3>
+    <ul class="compact-list">
+      <li>Max steps: {{ mission.run_budget.max_steps }}</li>
+      <li>Max tokens: {{ mission.run_budget.max_tokens }}</li>
+      <li>Max time minutes: {{ mission.run_budget.max_time_minutes }}</li>
+      <li>Max cost EUR: {{ mission.run_budget.max_cost_eur }}</li>
+    </ul>
+    {% if runs %}
+      <p class="muted">
+        Latest run usage:
+        input={{ runs[0].usage.input_tokens if runs[0].usage else 'n/a' }},
+        output={{ runs[0].usage.output_tokens if runs[0].usage else 'n/a' }},
+        duration_ms={{ runs[0].usage.duration_ms if runs[0].usage else 'n/a' }},
+        stop_reason={{ runs[0].pause_reason or 'none' }}.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3>Execution runs</h3>
+    {% if runs %}
+      <div class="list">
+        {% for run in runs %}
+          <div class="list-row">
+            <div>
+              <strong>{{ run.run_id }}</strong>
+              <div class="muted">
+                Executor: {{ run.executor }} · Changed files: {{ run.changed_files|join(', ') or 'none' }}
+              </div>
+              <div class="muted">
+                Input tokens: {{ run.usage.input_tokens if run.usage else 'n/a' }} ·
+                Output tokens: {{ run.usage.output_tokens if run.usage else 'n/a' }}
+              </div>
+              <div class="muted">
+                Stop reason: {{ run.pause_reason or 'none' }}
+              </div>
+            </div>
+            <span class="status">{{ run.normalized_status }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No run records yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3>Request approval checkpoint</h3>
+    <form class="form-grid" method="post" action="/app/missions/{{ mission.id }}/approval">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label>
+        <span>Category</span>
+        <select name="category">
+          <option value="change_strategy">Change strategy</option>
+          <option value="overwrite_important_files">Overwrite important files</option>
+          <option value="shell_commands">Shell commands</option>
+          <option value="spending_money">Spending money</option>
+        </select>
+      </label>
+      <label class="full">
+        <span>Reason</span>
+        <input type="text" name="reason" value="Manual checkpoint requested by owner." />
+      </label>
+      <div class="full actions">
+        <button type="submit" class="secondary">Create approval</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="grid two">
+    <section class="panel">
+      <h3>Status file</h3>
+      <pre>{{ texts["STATUS.md"] }}</pre>
+    </section>
+    <section class="panel">
+      <h3>PM report</h3>
+      <pre>{{ texts["PM_REPORT.md"] }}</pre>
+    </section>
+  </section>
+  <section class="panel">
+    <h3>Tasks file</h3>
+    <pre>{{ texts["TASKS.md"] }}</pre>
+  </section>
+{% endblock %}

@@ -1,0 +1,148 @@
+name: praetor
+
+# Note:
+# Subscription executor mode intentionally does NOT run Codex or Claude Code
+# inside Docker. Praetor talks to a small host-side executor bridge instead.
+#
+# Quick Start default:
+#   PRAETOR_RUNTIME_MODE=api
+#
+# Bring Your Own Subscription:
+#   PRAETOR_RUNTIME_MODE=subscription_executor
+#   PRAETOR_EXECUTOR_TRANSPORT=host_bridge
+#   run praetor-execd on the host
+#
+# Expected topology:
+# Docker: web + api + worker
+# Host OS: codex / claude + praetor-execd
+#
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${PRAETOR_BIND_HOST:-127.0.0.1}:${PRAETOR_WEB_PORT:-3000}:3000"
+    environment:
+      PRAETOR_APP_URL: ${PRAETOR_APP_URL:-http://localhost:3000}
+      PRAETOR_WEB_UPSTREAM: http://api:8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - praetor
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      worker:
+        condition: service_healthy
+    expose:
+      - "8000"
+    environment:
+      PRAETOR_ENV: ${PRAETOR_ENV:-local}
+      PRAETOR_RUNTIME_MODE: ${PRAETOR_RUNTIME_MODE:-api}
+      PRAETOR_STATE_DIR: /app/data/state
+      PRAETOR_REQUIRE_LOGIN: ${PRAETOR_REQUIRE_LOGIN:-true}
+      PRAETOR_SECURE_COOKIE: ${PRAETOR_SECURE_COOKIE:-false}
+      PRAETOR_SESSION_SECRET: ${PRAETOR_SESSION_SECRET:-change-me}
+      PRAETOR_SETUP_TOKEN: ${PRAETOR_SETUP_TOKEN:-}
+      PRAETOR_DEBUG_ROUTES: ${PRAETOR_DEBUG_ROUTES:-true}
+      PRAETOR_BRIDGE_BASE_URL: ${PRAETOR_BRIDGE_BASE_URL:-http://host.docker.internal:9417}
+      PRAETOR_BRIDGE_TOKEN: ${PRAETOR_BRIDGE_TOKEN:-change-me}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PRAETOR_OPENAI_BASE_URL: ${PRAETOR_OPENAI_BASE_URL:-}
+      PRAETOR_ANTHROPIC_BASE_URL: ${PRAETOR_ANTHROPIC_BASE_URL:-}
+    volumes:
+      - type: bind
+        source: ${PRAETOR_WORKSPACE_DIR:-./workspace}
+        target: /app/workspace
+      - type: bind
+        source: ${PRAETOR_CONFIG_DIR:-./config}
+        target: /app/config
+      - type: bind
+        source: ${PRAETOR_DATA_DIR:-./data}
+        target: /app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - praetor
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8010"
+    environment:
+      PRAETOR_ENV: ${PRAETOR_ENV:-local}
+      PRAETOR_RUNTIME_MODE: ${PRAETOR_RUNTIME_MODE:-api}
+      PRAETOR_API_BASE_URL: http://api:8000
+      PRAETOR_BRIDGE_BASE_URL: ${PRAETOR_BRIDGE_BASE_URL:-http://host.docker.internal:9417}
+      PRAETOR_BRIDGE_TOKEN: ${PRAETOR_BRIDGE_TOKEN:-change-me}
+      PRAETOR_ALLOWED_EXECUTORS: ${PRAETOR_ALLOWED_EXECUTORS:-codex,claude_code}
+    volumes:
+      - type: bind
+        source: ${PRAETOR_WORKSPACE_DIR:-./workspace}
+        target: /app/workspace
+      - type: bind
+        source: ${PRAETOR_CONFIG_DIR:-./config}
+        target: /app/config
+      - type: bind
+        source: ${PRAETOR_DATA_DIR:-./data}
+        target: /app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - praetor
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - local-model
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ${PRAETOR_OLLAMA_DIR:-./ollama}
+        target: /root/.ollama
+    ports:
+      - "${PRAETOR_BIND_HOST:-127.0.0.1}:${PRAETOR_OLLAMA_PORT:-11434}:11434"
+    networks:
+      - praetor
+
+networks:
+  praetor:
+    driver: bridge

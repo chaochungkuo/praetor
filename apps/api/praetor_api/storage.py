@@ -1,0 +1,471 @@
+from __future__ import annotations
+
+from contextlib import contextmanager
+from datetime import datetime
+import json
+import os
+import sqlite3
+from pathlib import Path
+from typing import Iterator
+
+from .models import AppSettings, ApprovalRequest, MeetingRecord, MissionDefinition, OwnerAuthRecord, TaskDefinition
+
+
+class SQLiteIndex:
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _init_db(self) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    payload_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS missions (
+                    mission_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    priority TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+        try:
+            os.chmod(self.db_path, 0o600)
+        except OSError:
+            pass
+
+    def save_settings(self, settings: AppSettings) -> None:
+        payload = settings.model_dump_json(indent=2)
+        updated_at = settings.updated_at.isoformat()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO settings (id, payload_json, updated_at)
+                VALUES (1, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    updated_at = excluded.updated_at
+                """,
+                (payload, updated_at),
+            )
+
+    def load_settings(self) -> AppSettings | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT payload_json FROM settings WHERE id = 1").fetchone()
+        if row is None:
+            return None
+        return AppSettings.model_validate_json(row["payload_json"])
+
+    def upsert_mission(self, mission: MissionDefinition) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO missions (mission_id, title, status, priority, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(mission_id) DO UPDATE SET
+                    title = excluded.title,
+                    status = excluded.status,
+                    priority = excluded.priority,
+                    updated_at = excluded.updated_at,
+                    payload_json = excluded.payload_json
+                """,
+                (
+                    mission.id,
+                    mission.title,
+                    mission.status,
+                    mission.priority,
+                    mission.updated_at.isoformat(),
+                    mission.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_missions(self) -> list[MissionDefinition]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM missions ORDER BY updated_at DESC, mission_id DESC"
+            ).fetchall()
+        return [MissionDefinition.model_validate_json(row["payload_json"]) for row in rows]
+
+
+class FilesystemStore:
+    def __init__(self, state_dir: Path) -> None:
+        self.state_dir = state_dir
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.settings_path = self.state_dir / "settings.json"
+        self.auth_path = self.state_dir / "auth.json"
+        self.audit_path = self.state_dir / "audit.jsonl"
+        self.approvals_path = self.state_dir / "approvals.json"
+
+    def save_settings(self, settings: AppSettings) -> None:
+        _write_private_text(self.settings_path, settings.model_dump_json(indent=2))
+
+    def load_settings(self) -> AppSettings | None:
+        if not self.settings_path.exists():
+            return None
+        return AppSettings.model_validate_json(self.settings_path.read_text(encoding="utf-8"))
+
+    def save_auth(self, auth_record: OwnerAuthRecord) -> None:
+        _write_private_text(self.auth_path, auth_record.model_dump_json(indent=2))
+
+    def load_auth(self) -> OwnerAuthRecord | None:
+        if not self.auth_path.exists():
+            return None
+        return OwnerAuthRecord.model_validate_json(self.auth_path.read_text(encoding="utf-8"))
+
+    def mission_dir(self, workspace_root: Path, mission_id: str) -> Path:
+        return workspace_root / "Missions" / mission_id
+
+    def meeting_dir(self, workspace_root: Path, mission_id: str) -> Path:
+        return self.mission_dir(workspace_root, mission_id) / "meetings"
+
+    def save_mission(self, workspace_root: Path, mission: MissionDefinition) -> Path:
+        mission_dir = self.mission_dir(workspace_root, mission.id)
+        logs_dir = mission_dir / "logs"
+        mission_dir.mkdir(parents=True, exist_ok=True)
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        (mission_dir / "mission.json").write_text(
+            mission.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+        (mission_dir / "MISSION.md").write_text(
+            f"# {mission.title}\n\nStatus: {mission.status}\n\n"
+            f"Summary: {mission.summary or ''}\n",
+            encoding="utf-8",
+        )
+        (mission_dir / "STATUS.md").write_text(
+            f"# Status\n\n- status: {mission.status}\n- priority: {mission.priority}\n",
+            encoding="utf-8",
+        )
+        (mission_dir / "TASKS.md").write_text("# Tasks\n\n", encoding="utf-8")
+        (mission_dir / "DECISIONS.md").write_text("# Decisions\n\n", encoding="utf-8")
+        (mission_dir / "CONTEXT.md").write_text("# Context\n\n", encoding="utf-8")
+        (mission_dir / "PM_REPORT.md").write_text("# PM Report\n\n", encoding="utf-8")
+        (mission_dir / "REPORT.md").write_text("# Report\n\n", encoding="utf-8")
+        return mission_dir
+
+    def save_task(self, workspace_root: Path, task: TaskDefinition) -> Path:
+        mission_dir = self.mission_dir(workspace_root, task.mission_id)
+        mission_dir.mkdir(parents=True, exist_ok=True)
+        tasks_dir = mission_dir / "logs"
+        tasks_dir.mkdir(parents=True, exist_ok=True)
+        path = tasks_dir / f"{task.id}.task.json"
+        path.write_text(task.model_dump_json(indent=2), encoding="utf-8")
+        return path
+
+    def append_report(
+        self,
+        workspace_root: Path,
+        mission_id: str,
+        text: str,
+    ) -> None:
+        mission_dir = self.mission_dir(workspace_root, mission_id)
+        report = mission_dir / "REPORT.md"
+        existing = report.read_text(encoding="utf-8") if report.exists() else "# Report\n\n"
+        report.write_text(existing.rstrip() + "\n\n" + text.strip() + "\n", encoding="utf-8")
+
+    def append_pm_report(
+        self,
+        workspace_root: Path,
+        mission_id: str,
+        text: str,
+    ) -> None:
+        mission_dir = self.mission_dir(workspace_root, mission_id)
+        report = mission_dir / "PM_REPORT.md"
+        existing = report.read_text(encoding="utf-8") if report.exists() else "# PM Report\n\n"
+        report.write_text(existing.rstrip() + "\n\n" + text.strip() + "\n", encoding="utf-8")
+
+    def load_mission(self, workspace_root: Path, mission_id: str) -> MissionDefinition | None:
+        path = self.mission_dir(workspace_root, mission_id) / "mission.json"
+        if not path.exists():
+            return None
+        return MissionDefinition.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def list_tasks(self, workspace_root: Path, mission_id: str) -> list[TaskDefinition]:
+        tasks_dir = self.mission_dir(workspace_root, mission_id) / "logs"
+        if not tasks_dir.exists():
+            return []
+        tasks: list[TaskDefinition] = []
+        for path in sorted(tasks_dir.glob("*.task.json")):
+            try:
+                tasks.append(TaskDefinition.model_validate_json(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+        return tasks
+
+    def read_mission_texts(self, workspace_root: Path, mission_id: str) -> dict[str, str]:
+        mission_dir = self.mission_dir(workspace_root, mission_id)
+        texts: dict[str, str] = {}
+        for name in ["MISSION.md", "STATUS.md", "TASKS.md", "DECISIONS.md", "CONTEXT.md", "PM_REPORT.md", "REPORT.md"]:
+            path = mission_dir / name
+            texts[name] = path.read_text(encoding="utf-8") if path.exists() else ""
+        return texts
+
+    def save_bridge_run(self, workspace_root: Path, mission_id: str, payload: dict) -> Path:
+        mission_dir = self.mission_dir(workspace_root, mission_id)
+        logs_dir = mission_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        run_id = payload.get("run_id", "unknown")
+        path = logs_dir / f"{run_id}.bridge.json"
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
+        return path
+
+    def list_bridge_runs(self, workspace_root: Path, mission_id: str) -> list[dict]:
+        logs_dir = self.mission_dir(workspace_root, mission_id) / "logs"
+        if not logs_dir.exists():
+            return []
+        runs: list[dict] = []
+        for path in sorted(logs_dir.glob("*.bridge.json")):
+            try:
+                runs.append(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+        runs.sort(key=lambda item: item.get("finished_at") or item.get("started_at") or "", reverse=True)
+        return runs
+
+    def list_recent_runs(self, workspace_root: Path, limit: int = 25) -> list[dict]:
+        missions_root = workspace_root / "Missions"
+        if not missions_root.exists():
+            return []
+        runs: list[dict] = []
+        for path in missions_root.glob("*/logs/*.bridge.json"):
+            try:
+                runs.append(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+        runs.sort(key=lambda item: item.get("finished_at") or item.get("started_at") or "", reverse=True)
+        return runs[:limit]
+
+    def append_audit_event(self, payload: dict) -> None:
+        with self.audit_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        try:
+            os.chmod(self.audit_path, 0o600)
+        except OSError:
+            pass
+
+    def list_audit_events(self, limit: int = 50) -> list[dict]:
+        if not self.audit_path.exists():
+            return []
+        lines = self.audit_path.read_text(encoding="utf-8").splitlines()
+        events: list[dict] = []
+        for line in lines[-limit:]:
+            try:
+                events.append(json.loads(line))
+            except Exception:
+                continue
+        events.reverse()
+        return events
+
+    def list_missions(self, workspace_root: Path) -> list[MissionDefinition]:
+        missions_root = workspace_root / "Missions"
+        if not missions_root.exists():
+            return []
+        missions: list[MissionDefinition] = []
+        for path in sorted(missions_root.glob("*/mission.json")):
+            try:
+                missions.append(MissionDefinition.model_validate_json(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+        missions.sort(key=lambda item: item.updated_at, reverse=True)
+        return missions
+
+    def list_wiki_pages(self, workspace_root: Path) -> list[dict[str, str]]:
+        wiki_root = workspace_root / "Wiki"
+        if not wiki_root.exists():
+            return []
+        pages: list[dict[str, str]] = []
+        for path in sorted(wiki_root.glob("*.md")):
+            pages.append(
+                {
+                    "name": path.name,
+                    "path": str(path.relative_to(workspace_root)),
+                    "content": path.read_text(encoding="utf-8"),
+                }
+            )
+        return pages
+
+    def save_approval(self, approval: ApprovalRequest) -> None:
+        approvals = self.list_approvals()
+        approvals = [item for item in approvals if item.id != approval.id] + [approval]
+        approvals.sort(key=lambda item: item.created_at, reverse=True)
+        _write_private_text(
+            self.approvals_path,
+            json.dumps([item.model_dump(mode="json") for item in approvals], indent=2, ensure_ascii=True),
+        )
+
+    def list_approvals(self) -> list[ApprovalRequest]:
+        if not self.approvals_path.exists():
+            return []
+        payload = json.loads(self.approvals_path.read_text(encoding="utf-8"))
+        return [ApprovalRequest.model_validate(item) for item in payload]
+
+    def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
+        meetings_dir = self.meeting_dir(workspace_root, meeting.mission_id)
+        meetings_dir.mkdir(parents=True, exist_ok=True)
+        path = meetings_dir / f"{meeting.id}.meeting.json"
+        path.write_text(meeting.model_dump_json(indent=2), encoding="utf-8")
+        markdown = meetings_dir / f"{meeting.id}.md"
+        markdown.write_text(
+            "\n".join(
+                [
+                    f"# Meeting {meeting.id}",
+                    "",
+                    f"Type: {meeting.type}",
+                    f"Moderator: {meeting.moderator}",
+                    "",
+                    "## Agenda",
+                    *[f"- {item}" for item in meeting.agenda],
+                    "",
+                    "## Outputs",
+                    *[f"- {item}" for item in meeting.outputs],
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
+        roots = []
+        if mission_id is not None:
+            roots = [self.meeting_dir(workspace_root, mission_id)]
+        else:
+            roots = list((workspace_root / "Missions").glob("*/meetings"))
+        meetings: list[MeetingRecord] = []
+        for root in roots:
+            if not root.exists():
+                continue
+            for path in sorted(root.glob("*.meeting.json")):
+                try:
+                    meetings.append(MeetingRecord.model_validate_json(path.read_text(encoding="utf-8")))
+                except Exception:
+                    continue
+        meetings.sort(key=lambda item: item.created_at, reverse=True)
+        return meetings
+
+
+class AppStorage:
+    def __init__(self, state_dir: Path) -> None:
+        self.fs = FilesystemStore(state_dir)
+        self.index = SQLiteIndex(state_dir / "index.sqlite3")
+
+    def save_settings(self, settings: AppSettings) -> None:
+        self.fs.save_settings(settings)
+        self.index.save_settings(settings)
+
+    def save_auth(self, auth_record: OwnerAuthRecord) -> None:
+        self.fs.save_auth(auth_record)
+
+    def load_auth(self) -> OwnerAuthRecord | None:
+        return self.fs.load_auth()
+
+    def load_settings(self) -> AppSettings | None:
+        settings = self.fs.load_settings()
+        if settings is not None:
+            self.index.save_settings(settings)
+            return settings
+        return self.index.load_settings()
+
+    def save_mission(self, workspace_root: Path, mission: MissionDefinition) -> Path:
+        path = self.fs.save_mission(workspace_root, mission)
+        self.index.upsert_mission(mission)
+        return path
+
+    def load_mission(self, workspace_root: Path, mission_id: str) -> MissionDefinition | None:
+        mission = self.fs.load_mission(workspace_root, mission_id)
+        if mission is not None:
+            self.index.upsert_mission(mission)
+            return mission
+        return None
+
+    def list_missions(self, workspace_root: Path) -> list[MissionDefinition]:
+        missions = self.fs.list_missions(workspace_root)
+        if missions:
+            for mission in missions:
+                self.index.upsert_mission(mission)
+            return missions
+        return self.index.list_missions()
+
+    def save_task(self, workspace_root: Path, task: TaskDefinition) -> Path:
+        return self.fs.save_task(workspace_root, task)
+
+    def append_report(self, workspace_root: Path, mission_id: str, text: str) -> None:
+        self.fs.append_report(workspace_root, mission_id, text)
+
+    def append_pm_report(self, workspace_root: Path, mission_id: str, text: str) -> None:
+        self.fs.append_pm_report(workspace_root, mission_id, text)
+
+    def list_tasks(self, workspace_root: Path, mission_id: str) -> list[TaskDefinition]:
+        return self.fs.list_tasks(workspace_root, mission_id)
+
+    def read_mission_texts(self, workspace_root: Path, mission_id: str) -> dict[str, str]:
+        return self.fs.read_mission_texts(workspace_root, mission_id)
+
+    def save_bridge_run(self, workspace_root: Path, mission_id: str, payload: dict) -> Path:
+        return self.fs.save_bridge_run(workspace_root, mission_id, payload)
+
+    def list_bridge_runs(self, workspace_root: Path, mission_id: str) -> list[dict]:
+        return self.fs.list_bridge_runs(workspace_root, mission_id)
+
+    def list_recent_runs(self, workspace_root: Path, limit: int = 25) -> list[dict]:
+        return self.fs.list_recent_runs(workspace_root, limit=limit)
+
+    def list_wiki_pages(self, workspace_root: Path) -> list[dict[str, str]]:
+        return self.fs.list_wiki_pages(workspace_root)
+
+    def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
+        return self.fs.save_meeting(workspace_root, meeting)
+
+    def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
+        return self.fs.list_meetings(workspace_root, mission_id=mission_id)
+
+    def save_approval(self, approval: ApprovalRequest) -> None:
+        self.fs.save_approval(approval)
+
+    def list_approvals(self) -> list[ApprovalRequest]:
+        return self.fs.list_approvals()
+
+    def append_audit_event(self, payload: dict) -> None:
+        self.fs.append_audit_event(payload)
+
+    def list_audit_events(self, limit: int = 50) -> list[dict]:
+        return self.fs.list_audit_events(limit=limit)
+
+
+def parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def write_json(path: Path, payload: dict) -> None:
+    _write_private_text(path, json.dumps(payload, indent=2, ensure_ascii=True))
+
+
+def _write_private_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass

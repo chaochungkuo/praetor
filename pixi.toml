@@ -1,0 +1,46 @@
+[workspace]
+authors = ["Jove Sus"]
+channels = ["conda-forge"]
+name = "praetor"
+platforms = ["osx-arm64", "linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+python = "3.12.*"
+pip = ">=24"
+
+[pypi-dependencies]
+fastapi = ">=0.136,<1"
+uvicorn = ">=0.46,<1"
+pydantic = ">=2.13,<3"
+pyyaml = ">=6,<7"
+httpx = ">=0.28,<1"
+jinja2 = ">=3.1,<4"
+python-multipart = ">=0.0.20,<1"
+itsdangerous = ">=2.2,<3"
+
+[activation.env]
+PRAETOR_BRIDGE_APP_DIR = "bridges/praetor-execd"
+PRAETOR_RUNTIME_APP_DIR = "workers/runtime"
+
+[tasks]
+py = "python --version"
+bridge-serve = "python -m uvicorn --app-dir bridges/praetor-execd praetor_execd.main:app --host 127.0.0.1 --port 9417"
+app-serve = "python -m uvicorn --app-dir apps/api praetor_api.main:app --host 127.0.0.1 --port 9741"
+app-import-check = "python tools/app_import_check.py"
+web-import-check = "python tools/web_import_check.py"
+worker-import-check = "python tools/worker_import_check.py"
+app-smoke = "python tools/app_smoke.py"
+app-ui-smoke = "python tools/app_ui_smoke.py"
+app-auth-smoke = "python tools/app_auth_smoke.py"
+app-security-smoke = "python tools/app_security_smoke.py"
+app-api-smoke = "python tools/app_api_smoke.py"
+app-fallback-smoke = "python tools/app_fallback_smoke.py"
+stack-smoke = "python tools/stack_smoke.py"
+bridge-import-check = "python tools/bridge_import_check.py"
+runtime-import-check = "python tools/runtime_import_check.py"
+bridge-smoke = "python tools/bridge_smoke.py"
+bridge-e2e = "python tools/bridge_e2e.py"
+claude-e2e = "python tools/claude_e2e.py"
+py-compile = "python tools/py_compile_check.py"
+check = { depends-on = ["app-import-check", "web-import-check", "worker-import-check", "bridge-import-check", "runtime-import-check", "py-compile"] }

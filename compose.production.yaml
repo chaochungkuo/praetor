@@ -1,0 +1,110 @@
+services:
+  # The production overlay assumes the same host-side executor bridge model.
+  # It does not add Codex or Claude Code containers on purpose.
+  web:
+    environment:
+      PRAETOR_APP_URL: ${PRAETOR_APP_URL}
+
+  api:
+    environment:
+      PRAETOR_SESSION_SECRET: ""
+      PRAETOR_SETUP_TOKEN: ""
+      PRAETOR_BRIDGE_TOKEN: ""
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      PRAETOR_ENV: production
+      PRAETOR_REQUIRE_LOGIN: ${PRAETOR_REQUIRE_LOGIN:-true}
+      PRAETOR_SECURE_COOKIE: ${PRAETOR_SECURE_COOKIE:-true}
+      PRAETOR_SESSION_SECRET_FILE: /run/secrets/praetor_session_secret
+      PRAETOR_SETUP_TOKEN_FILE: /run/secrets/praetor_setup_token
+      PRAETOR_BRIDGE_TOKEN_FILE: /run/secrets/praetor_bridge_token
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      PRAETOR_TRUST_PROXY: ${PRAETOR_TRUST_PROXY:-true}
+      PRAETOR_RATE_LIMIT_ENABLED: ${PRAETOR_RATE_LIMIT_ENABLED:-true}
+      PRAETOR_DEBUG_ROUTES: ${PRAETOR_DEBUG_ROUTES:-false}
+    secrets:
+      - praetor_session_secret
+      - praetor_setup_token
+      - praetor_bridge_token
+      - openai_api_key
+      - anthropic_api_key
+
+  worker:
+    environment:
+      PRAETOR_ENV: production
+      PRAETOR_BRIDGE_TOKEN: ""
+      PRAETOR_BRIDGE_TOKEN_FILE: /run/secrets/praetor_bridge_token
+    secrets:
+      - praetor_bridge_token
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PRAETOR_DOMAIN: ${PRAETOR_DOMAIN}
+      PRAETOR_UPSTREAM: web:3000
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        cat >/etc/caddy/Caddyfile <<EOF
+        ${PRAETOR_DOMAIN} {
+          encode zstd gzip
+          reverse_proxy ${PRAETOR_UPSTREAM}
+        }
+        EOF
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - type: bind
+        source: ${PRAETOR_PROXY_DATA_DIR:-./data/caddy}
+        target: /data
+      - type: bind
+        source: ${PRAETOR_PROXY_CONFIG_DIR:-./config/caddy}
+        target: /config
+    networks:
+      - praetor
+
+  backup:
+    image: alpine:3.20
+    profiles:
+      - ops
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        echo "Praetor backup skeleton container running."
+        while true; do sleep 3600; done
+    volumes:
+      - type: bind
+        source: ${PRAETOR_WORKSPACE_DIR:-./workspace}
+        target: /backup/workspace
+      - type: bind
+        source: ${PRAETOR_CONFIG_DIR:-./config}
+        target: /backup/config
+      - type: bind
+        source: ${PRAETOR_DATA_DIR:-./data}
+        target: /backup/data
+      - type: bind
+        source: ${PRAETOR_BACKUP_DIR:-./backups}
+        target: /backup/output
+    networks:
+      - praetor
+
+secrets:
+  praetor_session_secret:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_session_secret.txt
+  praetor_setup_token:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_setup_token.txt
+  praetor_bridge_token:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/praetor_bridge_token.txt
+  openai_api_key:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/openai_api_key.txt
+  anthropic_api_key:
+    file: ${PRAETOR_SECRETS_DIR:-./secrets}/anthropic_api_key.txt
