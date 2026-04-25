@@ -154,6 +154,19 @@ def main() -> int:
             {"body": "建立任務：檢查 Office v2 的 AI 內部對話是否清楚。"},
         )
         created_mission_id = chat["data"]["created_mission"]["id"]
+        approval_status, approval_chat = request(
+            "POST",
+            "/api/office/conversation",
+            {
+                "body": "請建立一個需要我批准的決策 checkpoint。",
+                "related_mission_id": created_mission_id,
+            },
+        )
+        memory_status, memory_chat = request(
+            "POST",
+            "/api/office/conversation",
+            {"body": "請記住：董事長辦公室必須優先呈現任務風險與 AI 內部對話。"},
+        )
         timeline_status, timeline = request("GET", f"/api/missions/{mission_id}/timeline")
         created_timeline_status, created_timeline = request("GET", f"/api/missions/{created_mission_id}/timeline")
         agent_status, agent_messages = request("GET", f"/api/missions/{created_mission_id}/agent-messages")
@@ -173,6 +186,12 @@ def main() -> int:
                     "chat_intent": chat["data"]["intent"],
                     "chat_created_mission": bool(chat["data"]["created_mission"]),
                     "chat_agent_messages": len(chat["data"]["agent_messages"]),
+                    "chat_actions": [item["type"] for item in chat["data"]["actions"]],
+                    "approval_status": approval_status,
+                    "approval_action_status": approval_chat["data"]["actions"][0]["status"],
+                    "approval_created": bool(approval_chat["data"]["created_approval"]),
+                    "memory_status": memory_status,
+                    "memory_action_status": memory_chat["data"]["actions"][0]["status"],
                     "timeline_status": timeline_status,
                     "timeline_events": len(timeline["data"]["events"]),
                     "created_timeline_status": created_timeline_status,

@@ -18,7 +18,7 @@ import {
   UserRound
 } from "lucide-react";
 import { getMissionAgentMessages, getMissionTimeline, getOfficeSnapshot, getSession, sendCeoMessage } from "./api";
-import type { AgentMessage, ConversationMessage, Mission, OfficeSnapshot, Session, TimelineEvent } from "./types";
+import type { AgentMessage, ConversationMessage, Mission, OfficeSnapshot, PlannerAction, Session, TimelineEvent } from "./types";
 import "./styles.css";
 
 type BrowserSpeechRecognition = {
@@ -44,6 +44,7 @@ function App() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [input, setInput] = useState("");
+  const [lastActions, setLastActions] = useState<PlannerAction[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
@@ -108,6 +109,7 @@ function App() {
         setSelectedMissionId(result.created_mission.id);
         setAgentMessages(result.agent_messages);
       }
+      setLastActions(result.actions);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -237,6 +239,15 @@ function App() {
             <div className="rail-item" key={approval.id}>
               <strong>{approval.category.replaceAll("_", " ")}</strong>
               <span>{approval.reason}</span>
+            </div>
+          ))}
+        </RailSection>
+        <RailSection title="CEO actions">
+          {lastActions.length === 0 ? <p>No planner actions in this session.</p> : lastActions.map((action) => (
+            <div className={`rail-item action-${action.status}`} key={action.id}>
+              <strong>{action.type.replaceAll("_", " ")}</strong>
+              <span>{action.title}</span>
+              <small>{action.status}{action.result_id ? ` · ${action.result_id}` : ""}</small>
             </div>
           ))}
         </RailSection>

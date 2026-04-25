@@ -23,7 +23,7 @@ This repository currently contains:
 - `praetor-execd` host-side executor bridge
 - worker-side bridge client skeleton
 - app backend with onboarding, mission persistence, browser UI, and API mode
-- v2 React/TypeScript Praetor Office shell with CEO chat and mission timeline APIs
+- v2 React/TypeScript Praetor Office shell with CEO chat, planner actions, and mission timeline APIs
 - authentication, setup-token, CSRF, and deployment hardening basics
 - repo-local Pixi development environment
 

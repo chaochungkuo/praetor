@@ -68,6 +68,8 @@ TimelineEventType = Literal[
     "meeting",
     "audit",
 ]
+PlannerActionType = Literal["mission_draft", "approval_request", "memory_update", "briefing"]
+PlannerActionStatus = Literal["proposed", "applied", "skipped"]
 
 
 class ApiEnvelope(BaseModel):
@@ -253,10 +255,29 @@ class ConversationCreateRequest(BaseModel):
     related_mission_id: str | None = None
 
 
+class PlannerAction(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("action"))
+    type: PlannerActionType
+    status: PlannerActionStatus = "proposed"
+    title: str
+    body: str | None = None
+    mission_id: str | None = None
+    result_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlannerPlan(BaseModel):
+    intent: str
+    response: str
+    actions: list[PlannerAction] = Field(default_factory=list)
+
+
 class ConversationCreateResult(BaseModel):
     messages: list[ConversationMessage] = Field(default_factory=list)
     created_mission: MissionDefinition | None = None
+    created_approval: ApprovalRequest | None = None
     agent_messages: list["AgentMessage"] = Field(default_factory=list)
+    actions: list[PlannerAction] = Field(default_factory=list)
     intent: str = "briefing"
 
 

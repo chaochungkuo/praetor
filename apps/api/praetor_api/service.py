@@ -25,6 +25,7 @@ from .models import (
     MissionStopRequest,
     OnboardingAnswers,
     OwnerAuthRecord,
+    PlannerAction,
     PraetorBriefing,
     RoleDefinition,
     RuntimeSelection,
@@ -33,6 +34,7 @@ from .models import (
     WorkspacePermissions,
     utc_now,
 )
+from .planner import CEOPlanner, CEOPlannerContext, default_ceo_planner
 from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
 from .storage import AppStorage
@@ -48,6 +50,7 @@ def parse_datetime(value: str | None) -> datetime:
 @dataclass
 class PraetorService:
     storage: AppStorage
+    planner: CEOPlanner | None = None
 
     def preview_onboarding(self, answers: OnboardingAnswers):
         return preview_onboarding(answers)
@@ -524,9 +527,19 @@ class PraetorService:
         text = request.body.strip()
         if not text:
             raise ValueError("Message body is required.")
-        intent = self._infer_ceo_intent(text)
+        planner = self.planner or default_ceo_planner()
+        plan = planner.plan(
+            CEOPlannerContext(
+                instruction=text,
+                related_mission_id=request.related_mission_id,
+                mission_count=len(self.storage.list_missions(Path(settings.workspace.root))),
+                pending_approvals=len([item for item in self.storage.list_approvals() if item.status == "pending"]),
+            )
+        )
         created_mission: MissionDefinition | None = None
+        created_approval: ApprovalRequest | None = None
         agent_messages: list[AgentMessage] = []
+        actions: list[PlannerAction] = []
 
         chairman = ConversationMessage(
             role="chairman",
@@ -534,21 +547,24 @@ class PraetorService:
             related_mission_id=request.related_mission_id,
         )
         related_mission_id = request.related_mission_id
-        if intent == "create_mission":
-            created_mission = self._create_mission_from_ceo_instruction(text)
-            related_mission_id = created_mission.id
-            chairman.related_mission_id = created_mission.id
-            agent_messages = self._seed_agent_thread_for_ceo_mission(created_mission, text)
+        for action in plan.actions:
+            applied = self._apply_planner_action(action, text, related_mission_id)
+            actions.append(applied)
+            if applied.type == "mission_draft" and applied.result_id:
+                created_mission = self.storage.load_mission(Path(settings.workspace.root), applied.result_id)
+                related_mission_id = applied.result_id
+                chairman.related_mission_id = applied.result_id
+                if created_mission is not None:
+                    agent_messages.extend(self._seed_agent_thread_for_ceo_mission(created_mission, text))
+            elif applied.type == "approval_request" and applied.result_id:
+                created_approval = next(
+                    (item for item in self.storage.list_approvals() if item.id == applied.result_id),
+                    None,
+                )
 
         response = ConversationMessage(
             role="ceo",
-            body=self._ceo_response(
-                text,
-                intent=intent,
-                created_mission=created_mission,
-                mission_count=len(self.storage.list_missions(Path(settings.workspace.root))),
-                pending_approvals=len([item for item in self.storage.list_approvals() if item.status == "pending"]),
-            ),
+            body=plan.response,
             related_mission_id=related_mission_id,
         )
         self.storage.append_conversation_message(chairman)
@@ -558,15 +574,19 @@ class PraetorService:
             {
                 "message_id": chairman.id,
                 "related_mission_id": related_mission_id,
-                "intent": intent,
+                "intent": plan.intent,
                 "created_mission_id": created_mission.id if created_mission else None,
+                "created_approval_id": created_approval.id if created_approval else None,
+                "actions": [item.model_dump(mode="json") for item in actions],
             },
         )
         return ConversationCreateResult(
             messages=[chairman, response],
             created_mission=created_mission,
+            created_approval=created_approval,
             agent_messages=agent_messages,
-            intent=intent,
+            actions=actions,
+            intent=plan.intent,
         )
 
     def list_ceo_messages(self, limit: int = 50) -> list[ConversationMessage]:
@@ -660,16 +680,59 @@ class PraetorService:
             raise KeyError(mission_id)
         return self.storage.list_agent_messages(mission_id=mission_id, limit=limit)
 
-    def _create_mission_from_ceo_instruction(self, text: str) -> MissionDefinition:
-        title, summary = self._mission_fields_from_instruction(text)
-        request = MissionCreateRequest(
-            title=title,
-            summary=summary,
-            domains=self._domains_from_instruction(text),
-            priority=self._priority_from_instruction(text),
-            requested_outputs=[],
-        )
-        return self.create_mission(request)
+    def _apply_planner_action(
+        self,
+        action: PlannerAction,
+        instruction: str,
+        related_mission_id: str | None,
+    ) -> PlannerAction:
+        if action.type == "mission_draft":
+            metadata = action.metadata
+            mission = self.create_mission(
+                MissionCreateRequest(
+                    title=action.title.strip() or "Chairman-directed mission",
+                    summary=action.body or f"Chairman instruction: {instruction}",
+                    domains=list(metadata.get("domains") or ["operations"]),
+                    priority=str(metadata.get("priority") or "normal"),
+                    requested_outputs=list(metadata.get("requested_outputs") or []),
+                )
+            )
+            return action.model_copy(update={"status": "applied", "mission_id": mission.id, "result_id": mission.id})
+
+        if action.type == "approval_request":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "approval_request requires a mission_id"},
+                    }
+                )
+            approval = self.create_approval(
+                ApprovalCreateRequest(
+                    mission_id=mission_id,
+                    category=action.metadata.get("category") or "change_strategy",
+                    reason=action.body or action.title,
+                )
+            )
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": approval.id})
+
+        if action.type == "memory_update":
+            settings = self._require_settings()
+            path = self.storage.append_wiki_page(
+                Path(settings.workspace.root),
+                str(action.metadata.get("page") or "CEO Memory.md"),
+                "\n".join(
+                    [
+                        f"## {utc_now().isoformat().replace('+00:00', 'Z')}",
+                        "",
+                        action.body or instruction,
+                    ]
+                ),
+            )
+            return action.model_copy(update={"status": "applied", "result_id": str(path)})
+
+        return action.model_copy(update={"status": "applied"})
 
     def _seed_agent_thread_for_ceo_mission(self, mission: MissionDefinition, instruction: str) -> list[AgentMessage]:
         messages = [
@@ -718,74 +781,6 @@ class PraetorService:
             )
         events.sort(key=lambda item: item.created_at, reverse=True)
         return events[:limit]
-
-    @staticmethod
-    def _infer_ceo_intent(text: str) -> str:
-        lowered = text.lower()
-        if any(word in lowered for word in ["create", "建立", "新增", "任務", "mission"]):
-            return "create_mission"
-        if any(word in lowered for word in ["status", "進度", "狀態", "卡住"]):
-            return "status_briefing"
-        if any(word in lowered for word in ["risk", "安全", "風險", "privacy"]):
-            return "risk_review"
-        return "briefing"
-
-    @staticmethod
-    def _ceo_response(
-        text: str,
-        *,
-        intent: str,
-        created_mission: MissionDefinition | None,
-        mission_count: int,
-        pending_approvals: int,
-    ) -> str:
-        if intent == "create_mission" and created_mission is not None:
-            return (
-                f"我已把你的指令建立成 mission：{created_mission.title}。"
-                "我會先讓 PM 拆解工作，Developer 等待具體執行範圍，Reviewer 會負責檢查輸出與風險。"
-            )
-        if intent == "status_briefing":
-            return (
-                f"目前共有 {mission_count} 個 mission，待你批准的事項有 {pending_approvals} 個。"
-                "我會持續把卡點、風險與需要董事長判斷的事項浮到右側決策欄。"
-            )
-        if intent == "risk_review":
-            return "我會優先檢查資料邊界、執行權限、外部 provider 暴露面與需要人工批准的動作。"
-        _ = text
-        return "收到。我會把這段指示納入公司脈絡，整理成可執行的下一步，並在需要決策時回到你這裡。"
-
-    @staticmethod
-    def _mission_fields_from_instruction(text: str) -> tuple[str, str]:
-        cleaned = text.strip()
-        for marker in ["建立任務", "新增任務", "create mission", "Create mission", "mission:"]:
-            cleaned = cleaned.replace(marker, "")
-        cleaned = cleaned.lstrip("：: -").strip()
-        if not cleaned:
-            cleaned = "Chairman-directed mission"
-        title = cleaned.splitlines()[0][:90]
-        summary = cleaned if len(cleaned) > len(title) else f"Chairman instruction: {cleaned}"
-        return title, summary
-
-    @staticmethod
-    def _domains_from_instruction(text: str) -> list[str]:
-        lowered = text.lower()
-        domains = []
-        if any(word in lowered for word in ["code", "developer", "開發", "程式", "ui", "frontend", "backend"]):
-            domains.append("development")
-        if any(word in lowered for word in ["finance", "cost", "成本", "財務"]):
-            domains.append("finance")
-        if any(word in lowered for word in ["operation", "ops", "流程", "營運"]):
-            domains.append("operations")
-        return domains or ["operations"]
-
-    @staticmethod
-    def _priority_from_instruction(text: str) -> str:
-        lowered = text.lower()
-        if any(word in lowered for word in ["urgent", "critical", "緊急", "重要", "立刻"]):
-            return "critical"
-        if any(word in lowered for word in ["high", "優先"]):
-            return "high"
-        return "normal"
 
     def runtime_health(self) -> dict:
         runtime = MissionRuntime()

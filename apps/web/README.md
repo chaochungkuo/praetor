@@ -26,6 +26,7 @@ The production Docker image builds `frontend/` into `dist/` and serves it from t
 Current Office capabilities:
 
 - CEO chat backed by `/api/office/conversation`
-- chairman instructions can create planned missions
+- chairman instructions run through a replaceable CEO planner interface
+- planner actions currently support mission drafts, approval requests, and memory updates
 - mission room with timeline and AI internal conversation
 - browser speech recognition as the first voice input path

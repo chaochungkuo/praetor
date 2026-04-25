@@ -330,6 +330,15 @@ class FilesystemStore:
             )
         return pages
 
+    def append_wiki_page(self, workspace_root: Path, page_name: str, text: str) -> Path:
+        safe_name = page_name.replace("/", "-").replace("\\", "-").strip() or "CEO Memory.md"
+        if not safe_name.endswith(".md"):
+            safe_name = f"{safe_name}.md"
+        path = workspace_root / "Wiki" / safe_name
+        existing = path.read_text(encoding="utf-8") if path.exists() else f"# {safe_name.removesuffix('.md')}\n\n"
+        _write_workspace_text(path, existing.rstrip() + "\n\n" + text.strip() + "\n")
+        return path
+
     def save_approval(self, approval: ApprovalRequest) -> None:
         approvals = self.list_approvals()
         approvals = [item for item in approvals if item.id != approval.id] + [approval]
@@ -492,6 +501,9 @@ class AppStorage:
 
     def list_wiki_pages(self, workspace_root: Path) -> list[dict[str, str]]:
         return self.fs.list_wiki_pages(workspace_root)
+
+    def append_wiki_page(self, workspace_root: Path, page_name: str, text: str) -> Path:
+        return self.fs.append_wiki_page(workspace_root, page_name, text)
 
     def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
         return self.fs.save_meeting(workspace_root, meeting)

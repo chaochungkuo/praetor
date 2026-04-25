@@ -52,10 +52,23 @@ export type AgentMessage = {
   run_id?: string | null;
 };
 
+export type PlannerAction = {
+  id: string;
+  type: "mission_draft" | "approval_request" | "memory_update" | "briefing";
+  status: "proposed" | "applied" | "skipped";
+  title: string;
+  body?: string | null;
+  mission_id?: string | null;
+  result_id?: string | null;
+  metadata: Record<string, unknown>;
+};
+
 export type ConversationResult = {
   messages: ConversationMessage[];
   created_mission?: Mission | null;
+  created_approval?: Approval | null;
   agent_messages: AgentMessage[];
+  actions: PlannerAction[];
   intent: string;
 };
 

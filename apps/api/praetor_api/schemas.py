@@ -13,6 +13,8 @@ from .models import (
     MissionDefinition,
     OnboardingAnswers,
     OnboardingPreview,
+    PlannerAction,
+    PlannerPlan,
     PraetorBriefing,
     RunRecord,
     RoleDefinition,
@@ -32,6 +34,8 @@ SCHEMA_MODELS = {
     "meeting_record": MeetingRecord,
     "onboarding_answers": OnboardingAnswers,
     "onboarding_preview": OnboardingPreview,
+    "planner_action": PlannerAction,
+    "planner_plan": PlannerPlan,
     "praetor_briefing": PraetorBriefing,
     "run_record": RunRecord,
 }
