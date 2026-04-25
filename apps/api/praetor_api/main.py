@@ -382,18 +382,28 @@ def office_conversation():
 @app.post("/api/office/conversation")
 def create_office_conversation(payload: ConversationCreateRequest):
     try:
-        messages = get_ctx().service.create_ceo_message(payload)
+        result = get_ctx().service.create_ceo_message(payload)
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
     except ValueError as exc:
         fail(400, "invalid_request", str(exc))
-    return ok({"messages": messages})
+    return ok(result)
 
 
 @app.get("/api/missions/{mission_id}/timeline")
 def mission_timeline(mission_id: str):
     try:
         return ok({"events": get_ctx().service.mission_timeline(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/missions/{mission_id}/agent-messages")
+def mission_agent_messages(mission_id: str):
+    try:
+        return ok({"messages": get_ctx().service.mission_agent_messages(mission_id)})
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
     except KeyError:

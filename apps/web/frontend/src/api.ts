@@ -1,4 +1,4 @@
-import type { ApiEnvelope, ConversationMessage, OfficeSnapshot, Session, TimelineEvent } from "./types";
+import type { AgentMessage, ApiEnvelope, ConversationResult, OfficeSnapshot, Session, TimelineEvent } from "./types";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -24,13 +24,12 @@ export async function getOfficeSnapshot(): Promise<OfficeSnapshot> {
   return api<OfficeSnapshot>("/api/office/snapshot");
 }
 
-export async function sendCeoMessage(body: string, csrfToken: string): Promise<ConversationMessage[]> {
-  const data = await api<{ messages: ConversationMessage[] }>("/api/office/conversation", {
+export async function sendCeoMessage(body: string, csrfToken: string): Promise<ConversationResult> {
+  return api<ConversationResult>("/api/office/conversation", {
     method: "POST",
     headers: { "X-CSRF-Token": csrfToken },
     body: JSON.stringify({ body })
   });
-  return data.messages;
 }
 
 export async function getMissionTimeline(missionId: string): Promise<TimelineEvent[]> {
@@ -38,3 +37,7 @@ export async function getMissionTimeline(missionId: string): Promise<TimelineEve
   return data.events;
 }
 
+export async function getMissionAgentMessages(missionId: string): Promise<AgentMessage[]> {
+  const data = await api<{ messages: AgentMessage[] }>(`/api/missions/${missionId}/agent-messages`);
+  return data.messages;
+}

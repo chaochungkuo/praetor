@@ -209,8 +209,8 @@ pixi run office-smoke
 - initializes the app
 - creates a mission
 - reads the Office snapshot API
-- sends a CEO conversation message
-- reads the mission timeline
+- sends a CEO conversation message that can create a mission
+- reads the mission timeline and agent message thread
 - verifies the React Office entrypoint is served
 
 ## Key tasks

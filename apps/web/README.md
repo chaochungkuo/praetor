@@ -22,3 +22,10 @@ npm --prefix apps/web run build
 ```
 
 The production Docker image builds `frontend/` into `dist/` and serves it from the FastAPI web entrypoint.
+
+Current Office capabilities:
+
+- CEO chat backed by `/api/office/conversation`
+- chairman instructions can create planned missions
+- mission room with timeline and AI internal conversation
+- browser speech recognition as the first voice input path

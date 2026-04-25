@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
+  MessagesSquare,
   AudioLines,
   Bot,
   BriefcaseBusiness,
@@ -16,8 +17,8 @@ import {
   Sparkles,
   UserRound
 } from "lucide-react";
-import { getMissionTimeline, getOfficeSnapshot, getSession, sendCeoMessage } from "./api";
-import type { ConversationMessage, Mission, OfficeSnapshot, Session, TimelineEvent } from "./types";
+import { getMissionAgentMessages, getMissionTimeline, getOfficeSnapshot, getSession, sendCeoMessage } from "./api";
+import type { AgentMessage, ConversationMessage, Mission, OfficeSnapshot, Session, TimelineEvent } from "./types";
 import "./styles.css";
 
 type BrowserSpeechRecognition = {
@@ -41,6 +42,7 @@ function App() {
   const [snapshot, setSnapshot] = useState<OfficeSnapshot | null>(null);
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +59,11 @@ function App() {
       setTimeline([]);
       return;
     }
-    getMissionTimeline(selectedMissionId)
-      .then(setTimeline)
+    Promise.all([getMissionTimeline(selectedMissionId), getMissionAgentMessages(selectedMissionId)])
+      .then(([events, messages]) => {
+        setTimeline(events);
+        setAgentMessages(messages);
+      })
       .catch((err: Error) => setError(err.message));
   }, [selectedMissionId]);
 
@@ -93,12 +98,16 @@ function App() {
     setIsSending(true);
     setError(null);
     try {
-      const messages = await sendCeoMessage(input.trim(), session.csrf_token);
+      const result = await sendCeoMessage(input.trim(), session.csrf_token);
       setInput("");
       setSnapshot((current) =>
-        current ? { ...current, ceo_thread: [...current.ceo_thread, ...messages] } : current
+        current ? { ...current, ceo_thread: [...current.ceo_thread, ...result.messages] } : current
       );
       await refreshOffice(false);
+      if (result.created_mission) {
+        setSelectedMissionId(result.created_mission.id);
+        setAgentMessages(result.agent_messages);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -213,7 +222,12 @@ function App() {
         </section>
 
         <section className="mission-room">
-          <MissionRoom mission={selectedMission} timeline={timeline} agentActivity={snapshot.agent_activity} />
+          <MissionRoom
+            mission={selectedMission}
+            timeline={timeline}
+            agentActivity={snapshot.agent_activity}
+            agentMessages={agentMessages}
+          />
         </section>
       </main>
 
@@ -324,10 +338,11 @@ function MissionControl({ missions, selectedMissionId, onSelect }: {
   );
 }
 
-function MissionRoom({ mission, timeline, agentActivity }: {
+function MissionRoom({ mission, timeline, agentActivity, agentMessages }: {
   mission?: Mission;
   timeline: TimelineEvent[];
   agentActivity: TimelineEvent[];
+  agentMessages: AgentMessage[];
 }) {
   const visibleEvents = timeline.length > 0 ? timeline : agentActivity;
   return (
@@ -350,18 +365,34 @@ function MissionRoom({ mission, timeline, agentActivity }: {
               <div><dt>Complexity</dt><dd>{mission.complexity_score.toFixed(2)}</dd></div>
             </dl>
           </div>
-          <div className="timeline">
-            {visibleEvents.length === 0 ? <p>No timeline events yet.</p> : visibleEvents.map((event) => (
-              <div className="timeline-event" key={event.id}>
-                <div className="timeline-marker" />
-                <div>
-                  <span>{event.actor.replaceAll("_", " ")}</span>
-                  <strong>{event.title}</strong>
-                  {event.body ? <p>{event.body}</p> : null}
-                  {event.status ? <em>{event.status}</em> : null}
-                </div>
+          <div className="mission-thread-grid">
+            <div>
+              <div className="thread-title"><Activity size={16} /> Timeline</div>
+              <div className="timeline">
+                {visibleEvents.length === 0 ? <p>No timeline events yet.</p> : visibleEvents.map((event) => (
+                  <div className="timeline-event" key={event.id}>
+                    <div className="timeline-marker" />
+                    <div>
+                      <span>{event.actor.replaceAll("_", " ")}</span>
+                      <strong>{event.title}</strong>
+                      {event.body ? <p>{event.body}</p> : null}
+                      {event.status ? <em>{event.status}</em> : null}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div>
+              <div className="thread-title"><MessagesSquare size={16} /> AI internal conversation</div>
+              <div className="agent-thread">
+                {agentMessages.length === 0 ? <p>No agent conversation yet.</p> : agentMessages.map((message) => (
+                  <div className={`agent-bubble ${message.role}`} key={message.id}>
+                    <strong>{message.role.replaceAll("_", " ")}</strong>
+                    <p>{message.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : <p>Create a mission to open the live room.</p>}

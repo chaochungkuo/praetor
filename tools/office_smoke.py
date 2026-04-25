@@ -151,9 +151,12 @@ def main() -> int:
         chat_status, chat = request(
             "POST",
             "/api/office/conversation",
-            {"body": "請整理目前任務進度與需要我決策的地方。"},
+            {"body": "建立任務：檢查 Office v2 的 AI 內部對話是否清楚。"},
         )
+        created_mission_id = chat["data"]["created_mission"]["id"]
         timeline_status, timeline = request("GET", f"/api/missions/{mission_id}/timeline")
+        created_timeline_status, created_timeline = request("GET", f"/api/missions/{created_mission_id}/timeline")
+        agent_status, agent_messages = request("GET", f"/api/missions/{created_mission_id}/agent-messages")
         with urllib.request.urlopen(f"{WEB_BASE}/office", timeout=10) as resp:
             office_html = resp.read().decode("utf-8")
         print(
@@ -167,8 +170,15 @@ def main() -> int:
                     "snapshot_missions": len(snapshot["data"]["missions"]),
                     "chat_status": chat_status,
                     "chat_messages": len(chat["data"]["messages"]),
+                    "chat_intent": chat["data"]["intent"],
+                    "chat_created_mission": bool(chat["data"]["created_mission"]),
+                    "chat_agent_messages": len(chat["data"]["agent_messages"]),
                     "timeline_status": timeline_status,
                     "timeline_events": len(timeline["data"]["events"]),
+                    "created_timeline_status": created_timeline_status,
+                    "created_timeline_events": len(created_timeline["data"]["events"]),
+                    "agent_status": agent_status,
+                    "agent_messages": len(agent_messages["data"]["messages"]),
                     "office_html": "Praetor Office" in office_html,
                 },
                 ensure_ascii=True,
@@ -182,4 +192,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

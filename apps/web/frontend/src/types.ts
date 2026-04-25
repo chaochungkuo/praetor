@@ -42,6 +42,23 @@ export type TimelineEvent = {
   metadata: Record<string, unknown>;
 };
 
+export type AgentMessage = {
+  id: string;
+  mission_id: string;
+  role: "ceo" | "project_manager" | "developer" | "reviewer" | "system";
+  body: string;
+  created_at: string;
+  task_id?: string | null;
+  run_id?: string | null;
+};
+
+export type ConversationResult = {
+  messages: ConversationMessage[];
+  created_mission?: Mission | null;
+  agent_messages: AgentMessage[];
+  intent: string;
+};
+
 export type OfficeSnapshot = {
   briefing: {
     active_missions: number;
@@ -70,4 +87,3 @@ export type ApiEnvelope<T> = {
   data: T;
   error?: { code: string; message: string } | null;
 };
-

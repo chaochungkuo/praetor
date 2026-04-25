@@ -253,6 +253,13 @@ class ConversationCreateRequest(BaseModel):
     related_mission_id: str | None = None
 
 
+class ConversationCreateResult(BaseModel):
+    messages: list[ConversationMessage] = Field(default_factory=list)
+    created_mission: MissionDefinition | None = None
+    agent_messages: list["AgentMessage"] = Field(default_factory=list)
+    intent: str = "briefing"
+
+
 class AgentMessage(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("agentmsg"))
     mission_id: str
