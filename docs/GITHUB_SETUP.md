@@ -41,6 +41,11 @@ This repository is configured for a modern GitHub workflow.
 - `Scorecard`: runs OpenSSF Scorecard on a weekly schedule and uploads SARIF results.
 - `Dependabot`: weekly GitHub Actions dependency updates.
 
+## Public Documentation
+
+- Pages site: https://chaochungkuo.github.io/praetor/
+- Scorecard: https://securityscorecards.dev/viewer/?uri=github.com/chaochungkuo/praetor
+
 ## Recommended Next Steps
 
 - Add signed release artifacts before publishing downloadable binaries or installers.

@@ -7,6 +7,8 @@
 [![CI](https://github.com/chaochungkuo/praetor/actions/workflows/ci.yml/badge.svg)](https://github.com/chaochungkuo/praetor/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/chaochungkuo/praetor/actions/workflows/docker-build.yml/badge.svg)](https://github.com/chaochungkuo/praetor/actions/workflows/docker-build.yml)
 [![CodeQL](https://github.com/chaochungkuo/praetor/actions/workflows/codeql.yml/badge.svg)](https://github.com/chaochungkuo/praetor/actions/workflows/codeql.yml)
+[![Pages](https://github.com/chaochungkuo/praetor/actions/workflows/pages.yml/badge.svg)](https://chaochungkuo.github.io/praetor/)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/chaochungkuo/praetor/badge)](https://securityscorecards.dev/viewer/?uri=github.com/chaochungkuo/praetor)
 
 Praetor is a local-first AI company operating system for solo founders.
 
@@ -29,6 +31,11 @@ This is still an active build-stage repo, not a finished product release.
 ## Roadmap
 
 - [ROADMAP.md](ROADMAP.md)
+
+## Documentation
+
+- [GitHub Pages documentation site](https://chaochungkuo.github.io/praetor/)
+- [GitHub repository setup](docs/GITHUB_SETUP.md)
 
 ## Official development baseline
 
