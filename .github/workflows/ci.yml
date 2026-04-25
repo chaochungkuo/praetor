@@ -33,6 +33,9 @@ jobs:
       - name: Documentation site build
         run: pixi run docs-site
 
+      - name: Praetor Office web build
+        run: pixi run web-build
+
       - name: Security smoke test
         run: pixi run app-security-smoke
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: Split stack smoke test
         run: pixi run stack-smoke
+
+      - name: Office v2 smoke test
+        run: pixi run office-smoke
 
       - name: Bridge smoke test
         run: pixi run bridge-smoke

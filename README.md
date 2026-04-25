@@ -23,6 +23,7 @@ This repository currently contains:
 - `praetor-execd` host-side executor bridge
 - worker-side bridge client skeleton
 - app backend with onboarding, mission persistence, browser UI, and API mode
+- v2 React/TypeScript Praetor Office shell with CEO chat and mission timeline APIs
 - authentication, setup-token, CSRF, and deployment hardening basics
 - repo-local Pixi development environment
 
@@ -129,6 +130,7 @@ docker compose -f compose.yaml up --build
 Then open:
 
 - [http://127.0.0.1:3000/app/praetor](http://127.0.0.1:3000/app/praetor)
+- [http://127.0.0.1:3000/office](http://127.0.0.1:3000/office)
 
 For the production overlay:
 
@@ -146,6 +148,8 @@ pixi run app-security-smoke
 pixi run app-api-smoke
 pixi run app-fallback-smoke
 pixi run stack-smoke
+pixi run web-build
+pixi run office-smoke
 ```
 
 `app-smoke` verifies the backend vertical slice:
@@ -200,6 +204,15 @@ pixi run stack-smoke
 - `worker` reports healthy visibility to `api`
 - onboarding and mission creation still work through the `web` entrypoint
 
+`office-smoke` verifies the v2 Office surface:
+
+- initializes the app
+- creates a mission
+- reads the Office snapshot API
+- sends a CEO conversation message
+- reads the mission timeline
+- verifies the React Office entrypoint is served
+
 ## Key tasks
 
 ```bash
@@ -216,6 +229,8 @@ pixi run app-security-smoke
 pixi run app-api-smoke
 pixi run app-fallback-smoke
 pixi run stack-smoke
+pixi run web-build
+pixi run office-smoke
 pixi run bridge-smoke
 pixi run bridge-import-check
 pixi run runtime-import-check

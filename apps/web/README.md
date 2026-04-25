@@ -5,7 +5,20 @@ This service is the browser-facing entrypoint for the multi-service stack.
 Current role:
 
 - health endpoint
+- serves the React/TypeScript Praetor Office app at `/office`
 - reverse proxy to the Praetor API app
-- stable place to evolve into a dedicated web shell later
+- browser-facing shell for the split `web / api / worker` stack
 
 It does not run mission logic itself.
+
+## Frontend
+
+The v2 Office frontend lives in `frontend/` and is built with Vite, React, and TypeScript.
+
+```bash
+npm --prefix apps/web install
+npm --prefix apps/web run dev
+npm --prefix apps/web run build
+```
+
+The production Docker image builds `frontend/` into `dist/` and serves it from the FastAPI web entrypoint.

@@ -1,6 +1,9 @@
 .git
 .pixi
 __pycache__
+node_modules
+apps/web/node_modules
+apps/web/dist
 *.pyc
 .DS_Store
 workspace

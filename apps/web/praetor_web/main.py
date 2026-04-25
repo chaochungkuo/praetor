@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 
 
 UPSTREAM = os.getenv("PRAETOR_WEB_UPSTREAM", "http://127.0.0.1:9741").rstrip("/")
+DIST_DIR = Path(__file__).resolve().parents[1] / "dist"
 HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -23,6 +26,9 @@ HOP_BY_HOP_HEADERS = {
 }
 
 app = FastAPI(title="praetor-web", version=__version__)
+
+if (DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
 
 
 @app.get("/health")
@@ -41,6 +47,23 @@ async def health():
         "upstream": UPSTREAM,
         "upstream_health": upstream_health,
     }
+
+
+@app.get("/office")
+async def office_app():
+    index = DIST_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "ok": False,
+            "error": {
+                "code": "office_not_built",
+                "message": "Praetor Office frontend has not been built.",
+            },
+        },
+    )
 
 
 @app.api_route(

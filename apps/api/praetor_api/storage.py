@@ -9,7 +9,16 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from .models import AppSettings, ApprovalRequest, MeetingRecord, MissionDefinition, OwnerAuthRecord, TaskDefinition
+from .models import (
+    AgentMessage,
+    AppSettings,
+    ApprovalRequest,
+    ConversationMessage,
+    MeetingRecord,
+    MissionDefinition,
+    OwnerAuthRecord,
+    TaskDefinition,
+)
 
 
 SAFE_ID_RE = re.compile(r"^[a-z][a-z0-9_]*_[a-f0-9]{12}$")
@@ -126,6 +135,8 @@ class FilesystemStore:
         self.auth_path = self.state_dir / "auth.json"
         self.audit_path = self.state_dir / "audit.jsonl"
         self.approvals_path = self.state_dir / "approvals.json"
+        self.conversation_path = self.state_dir / "office_conversation.json"
+        self.agent_messages_path = self.state_dir / "agent_messages.json"
 
     def save_settings(self, settings: AppSettings) -> None:
         _write_private_text(self.settings_path, settings.model_dump_json(indent=2))
@@ -379,6 +390,39 @@ class FilesystemStore:
         meetings.sort(key=lambda item: item.created_at, reverse=True)
         return meetings
 
+    def append_conversation_message(self, message: ConversationMessage) -> None:
+        messages = self.list_conversation_messages()
+        messages.append(message)
+        _write_private_text(
+            self.conversation_path,
+            json.dumps([item.model_dump(mode="json") for item in messages], indent=2, ensure_ascii=True),
+        )
+
+    def list_conversation_messages(self, limit: int = 50) -> list[ConversationMessage]:
+        if not self.conversation_path.exists():
+            return []
+        payload = json.loads(self.conversation_path.read_text(encoding="utf-8"))
+        messages = [ConversationMessage.model_validate(item) for item in payload]
+        return messages[-limit:]
+
+    def append_agent_message(self, message: AgentMessage) -> None:
+        messages = self.list_agent_messages(limit=10_000)
+        messages.append(message)
+        _write_private_text(
+            self.agent_messages_path,
+            json.dumps([item.model_dump(mode="json") for item in messages], indent=2, ensure_ascii=True),
+        )
+
+    def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
+        if not self.agent_messages_path.exists():
+            return []
+        payload = json.loads(self.agent_messages_path.read_text(encoding="utf-8"))
+        messages = [AgentMessage.model_validate(item) for item in payload]
+        if mission_id is not None:
+            messages = [item for item in messages if item.mission_id == mission_id]
+        messages.sort(key=lambda item: item.created_at)
+        return messages[-limit:]
+
 
 class AppStorage:
     def __init__(self, state_dir: Path) -> None:
@@ -454,6 +498,18 @@ class AppStorage:
 
     def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
         return self.fs.list_meetings(workspace_root, mission_id=mission_id)
+
+    def append_conversation_message(self, message: ConversationMessage) -> None:
+        self.fs.append_conversation_message(message)
+
+    def list_conversation_messages(self, limit: int = 50) -> list[ConversationMessage]:
+        return self.fs.list_conversation_messages(limit=limit)
+
+    def append_agent_message(self, message: AgentMessage) -> None:
+        self.fs.append_agent_message(message)
+
+    def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
+        return self.fs.list_agent_messages(mission_id=mission_id, limit=limit)
 
     def save_approval(self, approval: ApprovalRequest) -> None:
         self.fs.save_approval(approval)

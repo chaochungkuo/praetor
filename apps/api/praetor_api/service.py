@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .auth import hash_password, validate_password_strength, verify_password
 from .models import (
+    AgentMessage,
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    ConversationCreateRequest,
+    ConversationMessage,
     LoginRequest,
     MeetingRecord,
     MissionContinueRequest,
     MissionCreateRequest,
     MissionDefinition,
+    MissionTimelineEvent,
+    OfficeSnapshot,
     MissionPauseRequest,
     MissionStopRequest,
     OnboardingAnswers,
@@ -30,6 +36,12 @@ from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
 from .storage import AppStorage
 from .workspace import bootstrap_workspace
+
+
+def parse_datetime(value: str | None) -> datetime:
+    if not value:
+        return utc_now()
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 @dataclass
@@ -148,6 +160,24 @@ class PraetorService:
                 "pm_required": mission.pm_required,
             },
         )
+        self.storage.append_agent_message(
+            AgentMessage(
+                mission_id=mission.id,
+                role="ceo",
+                body=f"Mission created and assigned to {mission.manager_layer}: {mission.title}",
+            )
+        )
+        if mission.pm_required:
+            self.storage.append_agent_message(
+                AgentMessage(
+                    mission_id=mission.id,
+                    role="project_manager",
+                    body=(
+                        "I will break this mission into execution work, monitor risk, "
+                        "and report back to Praetor before escalation."
+                    ),
+                )
+            )
         return mission
 
     def list_missions(self) -> list[MissionDefinition]:
@@ -348,6 +378,18 @@ class PraetorService:
         )
         self.storage.save_task(workspace_root, primary_result.task)
         self.storage.save_bridge_run(workspace_root, mission.id, primary_result.run_record.model_dump(mode="json"))
+        self.storage.append_agent_message(
+            AgentMessage(
+                mission_id=mission.id,
+                role="developer",
+                task_id=primary_result.task.id,
+                run_id=primary_result.run_record.run_id,
+                body=(
+                    f"Execution finished with status {primary_result.run_record.normalized_status}. "
+                    f"Changed files: {', '.join(primary_result.run_record.changed_files) or 'none'}."
+                ),
+            )
+        )
 
         final_result = primary_result
         fallback_runtime = self._fallback_runtime(settings.runtime)
@@ -374,6 +416,18 @@ class PraetorService:
                     workspace_root,
                     mission.id,
                     fallback_result.run_record.model_dump(mode="json"),
+                )
+                self.storage.append_agent_message(
+                    AgentMessage(
+                        mission_id=mission.id,
+                        role="developer",
+                        task_id=fallback_result.task.id,
+                        run_id=fallback_result.run_record.run_id,
+                        body=(
+                            f"Fallback execution finished with status {fallback_result.run_record.normalized_status}. "
+                            f"Changed files: {', '.join(fallback_result.run_record.changed_files) or 'none'}."
+                        ),
+                    )
                 )
                 final_result = fallback_result
 
@@ -405,6 +459,18 @@ class PraetorService:
                     ]
                 ),
             )
+            self.storage.append_agent_message(
+                AgentMessage(
+                    mission_id=mission.id,
+                    role="project_manager",
+                    task_id=final_result.task.id,
+                    run_id=final_result.run_record.run_id,
+                    body=(
+                        f"Reviewing final run status {final_status}. "
+                        f"Owner-visible report has been updated."
+                    ),
+                )
+            )
         self._audit(
             "mission_run_finished",
             {
@@ -433,6 +499,161 @@ class PraetorService:
             "task": final_result.task,
             "bridge_run": final_result.run_record,
         }
+
+    def office_snapshot(self) -> OfficeSnapshot:
+        settings = self._require_settings()
+        missions = self.storage.list_missions(Path(settings.workspace.root))
+        recent_runs = self.storage.list_recent_runs(Path(settings.workspace.root), limit=12)
+        audit_events = self.storage.list_audit_events(limit=12)
+        approvals = self.storage.list_approvals()
+        pending_approvals = [item for item in approvals if item.status == "pending"]
+        return OfficeSnapshot(
+            briefing=self.praetor_briefing(),
+            missions=missions[:12],
+            approvals=pending_approvals,
+            recent_runs=recent_runs,
+            audit_events=audit_events,
+            ceo_thread=self.storage.list_conversation_messages(limit=30),
+            agent_activity=self._recent_agent_activity(limit=30),
+            runtime_health=self.runtime_health(),
+        )
+
+    def create_ceo_message(self, request: ConversationCreateRequest) -> list[ConversationMessage]:
+        self._require_settings()
+        text = request.body.strip()
+        if not text:
+            raise ValueError("Message body is required.")
+        chairman = ConversationMessage(
+            role="chairman",
+            body=text,
+            related_mission_id=request.related_mission_id,
+        )
+        response = ConversationMessage(
+            role="ceo",
+            body=self._ceo_response(text),
+            related_mission_id=request.related_mission_id,
+        )
+        self.storage.append_conversation_message(chairman)
+        self.storage.append_conversation_message(response)
+        self._audit(
+            "ceo_conversation_message",
+            {"message_id": chairman.id, "related_mission_id": request.related_mission_id},
+        )
+        return [chairman, response]
+
+    def list_ceo_messages(self, limit: int = 50) -> list[ConversationMessage]:
+        self._require_settings()
+        return self.storage.list_conversation_messages(limit=limit)
+
+    def mission_timeline(self, mission_id: str) -> list[MissionTimelineEvent]:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        mission = self.storage.load_mission(workspace_root, mission_id)
+        if mission is None:
+            raise KeyError(mission_id)
+        events: list[MissionTimelineEvent] = [
+            MissionTimelineEvent(
+                id=f"mission_created_{mission.id}",
+                mission_id=mission.id,
+                type="mission",
+                title="Mission created",
+                body=mission.summary,
+                actor="ceo",
+                status=mission.status,
+                created_at=mission.created_at,
+            )
+        ]
+        for task in self.storage.list_tasks(workspace_root, mission_id):
+            events.append(
+                MissionTimelineEvent(
+                    id=f"task_{task.id}",
+                    mission_id=mission_id,
+                    type="task",
+                    title=task.title,
+                    body=f"Executor: {task.current_executor or 'n/a'}",
+                    actor=task.role_owner,
+                    status=task.status,
+                    created_at=mission.updated_at,
+                    metadata={"task_id": task.id},
+                )
+            )
+        for run in self.storage.list_bridge_runs(workspace_root, mission_id):
+            usage = run.get("usage") or {}
+            events.append(
+                MissionTimelineEvent(
+                    id=f"run_{run.get('run_id', 'unknown')}",
+                    mission_id=mission_id,
+                    type="run",
+                    title=f"Run {run.get('normalized_status') or run.get('status')}",
+                    body=run.get("stdout_tail") or run.get("stderr_tail") or run.get("pause_reason"),
+                    actor=run.get("executor") or "executor",
+                    status=run.get("normalized_status") or run.get("status"),
+                    created_at=parse_datetime(run.get("finished_at") or run.get("started_at")),
+                    metadata={
+                        "run_id": run.get("run_id"),
+                        "changed_files": run.get("changed_files") or [],
+                        "usage": usage,
+                    },
+                )
+            )
+        for message in self.storage.list_agent_messages(mission_id=mission_id, limit=100):
+            events.append(
+                MissionTimelineEvent(
+                    id=message.id,
+                    mission_id=mission_id,
+                    type="agent_message",
+                    title=message.role.replace("_", " ").title(),
+                    body=message.body,
+                    actor=message.role,
+                    created_at=message.created_at,
+                    metadata={"task_id": message.task_id, "run_id": message.run_id},
+                )
+            )
+        for approval in self.storage.list_approvals():
+            if approval.mission_id == mission_id:
+                events.append(
+                    MissionTimelineEvent(
+                        id=approval.id,
+                        mission_id=mission_id,
+                        type="approval",
+                        title=f"Approval: {approval.category}",
+                        body=approval.reason,
+                        actor=approval.raised_by,
+                        status=approval.status,
+                        created_at=approval.created_at,
+                    )
+                )
+        events.sort(key=lambda item: item.created_at)
+        return events
+
+    def _recent_agent_activity(self, limit: int = 30) -> list[MissionTimelineEvent]:
+        events: list[MissionTimelineEvent] = []
+        for message in self.storage.list_agent_messages(limit=limit):
+            events.append(
+                MissionTimelineEvent(
+                    id=message.id,
+                    mission_id=message.mission_id,
+                    type="agent_message",
+                    title=message.role.replace("_", " ").title(),
+                    body=message.body,
+                    actor=message.role,
+                    created_at=message.created_at,
+                    metadata={"task_id": message.task_id, "run_id": message.run_id},
+                )
+            )
+        events.sort(key=lambda item: item.created_at, reverse=True)
+        return events[:limit]
+
+    @staticmethod
+    def _ceo_response(text: str) -> str:
+        lowered = text.lower()
+        if any(word in lowered for word in ["status", "進度", "狀態", "卡住"]):
+            return "我會把目前任務進度、卡點、待決策事項整理給你，並只升級需要董事長判斷的問題。"
+        if any(word in lowered for word in ["create", "建立", "新增", "任務", "mission"]):
+            return "我收到方向了。下一步我會把它整理成 mission，交給 PM 拆解，並保留需要你批准的邊界。"
+        if any(word in lowered for word in ["risk", "安全", "風險", "privacy"]):
+            return "我會優先檢查資料邊界、執行權限、外部 provider 暴露面與需要人工批准的動作。"
+        return "收到。我會把這段指示納入公司脈絡，整理成可執行的下一步，並在需要決策時回到你這裡。"
 
     def runtime_health(self) -> dict:
         runtime = MissionRuntime()

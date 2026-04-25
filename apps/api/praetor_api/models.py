@@ -56,6 +56,18 @@ TaskStatus = Literal[
 ]
 ApprovalStatus = Literal["pending", "approved", "rejected"]
 MeetingType = Literal["project_review", "risk_review", "weekly_planning", "decision_review"]
+ConversationRole = Literal["chairman", "ceo", "system"]
+AgentMessageRole = Literal["ceo", "project_manager", "developer", "reviewer", "system"]
+TimelineEventType = Literal[
+    "conversation",
+    "agent_message",
+    "mission",
+    "task",
+    "run",
+    "approval",
+    "meeting",
+    "audit",
+]
 
 
 class ApiEnvelope(BaseModel):
@@ -225,6 +237,53 @@ class MeetingRecord(BaseModel):
     agenda: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class ConversationMessage(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("msg"))
+    thread_id: str = "office"
+    role: ConversationRole
+    body: str
+    created_at: datetime = Field(default_factory=utc_now)
+    related_mission_id: str | None = None
+
+
+class ConversationCreateRequest(BaseModel):
+    body: str
+    related_mission_id: str | None = None
+
+
+class AgentMessage(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("agentmsg"))
+    mission_id: str
+    role: AgentMessageRole
+    body: str
+    created_at: datetime = Field(default_factory=utc_now)
+    task_id: str | None = None
+    run_id: str | None = None
+
+
+class MissionTimelineEvent(BaseModel):
+    id: str
+    mission_id: str | None = None
+    type: TimelineEventType
+    title: str
+    body: str | None = None
+    actor: str = "praetor"
+    status: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class OfficeSnapshot(BaseModel):
+    briefing: PraetorBriefing
+    missions: list[MissionDefinition] = Field(default_factory=list)
+    approvals: list[ApprovalRequest] = Field(default_factory=list)
+    recent_runs: list[dict[str, Any]] = Field(default_factory=list)
+    audit_events: list[dict[str, Any]] = Field(default_factory=list)
+    ceo_thread: list[ConversationMessage] = Field(default_factory=list)
+    agent_activity: list[MissionTimelineEvent] = Field(default_factory=list)
+    runtime_health: dict[str, Any] = Field(default_factory=dict)
 
 
 class AppSettings(BaseModel):

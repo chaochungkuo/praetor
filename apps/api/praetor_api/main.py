@@ -13,6 +13,7 @@ from .config import get_require_login, get_secure_cookie, get_session_max_age_se
 from .models import (
     ApiEnvelope,
     ApprovalCreateRequest,
+    ConversationCreateRequest,
     LoginRequest,
     MissionContinueRequest,
     MissionCreateRequest,
@@ -360,6 +361,43 @@ def export_schemas():
     output_dir = get_ctx().state_dir / "schemas"
     paths = get_ctx().service.export_schemas(output_dir)
     return ok({"paths": [str(path) for path in paths]})
+
+
+@app.get("/api/office/snapshot")
+def office_snapshot():
+    try:
+        return ok(get_ctx().service.office_snapshot())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.get("/api/office/conversation")
+def office_conversation():
+    try:
+        return ok({"messages": get_ctx().service.list_ceo_messages()})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.post("/api/office/conversation")
+def create_office_conversation(payload: ConversationCreateRequest):
+    try:
+        messages = get_ctx().service.create_ceo_message(payload)
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except ValueError as exc:
+        fail(400, "invalid_request", str(exc))
+    return ok({"messages": messages})
+
+
+@app.get("/api/missions/{mission_id}/timeline")
+def mission_timeline(mission_id: str):
+    try:
+        return ok({"events": get_ctx().service.mission_timeline(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
 @app.get("/debug/state")
