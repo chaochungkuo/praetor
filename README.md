@@ -151,6 +151,7 @@ pixi run stack-smoke
 pixi run web-build
 pixi run office-smoke
 pixi run planner-smoke
+pixi run organization-smoke
 ```
 
 `app-smoke` verifies the backend vertical slice:
@@ -221,6 +222,13 @@ pixi run planner-smoke
 - runs the Office conversation API in `PRAETOR_CEO_PLANNER_MODE=llm`
 - verifies LLM planner actions are validated, applied, and written to mission/memory state
 
+`organization-smoke` verifies the AI company operating model:
+
+- creates a mission and a mission-scoped AI team
+- verifies PM, Developer, Reviewer, Security Officer, and Legal Counsel agents can be onboarded
+- verifies delegation, decision escalation, standing order, and completion contract APIs
+- confirms the Office snapshot exposes organization telemetry
+
 ## Key tasks
 
 ```bash
@@ -240,6 +248,7 @@ pixi run stack-smoke
 pixi run web-build
 pixi run office-smoke
 pixi run planner-smoke
+pixi run organization-smoke
 pixi run bridge-smoke
 pixi run bridge-import-check
 pixi run runtime-import-check
@@ -263,7 +272,21 @@ PRAETOR_CEO_PLANNER_MODEL=gpt-4.1-mini
 OPENAI_API_KEY=...
 ```
 
-The planner may emit four action types: `mission_draft`, `approval_request`, `memory_update`, and `briefing`. LLM output is parsed as JSON, validated against the planner schema, sanitized before side effects, and falls back to the deterministic planner if the provider is unavailable or returns invalid output.
+The planner emits explicit action types for mission creation, approvals, memory, briefings, staffing, agent creation, delegation, escalation, closeout, and standing orders. LLM output is parsed as JSON, validated against the planner schema, sanitized before side effects, and falls back to the deterministic planner if the provider is unavailable or returns invalid output.
+
+## AI organization lifecycle
+
+Praetor models AI-to-AI work as a company operating system, not only a chat thread. The Office API tracks:
+
+- `AgentRoleSpec`: reusable job descriptions such as CEO, Project Manager, Developer, Reviewer, Security Officer, and Legal Counsel
+- `AgentInstance`: mission-scoped AI workers with a charter, skills, tools, memory access, decision authority, and escalation triggers
+- `MissionTeam`: the temporary team assigned to one mission
+- `DelegationRecord`: a formal work order from one AI role to another
+- `EscalationRecord`: an upward decision request to PM, CEO, or chairman
+- `StandingOrder`: durable chairman policy for when AI can decide autonomously and when it must ask
+- `CompletionContract`: closeout checks for outputs, delegation status, review, pending escalations, final report, and memory update
+
+The CEO planner can now emit organization actions: `staffing_proposal`, `agent_create`, `delegation_create`, `decision_escalation`, `mission_closeout`, and `standing_order_update`.
 
 ## Development workflow
 

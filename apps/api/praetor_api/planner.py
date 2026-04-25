@@ -29,7 +29,12 @@ class DeterministicCEOPlanner:
         actions: list[PlannerAction] = []
         intent = "briefing"
 
-        if self._wants_mission(lowered):
+        wants_staffing = self._wants_staffing(lowered)
+        wants_new_mission = self._wants_mission(lowered) and not (
+            context.related_mission_id and wants_staffing and not self._explicit_new_mission(lowered)
+        )
+
+        if wants_new_mission:
             title, summary = self._mission_fields(text)
             actions.append(
                 PlannerAction(
@@ -77,6 +82,63 @@ class DeterministicCEOPlanner:
             if intent == "briefing":
                 intent = "memory_update"
 
+        if wants_staffing:
+            roles = self._staffing_roles(lowered)
+            actions.append(
+                PlannerAction(
+                    type="staffing_proposal",
+                    title="AI organization staffing proposal",
+                    body="CEO recommends forming a mission team with explicit reporting lines, skills, and escalation rules.",
+                    mission_id=context.related_mission_id,
+                    metadata={"roles": roles, "requires_existing_mission": True},
+                )
+            )
+            if context.related_mission_id:
+                actions.append(
+                    PlannerAction(
+                        type="delegation_create",
+                        title="Create mission operating plan",
+                        body="Convert chairman intent into work orders, blockers, review criteria, and escalation checkpoints.",
+                        mission_id=context.related_mission_id,
+                        metadata={
+                            "to_role": "Project Manager",
+                            "success_criteria": [
+                                "team roles are clear",
+                                "work orders have owners",
+                                "review and escalation checkpoints are visible",
+                            ],
+                            "constraints": ["escalate safety, privacy, legal, spending, or destructive actions"],
+                        },
+                    )
+                )
+            if intent == "briefing":
+                intent = "staffing_proposal"
+
+        if self._wants_escalation(lowered):
+            actions.append(
+                PlannerAction(
+                    type="decision_escalation",
+                    title="Chairman escalation rule",
+                    body="This instruction touches authority boundaries or sensitive operating policy and should be visible as an escalation.",
+                    mission_id=context.related_mission_id,
+                    metadata={"to_level": "chairman", "category": "change_strategy"},
+                )
+            )
+            if intent == "briefing":
+                intent = "decision_escalation"
+
+        if self._wants_standing_order(lowered):
+            actions.append(
+                PlannerAction(
+                    type="standing_order_update",
+                    title="Chairman standing order",
+                    body=text,
+                    metadata={"scope": self._standing_order_scope(lowered), "effect": "governance_rule"},
+                )
+            )
+            if intent == "briefing":
+                intent = "standing_order_update"
+
         if not actions:
             actions.append(
                 PlannerAction(
@@ -100,12 +162,78 @@ class DeterministicCEOPlanner:
         return any(word in lowered for word in ["create", "建立", "新增", "任務", "mission"])
 
     @staticmethod
+    def _explicit_new_mission(lowered: str) -> bool:
+        return any(word in lowered for word in ["建立任務", "新增任務", "create mission", "new mission", "mission:"])
+
+    @staticmethod
     def _wants_approval(lowered: str) -> bool:
         return any(word in lowered for word in ["approval", "approve", "批准", "核准", "決策", "checkpoint"])
 
     @staticmethod
     def _wants_memory(lowered: str) -> bool:
         return any(word in lowered for word in ["memory", "remember", "記住", "記憶", "保存", "原則"])
+
+    @staticmethod
+    def _wants_staffing(lowered: str) -> bool:
+        return any(
+            word in lowered
+            for word in [
+                "staff",
+                "staffing",
+                "agent",
+                "team",
+                "hire",
+                "role",
+                "pm",
+                "project manager",
+                "reviewer",
+                "lawyer",
+                "legal",
+                "security",
+                "sales",
+                "組隊",
+                "團隊",
+                "团队",
+                "角色",
+                "法務",
+                "法律",
+                "律師",
+                "安全",
+                "隱私",
+                "隐私",
+            ]
+        )
+
+    @staticmethod
+    def _wants_escalation(lowered: str) -> bool:
+        return any(word in lowered for word in ["escalate", "升級", "升级", "裁示", "決策", "decision", "approval"])
+
+    @staticmethod
+    def _wants_standing_order(lowered: str) -> bool:
+        return any(word in lowered for word in ["以后", "以後", "不用再問", "不用再问", "standing order", "policy", "規則", "规则"])
+
+    @staticmethod
+    def _staffing_roles(lowered: str) -> list[str]:
+        roles = ["Project Manager", "Developer", "Reviewer"]
+        if any(word in lowered for word in ["security", "安全", "privacy", "隱私", "隐私"]):
+            roles.append("Security Officer")
+        if any(word in lowered for word in ["lawyer", "legal", "法務", "法律", "律師"]):
+            roles.append("Legal Counsel")
+        if any(word in lowered for word in ["sales", "業務", "销售", "銷售"]):
+            roles.append("Sales Manager")
+        return roles
+
+    @staticmethod
+    def _standing_order_scope(lowered: str) -> str:
+        if any(word in lowered for word in ["security", "安全"]):
+            return "security"
+        if any(word in lowered for word in ["privacy", "隱私", "隐私"]):
+            return "privacy"
+        if any(word in lowered for word in ["legal", "law", "法務", "法律"]):
+            return "legal"
+        if any(word in lowered for word in ["finance", "spending", "money", "財務", "金錢"]):
+            return "finance"
+        return "global"
 
     @staticmethod
     def _mission_fields(text: str) -> tuple[str, str]:
@@ -189,14 +317,20 @@ class LLMCEOPlanner:
                 "- approval_request: request a chairman decision checkpoint. Requires an existing mission_id.",
                 "- memory_update: write durable company memory.",
                 "- briefing: record status or context without side effects.",
+                "- staffing_proposal: recommend or create a mission team with roles and reporting lines.",
+                "- agent_create: create one mission-scoped AI agent.",
+                "- delegation_create: assign work from one AI role to another AI role.",
+                "- decision_escalation: escalate a decision to PM, CEO, or chairman.",
+                "- mission_closeout: request mission completion against the completion contract.",
+                "- standing_order_update: record durable chairman policy or authority guidance.",
                 "",
                 "Required JSON shape:",
                 "{",
-                '  "intent": "mission_draft|approval_request|memory_update|briefing",',
+                '  "intent": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update",',
                 '  "response": "short CEO response to the chairman",',
                 '  "actions": [',
                 "    {",
-                '      "type": "mission_draft|approval_request|memory_update|briefing",',
+                '      "type": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update",',
                 '      "title": "short title",',
                 '      "body": "details",',
                 '      "mission_id": "optional existing mission id",',
@@ -209,6 +343,11 @@ class LLMCEOPlanner:
                 '- mission_draft metadata may include "domains", "priority", "requested_outputs".',
                 '- approval_request metadata may include "category"; default category is "change_strategy".',
                 '- memory_update metadata may include "page"; default page is "CEO Memory.md".',
+                '- staffing_proposal metadata may include "roles".',
+                '- agent_create metadata must include "role" when possible.',
+                '- delegation_create metadata may include "from_role", "to_role", "success_criteria", "constraints".',
+                '- decision_escalation metadata may include "from_role", "to_level", "category", "options".',
+                '- standing_order_update metadata may include "scope" and "effect".',
                 "",
                 f"Existing mission count: {context.mission_count}",
                 f"Pending approvals: {context.pending_approvals}",
@@ -246,6 +385,38 @@ class LLMCEOPlanner:
             elif action.type == "memory_update":
                 page = str(metadata.get("page") or "CEO Memory.md").replace("/", "-").replace("\\", "-")
                 metadata["page"] = page or "CEO Memory.md"
+            elif action.type == "staffing_proposal":
+                roles = LLMCEOPlanner._clean_string_list(metadata.get("roles"), limit=10)
+                metadata["roles"] = roles or ["Project Manager", "Developer", "Reviewer"]
+            elif action.type == "agent_create":
+                metadata["role"] = LLMCEOPlanner._clean_text(str(metadata.get("role") or title), limit=80)
+            elif action.type == "delegation_create":
+                metadata["from_role"] = LLMCEOPlanner._clean_text(str(metadata.get("from_role") or "ceo"), limit=80)
+                metadata["to_role"] = LLMCEOPlanner._clean_text(str(metadata.get("to_role") or "Project Manager"), limit=80)
+                metadata["success_criteria"] = LLMCEOPlanner._clean_string_list(metadata.get("success_criteria"), limit=8)
+                metadata["constraints"] = LLMCEOPlanner._clean_string_list(metadata.get("constraints"), limit=8)
+            elif action.type == "decision_escalation":
+                level = metadata.get("to_level") or "chairman"
+                if level not in {"project_manager", "ceo", "chairman"}:
+                    level = "chairman"
+                category = metadata.get("category") or "change_strategy"
+                allowed = {"delete_files", "overwrite_important_files", "external_communication", "spending_money", "change_strategy", "shell_commands"}
+                if category not in allowed:
+                    category = "change_strategy"
+                metadata["to_level"] = level
+                metadata["category"] = category
+                metadata["options"] = [
+                    {"value": LLMCEOPlanner._clean_text(str(item.get("value") or item.get("label") or ""), limit=80),
+                     "label": LLMCEOPlanner._clean_text(str(item.get("label") or item.get("value") or ""), limit=120)}
+                    for item in (metadata.get("options") or [])[:5]
+                    if isinstance(item, dict)
+                ]
+            elif action.type == "standing_order_update":
+                scope = metadata.get("scope") or "global"
+                if scope not in {"global", "mission", "security", "privacy", "legal", "finance", "product", "engineering"}:
+                    scope = "global"
+                metadata["scope"] = scope
+                metadata["effect"] = LLMCEOPlanner._clean_text(str(metadata.get("effect") or "guidance"), limit=80)
             actions.append(action.model_copy(update={"title": title, "body": body, "metadata": metadata}))
         if not actions:
             actions = [PlannerAction(type="briefing", title="Planner produced no action", body=plan.response)]

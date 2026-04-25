@@ -371,6 +371,32 @@ def office_snapshot():
         fail(400, "not_initialized", str(exc))
 
 
+@app.get("/api/organization")
+def organization_snapshot():
+    try:
+        return ok(get_ctx().service.organization_snapshot())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.get("/api/missions/{mission_id}/organization")
+def mission_organization_snapshot(mission_id: str):
+    try:
+        return ok(get_ctx().service.organization_snapshot(mission_id=mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.get("/api/missions/{mission_id}/completion-contract")
+def mission_completion_contract(mission_id: str):
+    try:
+        return ok(get_ctx().service.mission_completion_contract(mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
 @app.get("/api/office/conversation")
 def office_conversation():
     try:

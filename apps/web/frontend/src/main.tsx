@@ -6,7 +6,6 @@ import {
   AudioLines,
   Bot,
   BriefcaseBusiness,
-  CheckCircle2,
   CirclePause,
   Command,
   Gauge,
@@ -15,10 +14,13 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  UserRound
+  UserRound,
+  UsersRound,
+  GitBranch,
+  AlertTriangle
 } from "lucide-react";
 import { getMissionAgentMessages, getMissionTimeline, getOfficeSnapshot, getSession, sendCeoMessage } from "./api";
-import type { AgentMessage, ConversationMessage, Mission, OfficeSnapshot, PlannerAction, Session, TimelineEvent } from "./types";
+import type { AgentMessage, ConversationMessage, Mission, OfficeSnapshot, OrganizationSnapshot, PlannerAction, Session, TimelineEvent } from "./types";
 import "./styles.css";
 
 type BrowserSpeechRecognition = {
@@ -203,7 +205,7 @@ function App() {
           <Metric icon={<Activity />} label="Active missions" value={snapshot.briefing.active_missions} />
           <Metric icon={<CirclePause />} label="Paused" value={snapshot.briefing.paused_missions} />
           <Metric icon={<ShieldCheck />} label="Approvals" value={snapshot.approvals.length} />
-          <Metric icon={<CheckCircle2 />} label="Total missions" value={snapshot.missions.length} />
+          <Metric icon={<UsersRound />} label="AI agents" value={snapshot.organization.agents.length} />
         </section>
 
         <section className="office-grid">
@@ -224,6 +226,7 @@ function App() {
         </section>
 
         <section className="mission-room">
+          <OrganizationPanel organization={snapshot.organization} selectedMissionId={selectedMission?.id ?? null} />
           <MissionRoom
             mission={selectedMission}
             timeline={timeline}
@@ -239,6 +242,15 @@ function App() {
             <div className="rail-item" key={approval.id}>
               <strong>{approval.category.replaceAll("_", " ")}</strong>
               <span>{approval.reason}</span>
+            </div>
+          ))}
+        </RailSection>
+        <RailSection title="Escalations">
+          {snapshot.organization.escalations.filter((item) => item.status === "pending").length === 0 ? <p>No pending escalations.</p> : snapshot.organization.escalations.filter((item) => item.status === "pending").slice(0, 6).map((item) => (
+            <div className="rail-item action-skipped" key={item.id}>
+              <strong>{item.to_level.replaceAll("_", " ")}</strong>
+              <span>{item.reason}</span>
+              <small>{item.category}</small>
             </div>
           ))}
         </RailSection>
@@ -407,6 +419,79 @@ function MissionRoom({ mission, timeline, agentActivity, agentMessages }: {
           </div>
         </div>
       ) : <p>Create a mission to open the live room.</p>}
+    </section>
+  );
+}
+
+function OrganizationPanel({ organization, selectedMissionId }: {
+  organization: OrganizationSnapshot;
+  selectedMissionId: string | null;
+}) {
+  const agents = selectedMissionId
+    ? organization.agents.filter((agent) => agent.mission_id === selectedMissionId)
+    : organization.agents;
+  const delegations = selectedMissionId
+    ? organization.delegations.filter((item) => item.mission_id === selectedMissionId)
+    : organization.delegations;
+  const escalations = selectedMissionId
+    ? organization.escalations.filter((item) => item.mission_id === selectedMissionId)
+    : organization.escalations;
+  return (
+    <section className="surface organization-panel">
+      <div className="surface-header">
+        <div>
+          <p className="eyebrow">AI organization</p>
+          <h2>編組、交辦、升級</h2>
+        </div>
+        <UsersRound />
+      </div>
+      <div className="org-grid">
+        <div>
+          <div className="thread-title"><UsersRound size={16} /> Mission team</div>
+          <div className="agent-roster">
+            {agents.length === 0 ? <p>No mission agents yet.</p> : agents.map((agent) => (
+              <div className="agent-card" key={agent.id}>
+                <strong>{agent.role_name}</strong>
+                <span>reports to {agent.supervisor_role.replaceAll("_", " ")}</span>
+                <p>{agent.charter}</p>
+                <small>{agent.skills.slice(0, 4).join(" · ") || "mission context"}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="thread-title"><GitBranch size={16} /> Delegations</div>
+          <div className="agent-roster">
+            {delegations.length === 0 ? <p>No delegations yet.</p> : delegations.slice(0, 6).map((delegation) => (
+              <div className="agent-card" key={delegation.id}>
+                <strong>{delegation.from_role.replaceAll("_", " ")} → {delegation.to_role}</strong>
+                <span>{delegation.status}</span>
+                <p>{delegation.title}</p>
+                <small>{delegation.success_criteria.slice(0, 2).join(" · ") || "report blockers and completion"}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="thread-title"><AlertTriangle size={16} /> Escalation rules</div>
+          <div className="agent-roster">
+            {escalations.length === 0 ? organization.standing_orders.slice(0, 4).map((order) => (
+              <div className="agent-card" key={order.id}>
+                <strong>{order.scope}</strong>
+                <span>{order.effect}</span>
+                <p>{order.instruction}</p>
+              </div>
+            )) : escalations.slice(0, 6).map((escalation) => (
+              <div className="agent-card" key={escalation.id}>
+                <strong>{escalation.from_role.replaceAll("_", " ")} → {escalation.to_level}</strong>
+                <span>{escalation.status}</span>
+                <p>{escalation.reason}</p>
+                <small>{escalation.category}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

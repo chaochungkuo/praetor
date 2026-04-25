@@ -8,19 +8,26 @@ from typing import Any
 from .auth import hash_password, validate_password_strength, verify_password
 from .models import (
     AgentMessage,
+    AgentInstance,
+    AgentRoleSpec,
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    CompletionContract,
     ConversationCreateRequest,
     ConversationMessage,
     ConversationCreateResult,
+    DelegationRecord,
+    EscalationRecord,
     LoginRequest,
     MeetingRecord,
     MissionContinueRequest,
     MissionCreateRequest,
     MissionDefinition,
+    MissionTeam,
     MissionTimelineEvent,
     OfficeSnapshot,
+    OrganizationSnapshot,
     MissionPauseRequest,
     MissionStopRequest,
     OnboardingAnswers,
@@ -29,6 +36,7 @@ from .models import (
     PraetorBriefing,
     RoleDefinition,
     RuntimeSelection,
+    StandingOrder,
     TaskDefinition,
     WorkspaceConfig,
     WorkspacePermissions,
@@ -97,6 +105,8 @@ class PraetorService:
                 password_hash=hash_password(answers.owner_password),
             )
         )
+        self._ensure_default_agent_roles()
+        self._ensure_default_standing_orders()
         self._audit(
             "onboarding_completed",
             {
@@ -106,6 +116,91 @@ class PraetorService:
             },
         )
         return settings
+
+    def _ensure_default_agent_roles(self) -> None:
+        existing = {role.name for role in self.storage.list_agent_roles()}
+        defaults = [
+            AgentRoleSpec(
+                name="CEO",
+                purpose="Translate chairman intent into missions, teams, decisions, and durable company memory.",
+                responsibilities=["set strategic intent", "assign teams", "escalate sensitive decisions"],
+                skills=["executive planning", "risk triage", "memory stewardship"],
+                constraints=["must escalate privacy, safety, legal, spending, and destructive actions"],
+                escalation_triggers=["privacy risk", "security risk", "legal exposure", "external spending"],
+                decision_authority=["mission staffing", "low-risk product execution", "internal prioritization"],
+                default_supervisor_role="chairman",
+            ),
+            AgentRoleSpec(
+                name="Project Manager",
+                purpose="Convert CEO direction into scoped work orders, progress tracking, and risk reports.",
+                responsibilities=["break down work", "coordinate agents", "surface blockers"],
+                skills=["planning", "coordination", "status reporting"],
+                constraints=["cannot approve high-risk policy or privacy changes"],
+                escalation_triggers=["scope conflict", "blocked execution", "role disagreement"],
+                decision_authority=["task sequencing", "low-risk implementation tradeoffs"],
+            ),
+            AgentRoleSpec(
+                name="Developer",
+                purpose="Implement scoped engineering tasks and report changed files, tests, and blockers.",
+                responsibilities=["implement", "test", "report"],
+                skills=["software engineering", "debugging", "local verification"],
+                constraints=["cannot silently delete or overwrite important user files"],
+                escalation_triggers=["unsafe file operation", "unclear requirement", "test failure"],
+                decision_authority=["local code structure within assigned scope"],
+                default_supervisor_role="project_manager",
+            ),
+            AgentRoleSpec(
+                name="Reviewer",
+                purpose="Validate outputs against mission intent, safety boundaries, and completion criteria.",
+                responsibilities=["review outputs", "check tests", "block incomplete closeout"],
+                skills=["quality control", "risk review", "acceptance testing"],
+                constraints=["must record unresolved risks"],
+                escalation_triggers=["privacy issue", "security issue", "missing acceptance criteria"],
+                decision_authority=["block mission closeout until criteria pass"],
+                default_supervisor_role="project_manager",
+            ),
+            AgentRoleSpec(
+                name="Security Officer",
+                purpose="Protect user privacy, files, credentials, and local computer safety.",
+                responsibilities=["security review", "privacy review", "permission boundary checks"],
+                skills=["threat modeling", "secure defaults", "data handling review"],
+                constraints=["must escalate user-data and host-safety risks to chairman"],
+                escalation_triggers=["credential exposure", "user file access", "network data sharing"],
+                decision_authority=["block risky release until mitigated"],
+                default_supervisor_role="ceo",
+            ),
+            AgentRoleSpec(
+                name="Legal Counsel",
+                purpose="Identify legal, licensing, contractual, and external communication risks.",
+                responsibilities=["license review", "policy review", "legal risk memo"],
+                skills=["legal triage", "license classification", "policy drafting"],
+                constraints=["cannot provide final legal approval without chairman instruction"],
+                escalation_triggers=["contract", "non-permissive license", "external claim"],
+                decision_authority=["request legal escalation"],
+                default_supervisor_role="ceo",
+            ),
+        ]
+        for role in defaults:
+            if role.name not in existing:
+                self.storage.save_agent_role(role)
+
+    def _ensure_default_standing_orders(self) -> None:
+        if self.storage.list_standing_orders():
+            return
+        defaults = [
+            StandingOrder(
+                scope="security",
+                instruction="Any action that can affect user files, credentials, privacy, or host safety must be escalated to the chairman with options.",
+                effect="requires_chairman_escalation",
+            ),
+            StandingOrder(
+                scope="engineering",
+                instruction="Low-risk implementation details may be decided by the PM and Developer if tests and reviewer checks pass.",
+                effect="delegate_low_risk_execution",
+            ),
+        ]
+        for order in defaults:
+            self.storage.save_standing_order(order)
 
     def has_owner_auth(self) -> bool:
         return self.storage.load_auth() is not None
@@ -128,6 +223,8 @@ class PraetorService:
 
     def create_mission(self, request: MissionCreateRequest) -> MissionDefinition:
         settings = self._require_settings()
+        self._ensure_default_agent_roles()
+        self._ensure_default_standing_orders()
         complexity_score, pm_required, escalation_reason = assess_mission_complexity(request)
         mission = MissionDefinition(
             title=request.title,
@@ -171,6 +268,7 @@ class PraetorService:
                 body=f"Mission created and assigned to {mission.manager_layer}: {mission.title}",
             )
         )
+        self._ensure_mission_team(mission)
         if mission.pm_required:
             self.storage.append_agent_message(
                 AgentMessage(
@@ -183,6 +281,88 @@ class PraetorService:
                 )
             )
         return mission
+
+    def _ensure_mission_team(self, mission: MissionDefinition, requested_roles: list[str] | None = None) -> MissionTeam:
+        existing = self.storage.list_teams(mission_id=mission.id)
+        if existing:
+            return existing[0]
+        roles = requested_roles or self._recommended_roles_for_mission(mission)
+        agents = [self._create_agent_for_role(role, mission) for role in roles]
+        pm = next((agent for agent in agents if agent.role_name == "Project Manager"), None)
+        team = MissionTeam(
+            mission_id=mission.id,
+            name=f"{mission.title} team",
+            lead_agent_id=pm.id if pm else agents[0].id if agents else None,
+            member_agent_ids=[agent.id for agent in agents],
+            status="active",
+        )
+        self.storage.save_team(team)
+        self._audit(
+            "mission_team_created",
+            {
+                "mission_id": mission.id,
+                "team_id": team.id,
+                "roles": [agent.role_name for agent in agents],
+            },
+        )
+        return team
+
+    def _recommended_roles_for_mission(self, mission: MissionDefinition) -> list[str]:
+        roles = ["Project Manager", "Developer", "Reviewer"]
+        text = " ".join([mission.title, mission.summary or "", " ".join(mission.domains)]).lower()
+        if any(word in text for word in ["security", "privacy", "安全", "隱私", "隐私"]):
+            roles.append("Security Officer")
+        if any(word in text for word in ["legal", "law", "license", "合約", "法律", "法務"]):
+            roles.append("Legal Counsel")
+        return roles
+
+    def _create_agent_for_role(self, role_name: str, mission: MissionDefinition) -> AgentInstance:
+        existing = [agent for agent in self.storage.list_agents(mission_id=mission.id) if agent.role_name == role_name]
+        if existing:
+            return existing[0]
+        role = next((item for item in self.storage.list_agent_roles() if item.name == role_name), None)
+        if role is None:
+            role = AgentRoleSpec(
+                name=role_name,
+                purpose=f"Handle {role_name} responsibilities for a mission.",
+                responsibilities=["complete assigned mission work", "report blockers"],
+                escalation_triggers=["unclear requirement", "safety or privacy risk"],
+            )
+            self.storage.save_agent_role(role)
+        agent = AgentInstance(
+            role_name=role.name,
+            display_name=f"{role.name} - {mission.title[:48]}",
+            mission_id=mission.id,
+            supervisor_role=role.default_supervisor_role,
+            charter=self._agent_charter(role, mission),
+            skills=role.skills,
+            tools=role.tools,
+            memory_access=["company_dna", "standing_orders", f"mission:{mission.id}"],
+            decision_authority=role.decision_authority,
+            escalation_triggers=role.escalation_triggers,
+        )
+        self.storage.save_agent(agent)
+        self.storage.append_agent_message(
+            AgentMessage(
+                mission_id=mission.id,
+                role=self._agent_message_role(role.name),
+                body=f"Onboarded as {role.name}. Charter: {agent.charter}",
+            )
+        )
+        return agent
+
+    @staticmethod
+    def _agent_charter(role: AgentRoleSpec, mission: MissionDefinition) -> str:
+        responsibilities = "; ".join(role.responsibilities[:4]) or "complete assigned work"
+        constraints = "; ".join(role.constraints[:3]) or "stay within mission scope and escalation rules"
+        return (
+            f"You are the {role.name} for mission {mission.id}. Mission: {mission.title}. "
+            f"Responsibilities: {responsibilities}. Constraints: {constraints}."
+        )
+
+    @staticmethod
+    def _agent_message_role(role_name: str) -> str:
+        return role_name.lower().replace(" ", "_").replace("-", "_")
 
     def list_missions(self) -> list[MissionDefinition]:
         settings = self._require_settings()
@@ -206,6 +386,61 @@ class PraetorService:
     def list_mission_runs(self, mission_id: str) -> list[dict]:
         settings = self._require_settings()
         return self.storage.list_bridge_runs(Path(settings.workspace.root), mission_id)
+
+    def organization_snapshot(self, mission_id: str | None = None) -> OrganizationSnapshot:
+        self._require_settings()
+        self._ensure_default_agent_roles()
+        self._ensure_default_standing_orders()
+        return OrganizationSnapshot(
+            agent_roles=self.storage.list_agent_roles(),
+            agents=self.storage.list_agents(mission_id=mission_id),
+            teams=self.storage.list_teams(mission_id=mission_id),
+            delegations=self.storage.list_delegations(mission_id=mission_id),
+            escalations=self.storage.list_escalations(mission_id=mission_id),
+            standing_orders=self.storage.list_standing_orders(),
+        )
+
+    def mission_completion_contract(self, mission_id: str) -> CompletionContract:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        mission = self.get_mission(mission_id)
+        delegations = self.storage.list_delegations(mission_id=mission_id)
+        pending_escalations = self.storage.list_escalations(mission_id=mission_id, status="pending")
+        reports = self.storage.read_mission_texts(workspace_root, mission_id)
+        missing_outputs = [
+            output
+            for output in mission.requested_outputs
+            if not (workspace_root / output.removeprefix("/workspace/")).exists()
+        ]
+        required_outputs_present = not missing_outputs
+        delegations_done = not delegations or all(item.status == "done" for item in delegations)
+        review_passed = any(
+            message.role == "reviewer" and "pass" in message.body.lower()
+            for message in self.storage.list_agent_messages(mission_id=mission_id, limit=100)
+        ) or mission.status == "completed"
+        final_report_ready = bool(reports.get("REPORT.md", "").strip())
+        memory_updated = any(page["name"] == "CEO Memory.md" for page in self.storage.list_wiki_pages(workspace_root))
+        blockers: list[str] = []
+        if not required_outputs_present:
+            blockers.append(f"Missing requested outputs: {', '.join(missing_outputs)}")
+        if not delegations_done:
+            blockers.append("Delegations are still open.")
+        if pending_escalations:
+            blockers.append("Pending escalations require resolution.")
+        if not review_passed:
+            blockers.append("Reviewer has not passed the mission.")
+        can_close = required_outputs_present and delegations_done and not pending_escalations and final_report_ready
+        return CompletionContract(
+            mission_id=mission_id,
+            required_outputs_present=required_outputs_present,
+            delegations_done=delegations_done,
+            review_passed=review_passed,
+            no_pending_escalations=not pending_escalations,
+            final_report_ready=final_report_ready,
+            memory_updated=memory_updated,
+            can_close=can_close,
+            blockers=blockers,
+        )
 
     def list_audit_events(self, limit: int = 20) -> list[dict]:
         return self.storage.list_audit_events(limit=limit)
@@ -520,6 +755,7 @@ class PraetorService:
             ceo_thread=self.storage.list_conversation_messages(limit=30),
             agent_activity=self._recent_agent_activity(limit=30),
             runtime_health=self.runtime_health(),
+            organization=self.organization_snapshot(),
         )
 
     def create_ceo_message(self, request: ConversationCreateRequest) -> ConversationCreateResult:
@@ -671,6 +907,48 @@ class PraetorService:
                         created_at=approval.created_at,
                     )
                 )
+        for team in self.storage.list_teams(mission_id=mission_id):
+            events.append(
+                MissionTimelineEvent(
+                    id=team.id,
+                    mission_id=mission_id,
+                    type="team",
+                    title=f"Team: {team.name}",
+                    body=f"Members: {len(team.member_agent_ids)}",
+                    actor="ceo",
+                    status=team.status,
+                    created_at=team.created_at,
+                    metadata={"lead_agent_id": team.lead_agent_id, "member_agent_ids": team.member_agent_ids},
+                )
+            )
+        for delegation in self.storage.list_delegations(mission_id=mission_id):
+            events.append(
+                MissionTimelineEvent(
+                    id=delegation.id,
+                    mission_id=mission_id,
+                    type="delegation",
+                    title=delegation.title,
+                    body=delegation.instructions,
+                    actor=delegation.from_role,
+                    status=delegation.status,
+                    created_at=delegation.created_at,
+                    metadata={"to_role": delegation.to_role, "to_agent_id": delegation.to_agent_id},
+                )
+            )
+        for escalation in self.storage.list_escalations(mission_id=mission_id):
+            events.append(
+                MissionTimelineEvent(
+                    id=escalation.id,
+                    mission_id=mission_id,
+                    type="escalation",
+                    title=f"Escalation to {escalation.to_level}",
+                    body=escalation.reason,
+                    actor=escalation.from_role,
+                    status=escalation.status,
+                    created_at=escalation.created_at,
+                    metadata={"category": escalation.category, "options": escalation.options},
+                )
+            )
         events.sort(key=lambda item: item.created_at)
         return events
 
@@ -731,6 +1009,156 @@ class PraetorService:
                 ),
             )
             return action.model_copy(update={"status": "applied", "result_id": str(path)})
+
+        if action.type == "staffing_proposal":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "staffing requires a mission_id"},
+                    }
+                )
+            mission = self.get_mission(mission_id)
+            roles = list(action.metadata.get("roles") or self._recommended_roles_for_mission(mission))
+            team = self._ensure_mission_team(mission, requested_roles=roles)
+            self.storage.append_pm_report(
+                Path(self._require_settings().workspace.root),
+                mission_id,
+                "\n".join(
+                    [
+                        f"Staffing proposal applied: {action.title}",
+                        f"Roles: {', '.join(roles)}",
+                        action.body or "",
+                    ]
+                ),
+            )
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": team.id})
+
+        if action.type == "agent_create":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "agent creation requires a mission_id"},
+                    }
+                )
+            mission = self.get_mission(mission_id)
+            role_name = str(action.metadata.get("role") or action.title or "Specialist")
+            agent = self._create_agent_for_role(role_name, mission)
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": agent.id})
+
+        if action.type == "delegation_create":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "delegation requires a mission_id"},
+                    }
+                )
+            to_role = str(action.metadata.get("to_role") or "Project Manager")
+            to_agent = next(
+                (agent for agent in self.storage.list_agents(mission_id=mission_id) if agent.role_name == to_role),
+                None,
+            )
+            delegation = DelegationRecord(
+                mission_id=mission_id,
+                to_agent_id=to_agent.id if to_agent else None,
+                from_role=str(action.metadata.get("from_role") or "ceo"),
+                to_role=to_role,
+                title=action.title,
+                instructions=action.body or instruction,
+                success_criteria=list(action.metadata.get("success_criteria") or []),
+                constraints=list(action.metadata.get("constraints") or []),
+            )
+            self.storage.save_delegation(delegation)
+            self.storage.append_agent_message(
+                AgentMessage(
+                    mission_id=mission_id,
+                    role=self._agent_message_role(to_role),
+                    body=f"Delegation received: {delegation.title}. Success criteria: {', '.join(delegation.success_criteria) or 'report completion and blockers'}.",
+                )
+            )
+            self._audit("delegation_created", {"delegation_id": delegation.id, "mission_id": mission_id, "to_role": to_role})
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": delegation.id})
+
+        if action.type == "decision_escalation":
+            to_level = str(action.metadata.get("to_level") or "chairman")
+            if to_level not in {"project_manager", "ceo", "chairman"}:
+                to_level = "chairman"
+            category = str(action.metadata.get("category") or "change_strategy")
+            if category not in {"delete_files", "overwrite_important_files", "external_communication", "spending_money", "change_strategy", "shell_commands"}:
+                category = "change_strategy"
+            escalation = EscalationRecord(
+                mission_id=action.mission_id or related_mission_id,
+                from_role=str(action.metadata.get("from_role") or "ceo"),
+                to_level=to_level,
+                category=category,
+                reason=action.body or action.title,
+                options=list(action.metadata.get("options") or []),
+            )
+            self.storage.save_escalation(escalation)
+            if escalation.mission_id:
+                self.storage.append_agent_message(
+                    AgentMessage(
+                        mission_id=escalation.mission_id,
+                        role="ceo",
+                        body=f"Escalation opened for {escalation.to_level}: {escalation.reason}",
+                    )
+                )
+            self._audit(
+                "decision_escalation_created",
+                {"escalation_id": escalation.id, "mission_id": escalation.mission_id, "to_level": escalation.to_level},
+            )
+            return action.model_copy(update={"status": "applied", "mission_id": escalation.mission_id, "result_id": escalation.id})
+
+        if action.type == "standing_order_update":
+            scope = str(action.metadata.get("scope") or "global")
+            if scope not in {"global", "mission", "security", "privacy", "legal", "finance", "product", "engineering"}:
+                scope = "global"
+            order = StandingOrder(
+                scope=scope,
+                instruction=action.body or action.title,
+                effect=str(action.metadata.get("effect") or "guidance"),
+            )
+            self.storage.save_standing_order(order)
+            self._audit("standing_order_created", {"standing_order_id": order.id, "scope": order.scope})
+            return action.model_copy(update={"status": "applied", "result_id": order.id})
+
+        if action.type == "mission_closeout":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "mission closeout requires a mission_id"},
+                    }
+                )
+            contract = self.mission_completion_contract(mission_id)
+            if not contract.can_close:
+                escalation = EscalationRecord(
+                    mission_id=mission_id,
+                    from_role="reviewer",
+                    to_level="ceo",
+                    category="change_strategy",
+                    reason="Mission closeout blocked: " + "; ".join(contract.blockers),
+                )
+                self.storage.save_escalation(escalation)
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "mission_id": mission_id,
+                        "result_id": escalation.id,
+                        "metadata": {**action.metadata, "completion_contract": contract.model_dump(mode="json")},
+                    }
+                )
+            mission = self.get_mission(mission_id)
+            mission.status = "completed"
+            mission.updated_at = utc_now()
+            self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": mission.id})
 
         return action.model_copy(update={"status": "applied"})
 

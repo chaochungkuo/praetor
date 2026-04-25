@@ -426,6 +426,45 @@ dd {
   gap: 18px;
 }
 
+.organization-panel {
+  margin-bottom: 18px;
+}
+
+.org-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.agent-roster {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-card {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.035);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.agent-card strong {
+  text-transform: capitalize;
+}
+
+.agent-card span,
+.agent-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.agent-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .thread-title {
   display: flex;
   align-items: center;
@@ -638,6 +677,7 @@ dd {
   .office-grid,
   .room-layout,
   .mission-thread-grid,
+  .org-grid,
   .executive-rail {
     display: grid;
     grid-template-columns: 1fr;

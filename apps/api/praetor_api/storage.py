@@ -11,12 +11,18 @@ from typing import Iterator
 
 from .models import (
     AgentMessage,
+    AgentInstance,
+    AgentRoleSpec,
     AppSettings,
     ApprovalRequest,
     ConversationMessage,
+    DelegationRecord,
+    EscalationRecord,
     MeetingRecord,
     MissionDefinition,
+    MissionTeam,
     OwnerAuthRecord,
+    StandingOrder,
     TaskDefinition,
 )
 
@@ -137,6 +143,12 @@ class FilesystemStore:
         self.approvals_path = self.state_dir / "approvals.json"
         self.conversation_path = self.state_dir / "office_conversation.json"
         self.agent_messages_path = self.state_dir / "agent_messages.json"
+        self.agent_roles_path = self.state_dir / "agent_roles.json"
+        self.agents_path = self.state_dir / "agents.json"
+        self.teams_path = self.state_dir / "mission_teams.json"
+        self.delegations_path = self.state_dir / "delegations.json"
+        self.escalations_path = self.state_dir / "escalations.json"
+        self.standing_orders_path = self.state_dir / "standing_orders.json"
 
     def save_settings(self, settings: AppSettings) -> None:
         _write_private_text(self.settings_path, settings.model_dump_json(indent=2))
@@ -432,6 +444,88 @@ class FilesystemStore:
         messages.sort(key=lambda item: item.created_at)
         return messages[-limit:]
 
+    def save_agent_role(self, role: AgentRoleSpec) -> None:
+        roles = self.list_agent_roles()
+        roles = [item for item in roles if item.id != role.id and item.name != role.name] + [role]
+        roles.sort(key=lambda item: item.name.lower())
+        self._write_model_list(self.agent_roles_path, roles)
+
+    def list_agent_roles(self) -> list[AgentRoleSpec]:
+        return self._read_model_list(self.agent_roles_path, AgentRoleSpec)
+
+    def save_agent(self, agent: AgentInstance) -> None:
+        agents = self.list_agents()
+        agents = [item for item in agents if item.id != agent.id] + [agent]
+        agents.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.agents_path, agents)
+
+    def list_agents(self, mission_id: str | None = None) -> list[AgentInstance]:
+        agents = self._read_model_list(self.agents_path, AgentInstance)
+        if mission_id is not None:
+            agents = [item for item in agents if item.mission_id == mission_id]
+        return agents
+
+    def save_team(self, team: MissionTeam) -> None:
+        teams = self.list_teams()
+        teams = [item for item in teams if item.id != team.id and item.mission_id != team.mission_id] + [team]
+        teams.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.teams_path, teams)
+
+    def list_teams(self, mission_id: str | None = None) -> list[MissionTeam]:
+        teams = self._read_model_list(self.teams_path, MissionTeam)
+        if mission_id is not None:
+            teams = [item for item in teams if item.mission_id == mission_id]
+        return teams
+
+    def save_delegation(self, delegation: DelegationRecord) -> None:
+        delegations = self.list_delegations()
+        delegations = [item for item in delegations if item.id != delegation.id] + [delegation]
+        delegations.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.delegations_path, delegations)
+
+    def list_delegations(self, mission_id: str | None = None) -> list[DelegationRecord]:
+        delegations = self._read_model_list(self.delegations_path, DelegationRecord)
+        if mission_id is not None:
+            delegations = [item for item in delegations if item.mission_id == mission_id]
+        return delegations
+
+    def save_escalation(self, escalation: EscalationRecord) -> None:
+        escalations = self.list_escalations()
+        escalations = [item for item in escalations if item.id != escalation.id] + [escalation]
+        escalations.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.escalations_path, escalations)
+
+    def list_escalations(self, mission_id: str | None = None, status: str | None = None) -> list[EscalationRecord]:
+        escalations = self._read_model_list(self.escalations_path, EscalationRecord)
+        if mission_id is not None:
+            escalations = [item for item in escalations if item.mission_id == mission_id]
+        if status is not None:
+            escalations = [item for item in escalations if item.status == status]
+        return escalations
+
+    def save_standing_order(self, order: StandingOrder) -> None:
+        orders = self.list_standing_orders()
+        orders = [item for item in orders if item.id != order.id] + [order]
+        orders.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.standing_orders_path, orders)
+
+    def list_standing_orders(self) -> list[StandingOrder]:
+        return self._read_model_list(self.standing_orders_path, StandingOrder)
+
+    @staticmethod
+    def _write_model_list(path: Path, items: list) -> None:
+        _write_private_text(
+            path,
+            json.dumps([item.model_dump(mode="json") for item in items], indent=2, ensure_ascii=True),
+        )
+
+    @staticmethod
+    def _read_model_list(path: Path, model) -> list:
+        if not path.exists():
+            return []
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return [model.model_validate(item) for item in payload]
+
 
 class AppStorage:
     def __init__(self, state_dir: Path) -> None:
@@ -522,6 +616,42 @@ class AppStorage:
 
     def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
         return self.fs.list_agent_messages(mission_id=mission_id, limit=limit)
+
+    def save_agent_role(self, role: AgentRoleSpec) -> None:
+        self.fs.save_agent_role(role)
+
+    def list_agent_roles(self) -> list[AgentRoleSpec]:
+        return self.fs.list_agent_roles()
+
+    def save_agent(self, agent: AgentInstance) -> None:
+        self.fs.save_agent(agent)
+
+    def list_agents(self, mission_id: str | None = None) -> list[AgentInstance]:
+        return self.fs.list_agents(mission_id=mission_id)
+
+    def save_team(self, team: MissionTeam) -> None:
+        self.fs.save_team(team)
+
+    def list_teams(self, mission_id: str | None = None) -> list[MissionTeam]:
+        return self.fs.list_teams(mission_id=mission_id)
+
+    def save_delegation(self, delegation: DelegationRecord) -> None:
+        self.fs.save_delegation(delegation)
+
+    def list_delegations(self, mission_id: str | None = None) -> list[DelegationRecord]:
+        return self.fs.list_delegations(mission_id=mission_id)
+
+    def save_escalation(self, escalation: EscalationRecord) -> None:
+        self.fs.save_escalation(escalation)
+
+    def list_escalations(self, mission_id: str | None = None, status: str | None = None) -> list[EscalationRecord]:
+        return self.fs.list_escalations(mission_id=mission_id, status=status)
+
+    def save_standing_order(self, order: StandingOrder) -> None:
+        self.fs.save_standing_order(order)
+
+    def list_standing_orders(self) -> list[StandingOrder]:
+        return self.fs.list_standing_orders()
 
     def save_approval(self, approval: ApprovalRequest) -> None:
         self.fs.save_approval(approval)

@@ -36,8 +36,12 @@ PermissionCategory = Literal[
 ]
 MissionStatus = Literal[
     "planned",
+    "staffing",
     "active",
     "review",
+    "reviewing",
+    "ready_for_ceo",
+    "needs_decision",
     "waiting_approval",
     "paused",
     "resumed",
@@ -57,7 +61,7 @@ TaskStatus = Literal[
 ApprovalStatus = Literal["pending", "approved", "rejected"]
 MeetingType = Literal["project_review", "risk_review", "weekly_planning", "decision_review"]
 ConversationRole = Literal["chairman", "ceo", "system"]
-AgentMessageRole = Literal["ceo", "project_manager", "developer", "reviewer", "system"]
+AgentMessageRole = str
 TimelineEventType = Literal[
     "conversation",
     "agent_message",
@@ -65,11 +69,30 @@ TimelineEventType = Literal[
     "task",
     "run",
     "approval",
+    "delegation",
+    "escalation",
+    "team",
     "meeting",
     "audit",
 ]
-PlannerActionType = Literal["mission_draft", "approval_request", "memory_update", "briefing"]
+PlannerActionType = Literal[
+    "mission_draft",
+    "approval_request",
+    "memory_update",
+    "briefing",
+    "staffing_proposal",
+    "agent_create",
+    "delegation_create",
+    "decision_escalation",
+    "mission_closeout",
+    "standing_order_update",
+]
 PlannerActionStatus = Literal["proposed", "applied", "skipped"]
+AgentStatus = Literal["active", "paused", "retired"]
+EscalationLevel = Literal["project_manager", "ceo", "chairman"]
+EscalationStatus = Literal["pending", "resolved", "dismissed"]
+DelegationStatus = Literal["assigned", "running", "blocked", "review", "done", "cancelled"]
+StandingOrderScope = Literal["global", "mission", "security", "privacy", "legal", "finance", "product", "engineering"]
 
 
 class ApiEnvelope(BaseModel):
@@ -146,6 +169,101 @@ class RoleDefinition(BaseModel):
     outputs: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     auto_created: bool = True
+
+
+class AgentRoleSpec(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("agentrole"))
+    name: str
+    purpose: str
+    responsibilities: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    escalation_triggers: list[str] = Field(default_factory=list)
+    decision_authority: list[str] = Field(default_factory=list)
+    default_supervisor_role: str = "ceo"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentInstance(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("agent"))
+    role_name: str
+    display_name: str
+    mission_id: str | None = None
+    supervisor_agent_id: str | None = None
+    supervisor_role: str = "ceo"
+    status: AgentStatus = "active"
+    charter: str
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    memory_access: list[str] = Field(default_factory=list)
+    decision_authority: list[str] = Field(default_factory=list)
+    escalation_triggers: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MissionTeam(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("team"))
+    mission_id: str
+    name: str
+    lead_agent_id: str | None = None
+    member_agent_ids: list[str] = Field(default_factory=list)
+    status: str = "forming"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DelegationRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("delegation"))
+    mission_id: str
+    from_agent_id: str | None = None
+    to_agent_id: str | None = None
+    from_role: str = "ceo"
+    to_role: str
+    title: str
+    instructions: str
+    success_criteria: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    status: DelegationStatus = "assigned"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class EscalationRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("escalation"))
+    mission_id: str | None = None
+    from_agent_id: str | None = None
+    from_role: str = "system"
+    to_level: EscalationLevel = "ceo"
+    category: PermissionCategory | str = "change_strategy"
+    reason: str
+    options: list[dict[str, str]] = Field(default_factory=list)
+    status: EscalationStatus = "pending"
+    created_at: datetime = Field(default_factory=utc_now)
+    resolved_at: datetime | None = None
+
+
+class StandingOrder(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("order"))
+    scope: StandingOrderScope = "global"
+    instruction: str
+    authority: str = "chairman"
+    effect: str = "guidance"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class CompletionContract(BaseModel):
+    mission_id: str
+    required_outputs_present: bool = False
+    delegations_done: bool = False
+    review_passed: bool = False
+    no_pending_escalations: bool = False
+    final_report_ready: bool = False
+    memory_updated: bool = False
+    can_close: bool = False
+    blockers: list[str] = Field(default_factory=list)
 
 
 class TaskCheckpointPolicy(BaseModel):
@@ -281,6 +399,15 @@ class ConversationCreateResult(BaseModel):
     intent: str = "briefing"
 
 
+class OrganizationSnapshot(BaseModel):
+    agent_roles: list[AgentRoleSpec] = Field(default_factory=list)
+    agents: list[AgentInstance] = Field(default_factory=list)
+    teams: list[MissionTeam] = Field(default_factory=list)
+    delegations: list[DelegationRecord] = Field(default_factory=list)
+    escalations: list[EscalationRecord] = Field(default_factory=list)
+    standing_orders: list[StandingOrder] = Field(default_factory=list)
+
+
 class AgentMessage(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("agentmsg"))
     mission_id: str
@@ -312,6 +439,7 @@ class OfficeSnapshot(BaseModel):
     ceo_thread: list[ConversationMessage] = Field(default_factory=list)
     agent_activity: list[MissionTimelineEvent] = Field(default_factory=list)
     runtime_health: dict[str, Any] = Field(default_factory=dict)
+    organization: OrganizationSnapshot = Field(default_factory=OrganizationSnapshot)
 
 
 class AppSettings(BaseModel):

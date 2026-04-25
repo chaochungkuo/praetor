@@ -57,6 +57,9 @@ jobs:
       - name: CEO planner smoke test
         run: pixi run planner-smoke
 
+      - name: AI organization smoke test
+        run: pixi run organization-smoke
+
       - name: Bridge smoke test
         run: pixi run bridge-smoke
 

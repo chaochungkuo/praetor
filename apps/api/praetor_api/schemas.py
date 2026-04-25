@@ -4,20 +4,28 @@ import json
 from pathlib import Path
 
 from .models import (
+    AgentInstance,
+    AgentRoleSpec,
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
     CompanyDNA,
+    CompletionContract,
     DecisionRecord,
+    DelegationRecord,
+    EscalationRecord,
     MeetingRecord,
     MissionDefinition,
+    MissionTeam,
     OnboardingAnswers,
     OnboardingPreview,
+    OrganizationSnapshot,
     PlannerAction,
     PlannerPlan,
     PraetorBriefing,
     RunRecord,
     RoleDefinition,
+    StandingOrder,
     TaskDefinition,
 )
 
@@ -25,6 +33,14 @@ from .models import (
 SCHEMA_MODELS = {
     "app_settings": AppSettings,
     "company_dna": CompanyDNA,
+    "agent_role_spec": AgentRoleSpec,
+    "agent_instance": AgentInstance,
+    "mission_team": MissionTeam,
+    "delegation_record": DelegationRecord,
+    "escalation_record": EscalationRecord,
+    "standing_order": StandingOrder,
+    "completion_contract": CompletionContract,
+    "organization_snapshot": OrganizationSnapshot,
     "role_definition": RoleDefinition,
     "mission_definition": MissionDefinition,
     "task_definition": TaskDefinition,
