@@ -20,6 +20,7 @@ from .config import (
 )
 from .models import (
     ApprovalCreateRequest,
+    ConversationCreateRequest,
     LoginRequest,
     MissionContinueRequest,
     MissionCreateRequest,
@@ -71,6 +72,17 @@ TRANSLATIONS = {
         "approve": "Approve",
         "reject": "Reject",
         "runtime": "Runtime",
+        "praetor_briefing_title": "Praetor briefing",
+        "praetor_briefing_desc": "Talk to the CEO first. Praetor can turn the conversation into missions, approvals, memory, or staffing plans when needed.",
+        "ceo_chat": "Chat with CEO",
+        "ceo_chat_desc": "Use this as the chairman's instruction channel. For the full office view with mission telemetry and voice input, open the Chairman's Office.",
+        "message_to_ceo": "Message to CEO",
+        "message_to_ceo_placeholder": "Tell the CEO what you want to understand, decide, remember, or turn into a mission.",
+        "send_to_ceo": "Send to CEO",
+        "open_chairman_office": "Open Chairman's Office",
+        "recent_ceo_conversation": "Recent CEO conversation",
+        "no_ceo_messages": "No CEO conversation yet.",
+        "ceo_message_sent": "CEO replied.",
         "runtime_settings": "Runtime settings",
         "runtime_settings_desc": "Choose the model runtime Praetor should use. API keys are stored locally as private secret files and are never displayed after saving.",
         "runtime_settings_saved": "Runtime settings saved.",
@@ -318,6 +330,17 @@ TRANSLATIONS = {
         "approve": "批准",
         "reject": "拒絕",
         "runtime": "執行環境",
+        "praetor_briefing_title": "Praetor 簡報",
+        "praetor_briefing_desc": "先跟 CEO 對話。Praetor 會在需要時把對話轉成任務、批准請求、公司記憶或 AI 編組計畫。",
+        "ceo_chat": "與 CEO 對話",
+        "ceo_chat_desc": "這裡是董事長的指令通道。若要看完整辦公室、任務遙測與語音輸入，請進入董事長辦公室。",
+        "message_to_ceo": "給 CEO 的訊息",
+        "message_to_ceo_placeholder": "告訴 CEO 你想了解、決定、記住，或轉成任務的事情。",
+        "send_to_ceo": "送給 CEO",
+        "open_chairman_office": "進入董事長辦公室",
+        "recent_ceo_conversation": "最近 CEO 對話",
+        "no_ceo_messages": "目前尚無 CEO 對話。",
+        "ceo_message_sent": "CEO 已回覆。",
         "runtime_settings": "執行環境設定",
         "runtime_settings_desc": "選擇 Praetor 要使用的模型執行環境。API key 會以私密檔案保存在本機，不會在儲存後回顯。",
         "runtime_settings_saved": "執行環境設定已儲存。",
@@ -952,12 +975,14 @@ def praetor_page(request: Request):
     service = request.app.state.ctx.service
     settings = ctx["settings"]
     missions = service.list_missions() if settings is not None else []
+    ceo_messages = service.list_ceo_messages(limit=8) if settings is not None else []
     return templates.TemplateResponse(
         request=request,
         name="praetor.html",
         context={
             **ctx,
             "missions": missions[:8],
+            "ceo_messages": ceo_messages,
             "onboarding_defaults": _default_onboarding(),
             "starter_missions": _starter_missions(),
         },
@@ -1062,6 +1087,24 @@ async def update_runtime_submit(request: Request):
     except Exception as exc:
         return _redirect("/app/settings", str(exc), "error")
     return _redirect("/app/settings", t("runtime_settings_saved"), "success")
+
+
+@router.post("/app/ceo/conversation")
+async def create_ceo_conversation_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    body = str(form.get("body", "")).strip()
+    if not body:
+        return _redirect("/app/praetor", t("message_to_ceo_placeholder"), "error")
+    try:
+        request.app.state.ctx.service.create_ceo_message(ConversationCreateRequest(body=body))
+    except Exception as exc:
+        return _redirect("/app/praetor", _friendly_runtime_error(exc, t), "error")
+    return _redirect("/app/praetor", t("ceo_message_sent"), "success")
 
 
 @router.get("/app/memory", response_class=HTMLResponse)

@@ -276,56 +276,42 @@
     </script>
   {% else %}
     <section class="panel hero">
-      <h2>Praetor briefing</h2>
-      <p>You define direction and approval boundaries. Praetor manages execution, memory, and reporting.</p>
+      <h2>{{ t("praetor_briefing_title") }}</h2>
+      <p>{{ t("praetor_briefing_desc") }}</p>
     </section>
     <section class="grid two">
       <section class="panel">
-        <h3>Create mission</h3>
-        <form class="form-grid" method="post" action="/app/missions">
+        <h3>{{ t("ceo_chat") }}</h3>
+        <p class="muted">{{ t("ceo_chat_desc") }}</p>
+        <form class="form-grid" method="post" action="/app/ceo/conversation">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <label class="full">
-            <span>Mission title</span>
-            <input type="text" name="title" placeholder="Create first project" required />
-          </label>
-          <label class="full">
-            <span>Summary</span>
-            <textarea name="summary" rows="4" placeholder="Bootstrap a first project workspace and initial plan."></textarea>
-          </label>
-          <label>
-            <span>Domain</span>
-            <select name="domain">
-              <option value="operations">Operations</option>
-              <option value="development">Development</option>
-              <option value="finance">Finance</option>
-            </select>
-          </label>
-          <label>
-            <span>Priority</span>
-            <select name="priority">
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </label>
-          <label class="full">
-            <span>Requested outputs (one per line)</span>
-            <textarea name="requested_outputs" rows="4" placeholder="/workspace/Projects/Alpha/PROJECT.md"></textarea>
+            <span>{{ t("message_to_ceo") }}</span>
+            <textarea name="body" rows="5" placeholder="{{ t('message_to_ceo_placeholder') }}" required></textarea>
           </label>
           <div class="full actions">
-            <button type="submit">Create mission</button>
+            <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
+            <button type="submit">{{ t("send_to_ceo") }}</button>
           </div>
         </form>
       </section>
       <section class="panel">
-        <h3>Company DNA</h3>
-        <ul class="compact-list">
-          <li>Language: {{ settings.company_dna.language }}</li>
-          <li>Leadership: {{ settings.company_dna.leadership_style }}</li>
-          <li>Decision style: {{ settings.company_dna.decision_style }}</li>
-          <li>Organization: {{ settings.company_dna.organization_style }}</li>
-          <li>Autonomy: {{ settings.company_dna.autonomy_mode }}</li>
-        </ul>
+        <h3>{{ t("recent_ceo_conversation") }}</h3>
+        {% if ceo_messages %}
+          <div class="list">
+            {% for message in ceo_messages[-6:] %}
+              <div class="list-row">
+                <div>
+                  <strong>{{ "CEO" if message.role == "ceo" else settings.owner.name }}</strong>
+                  <div class="muted">{{ message.body }}</div>
+                </div>
+                <span class="status">{{ format_time(message.created_at) }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">{{ t("no_ceo_messages") }}</p>
+        {% endif %}
       </section>
     </section>
     <section class="panel">
