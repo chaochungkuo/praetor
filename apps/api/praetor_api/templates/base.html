@@ -38,28 +38,32 @@
               <p>{{ t("founder_command_center") }}</p>
             {% endif %}
           </div>
-          <div class="status-pills">
-            <div class="language-switch">
+          <div class="topbar-actions">
+            <div class="language-switch" aria-label="{{ t("language") }}">
               {% for code, label in language_options.items() %}
-                <a class="small-button {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next={{ current_url_quoted }}">{{ label }}</a>
+                <a class="language-option {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next={{ current_url_quoted }}">{{ label }}</a>
               {% endfor %}
             </div>
-            {% if authenticated %}
-              <span class="pill">{{ session_owner or t("owner") }}</span>
-              <form method="post" action="/app/logout">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                <button type="submit" class="small secondary">{{ t("logout") }}</button>
-              </form>
-            {% elif settings_initialized %}
-              <a class="small-button" href="/app/login">{{ t("login") }}</a>
-            {% endif %}
-            <span class="pill {{ 'ok' if runtime_ready else 'warn' }}">
-              {{ t("runtime_ready") if runtime_ready else t("runtime_not_configured") }}
-            </span>
-            {% if settings %}
-              <span class="pill">{{ settings.runtime.mode }}</span>
-              <span class="pill">{{ settings.runtime.executor or settings.runtime.provider or settings.runtime.model or 'default' }}</span>
-            {% endif %}
+            <div class="account-actions">
+              {% if authenticated %}
+                <span class="user-chip">{{ session_owner or t("owner") }}</span>
+                <form method="post" action="/app/logout">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <button type="submit" class="small secondary text-button">{{ t("logout") }}</button>
+                </form>
+              {% elif settings_initialized %}
+                <a class="small-button text-button" href="/app/login">{{ t("login") }}</a>
+              {% endif %}
+            </div>
+            <div class="runtime-chips">
+              <span class="runtime-chip {{ 'ok' if runtime_ready else 'warn' }}">
+                {{ t("runtime_ready") if runtime_ready else t("runtime_not_configured") }}
+              </span>
+              {% if settings %}
+                <span class="runtime-chip">{{ label(settings.runtime.mode) }}</span>
+                <span class="runtime-chip">{{ settings.runtime.executor or settings.runtime.provider or settings.runtime.model or 'default' }}</span>
+              {% endif %}
+            </div>
           </div>
         </header>
 
