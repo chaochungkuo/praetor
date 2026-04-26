@@ -235,6 +235,43 @@ TRANSLATIONS = {
         "disabled": "disabled",
         "yes": "yes",
         "no": "no",
+        "run_mission": "Run mission",
+        "pause_mission": "Pause",
+        "continue_mission": "Continue",
+        "stop_mission": "Stop",
+        "create_review": "Create review",
+        "summary": "Summary",
+        "manager_layer": "Manager",
+        "complexity_score": "Complexity",
+        "pm_required": "PM required",
+        "escalation_reason": "Escalation reason",
+        "requested_outputs": "Requested outputs",
+        "task_logs": "Tasks",
+        "no_task_logs": "No task logs yet.",
+        "report": "Report",
+        "run_budget": "Run budget",
+        "max_steps": "Max steps",
+        "max_tokens": "Max tokens",
+        "max_time_minutes": "Max time minutes",
+        "max_cost_eur": "Max cost EUR",
+        "latest_run_usage": "Latest run usage",
+        "execution_runs": "Execution runs",
+        "changed_files": "Changed files",
+        "input_tokens": "Input tokens",
+        "output_tokens": "Output tokens",
+        "stop_reason": "Stop reason",
+        "request_approval_checkpoint": "Request approval checkpoint",
+        "category": "Category",
+        "reason": "Reason",
+        "create_approval": "Create approval",
+        "status_file": "Status file",
+        "pm_report": "PM report",
+        "tasks_file": "Tasks file",
+        "runtime_auth_error": "The mission could not run because the model provider rejected the API key. Check the runtime settings or use a valid provider key.",
+        "mission_run_completed": "Mission run completed.",
+        "mission_paused": "Mission paused.",
+        "mission_resumed": "Mission resumed.",
+        "mission_stopped": "Mission stopped.",
     },
     "zh-TW": {
         "nav_praetor": "Praetor",
@@ -435,6 +472,43 @@ TRANSLATIONS = {
         "disabled": "停用",
         "yes": "是",
         "no": "否",
+        "run_mission": "執行任務",
+        "pause_mission": "暫停",
+        "continue_mission": "繼續",
+        "stop_mission": "停止",
+        "create_review": "建立審查",
+        "summary": "摘要",
+        "manager_layer": "管理方式",
+        "complexity_score": "複雜度",
+        "pm_required": "需要 PM",
+        "escalation_reason": "升級原因",
+        "requested_outputs": "要求產出",
+        "task_logs": "工作紀錄",
+        "no_task_logs": "目前沒有工作紀錄。",
+        "report": "報告",
+        "run_budget": "執行預算",
+        "max_steps": "最多步數",
+        "max_tokens": "最多 tokens",
+        "max_time_minutes": "最多時間（分鐘）",
+        "max_cost_eur": "最高成本（EUR）",
+        "latest_run_usage": "最近一次使用量",
+        "execution_runs": "執行紀錄",
+        "changed_files": "變更檔案",
+        "input_tokens": "輸入 tokens",
+        "output_tokens": "輸出 tokens",
+        "stop_reason": "停止原因",
+        "request_approval_checkpoint": "建立批准檢查點",
+        "category": "類別",
+        "reason": "原因",
+        "create_approval": "建立批准",
+        "status_file": "狀態檔案",
+        "pm_report": "PM 報告",
+        "tasks_file": "工作檔案",
+        "runtime_auth_error": "任務無法執行，因為模型供應商拒絕目前的 API key。請檢查執行環境設定，或改用有效的 provider key。",
+        "mission_run_completed": "任務執行完成。",
+        "mission_paused": "任務已暫停。",
+        "mission_resumed": "任務已繼續。",
+        "mission_stopped": "任務已停止。",
     },
 }
 
@@ -443,6 +517,7 @@ VALUE_LABELS = {
         "planned": "planned",
         "active": "active",
         "running": "running",
+        "resumed": "running",
         "paused": "paused",
         "completed": "completed",
         "failed": "failed",
@@ -456,6 +531,14 @@ VALUE_LABELS = {
         "api": "API",
         "subscription_executor": "subscription executor",
         "local_model": "local model",
+        "praetor_direct": "CEO direct",
+        "pm_auto": "PM managed",
+        "hybrid": "hybrid",
+        "change_strategy": "change strategy",
+        "overwrite_important_files": "overwrite important files",
+        "shell_commands": "shell commands",
+        "spending_money": "spending money",
+        "operations": "operations",
         "lean": "lean",
         "structured": "structured",
         "flexible": "flexible",
@@ -466,6 +549,7 @@ VALUE_LABELS = {
         "planned": "已規劃",
         "active": "進行中",
         "running": "執行中",
+        "resumed": "進行中",
         "paused": "已暫停",
         "completed": "已完成",
         "failed": "失敗",
@@ -479,6 +563,14 @@ VALUE_LABELS = {
         "api": "API",
         "subscription_executor": "訂閱執行器",
         "local_model": "本地模型",
+        "praetor_direct": "CEO 直接管理",
+        "pm_auto": "PM 管理",
+        "hybrid": "混合",
+        "change_strategy": "策略變更",
+        "overwrite_important_files": "覆寫重要檔案",
+        "shell_commands": "Shell 指令",
+        "spending_money": "花費金錢",
+        "operations": "營運",
         "lean": "精簡",
         "structured": "結構化",
         "flexible": "彈性",
@@ -527,6 +619,15 @@ def _redirect(path: str, flash: str | None = None, level: str = "info") -> Redir
         sep = "&" if "?" in path else "?"
         path = f"{path}{sep}flash={quote(flash)}&level={quote(level)}"
     return RedirectResponse(url=path, status_code=303)
+
+
+def _friendly_runtime_error(exc_or_message: Exception | str, t) -> str:
+    message = str(exc_or_message)
+    if "401 Unauthorized" in message and "api.openai.com" in message:
+        return t("runtime_auth_error")
+    if "api.openai.com" in message and "Unauthorized" in message:
+        return t("runtime_auth_error")
+    return message
 
 
 def _ui_language(request: Request, initialized_settings) -> str:
@@ -644,6 +745,8 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         runtime_health = service.runtime_health()
     approvals = service.list_approvals(status="pending") if initialized_settings is not None and authenticated else []
     flash, flash_level = _flash(request)
+    if flash and flash_level == "error":
+        flash = _friendly_runtime_error(flash, t)
     return {
         "request": request,
         "current_url": f"{request.url.path}{'?' + request.url.query if request.url.query else ''}",
@@ -1091,44 +1194,48 @@ async def create_mission_submit(request: Request):
 async def run_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
         request.app.state.ctx.service.run_mission(mission_id)
     except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
-    return _redirect(f"/app/missions/{mission_id}", "Mission run completed.", "success")
+        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
+    return _redirect(f"/app/missions/{mission_id}", t("mission_run_completed"), "success")
 
 
 @router.post("/app/missions/{mission_id}/pause")
 async def pause_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
         request.app.state.ctx.service.pause_mission(mission_id, MissionPauseRequest())
     except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
-    return _redirect(f"/app/missions/{mission_id}", "Mission paused.", "success")
+        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
+    return _redirect(f"/app/missions/{mission_id}", t("mission_paused"), "success")
 
 
 @router.post("/app/missions/{mission_id}/continue")
 async def continue_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
         request.app.state.ctx.service.continue_mission(mission_id, MissionContinueRequest())
     except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
-    return _redirect(f"/app/missions/{mission_id}", "Mission resumed.", "success")
+        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
+    return _redirect(f"/app/missions/{mission_id}", t("mission_resumed"), "success")
 
 
 @router.post("/app/missions/{mission_id}/stop")
 async def stop_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
         request.app.state.ctx.service.stop_mission(mission_id, MissionStopRequest())
     except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
-    return _redirect(f"/app/missions/{mission_id}", "Mission stopped.", "success")
+        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
+    return _redirect(f"/app/missions/{mission_id}", t("mission_stopped"), "success")
 
 
 @router.post("/app/missions/{mission_id}/meeting")
