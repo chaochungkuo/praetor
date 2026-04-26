@@ -144,6 +144,7 @@ export type OfficeSnapshot = {
   audit_events: Array<Record<string, unknown>>;
   ceo_thread: ConversationMessage[];
   agent_activity: TimelineEvent[];
+  recent_planner_actions: PlannerAction[];
   runtime_health: Record<string, unknown>;
   organization: OrganizationSnapshot;
 };

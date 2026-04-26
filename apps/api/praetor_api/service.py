@@ -754,6 +754,7 @@ class PraetorService:
             audit_events=audit_events,
             ceo_thread=self.storage.list_conversation_messages(limit=30),
             agent_activity=self._recent_agent_activity(limit=30),
+            recent_planner_actions=self._recent_planner_actions(audit_events, limit=8),
             runtime_health=self.runtime_health(),
             organization=self.organization_snapshot(),
         )
@@ -1209,6 +1210,20 @@ class PraetorService:
             )
         events.sort(key=lambda item: item.created_at, reverse=True)
         return events[:limit]
+
+    @staticmethod
+    def _recent_planner_actions(audit_events: list[dict], limit: int = 8) -> list[PlannerAction]:
+        actions: list[PlannerAction] = []
+        for event in audit_events:
+            payload = event.get("payload") or {}
+            for item in payload.get("actions") or []:
+                try:
+                    actions.append(PlannerAction.model_validate(item))
+                except Exception:
+                    continue
+                if len(actions) >= limit:
+                    return actions
+        return actions
 
     def runtime_health(self) -> dict:
         runtime = MissionRuntime()

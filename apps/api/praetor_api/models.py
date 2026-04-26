@@ -438,6 +438,7 @@ class OfficeSnapshot(BaseModel):
     audit_events: list[dict[str, Any]] = Field(default_factory=list)
     ceo_thread: list[ConversationMessage] = Field(default_factory=list)
     agent_activity: list[MissionTimelineEvent] = Field(default_factory=list)
+    recent_planner_actions: list[PlannerAction] = Field(default_factory=list)
     runtime_health: dict[str, Any] = Field(default_factory=dict)
     organization: OrganizationSnapshot = Field(default_factory=OrganizationSnapshot)
 
