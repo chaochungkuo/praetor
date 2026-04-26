@@ -323,6 +323,7 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "session_owner": getattr(request.state, "session_owner", None),
         "csrf_token": csrf_token(request),
         "setup_token": request.query_params.get("setup_token", ""),
+        "static_asset_version": int((STATIC_DIR / "praetor.css").stat().st_mtime),
     }
 
 

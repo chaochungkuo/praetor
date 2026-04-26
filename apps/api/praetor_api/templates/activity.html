@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="grid two">
+  <section class="grid two activity-grid">
     <section class="panel">
       <h3>Recent execution runs</h3>
       {% if recent_runs %}
         <div class="list">
           {% for run in recent_runs %}
-            <div class="list-row">
+            <div class="list-row activity-row">
               <div>
                 <strong>{{ run.executor }}</strong>
                 <div class="muted">{{ run.changed_files|join(', ') or 'no changed files recorded' }}</div>
@@ -26,10 +26,13 @@
       {% if audit_events %}
         <div class="list">
           {% for event in audit_events %}
-            <div class="list-row">
+            <div class="list-row activity-row">
               <div>
                 <strong>{{ event.type }}</strong>
-                <div class="muted">{{ event.payload }}</div>
+                <details>
+                  <summary>Payload</summary>
+                  <pre class="payload">{{ event.payload|tojson(indent=2) }}</pre>
+                </details>
               </div>
               <span class="status">{{ event.ts }}</span>
             </div>

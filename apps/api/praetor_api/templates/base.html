@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ page_title }} · Praetor</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}?v={{ static_asset_version }}" />
   </head>
   <body>
     <div class="shell">
