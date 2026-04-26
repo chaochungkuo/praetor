@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ ui_language }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mobile Briefing · Praetor</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}" />
+    <title>{{ page_title }} · Praetor</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}?v={{ static_asset_version }}" />
   </head>
   <body class="mobile-body">
     <main class="mobile-shell">
       <section class="panel hero">
         <h1>Praetor mobile briefing</h1>
-        <p>{{ settings.owner.name }} · quick executive view</p>
+        <p>{{ settings.owner.name }} · {{ t("founder_command_center") }}</p>
       </section>
 
       {% if flash %}
@@ -18,16 +18,16 @@
       {% endif %}
 
       <section class="panel">
-        <h2>Today</h2>
+        <h2>{{ t("today") }}</h2>
         <ul class="metric-list">
-          <li><span>Active missions</span><strong>{{ briefing.active_missions if briefing else 0 }}</strong></li>
-          <li><span>Paused missions</span><strong>{{ briefing.paused_missions if briefing else 0 }}</strong></li>
-          <li><span>Pending approvals</span><strong>{{ briefing.approvals_pending if briefing else 0 }}</strong></li>
+          <li><span>{{ t("active_missions") }}</span><strong>{{ briefing.active_missions if briefing else 0 }}</strong></li>
+          <li><span>{{ t("paused_missions") }}</span><strong>{{ briefing.paused_missions if briefing else 0 }}</strong></li>
+          <li><span>{{ t("pending_approvals") }}</span><strong>{{ briefing.approvals_pending if briefing else 0 }}</strong></li>
         </ul>
       </section>
 
       <section class="panel">
-        <h2>Pending approvals</h2>
+        <h2>{{ t("pending_approvals") }}</h2>
         {% if approvals %}
           <div class="list">
             {% for approval in approvals[:5] %}
@@ -39,49 +39,49 @@
                 <div class="inline-actions">
                   <form method="post" action="/app/approvals/{{ approval.id }}/approved">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                    <button type="submit" class="small">Approve</button>
+                    <button type="submit" class="small">{{ t("approve") }}</button>
                   </form>
                   <form method="post" action="/app/approvals/{{ approval.id }}/rejected">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                    <button type="submit" class="small secondary">Reject</button>
+                    <button type="submit" class="small secondary">{{ t("reject") }}</button>
                   </form>
                 </div>
               </div>
             {% endfor %}
           </div>
         {% else %}
-          <p class="muted">No approvals waiting.</p>
+          <p class="muted">{{ t("no_approvals_waiting") }}</p>
         {% endif %}
       </section>
 
       <section class="panel">
-        <h2>Mission briefing</h2>
+        <h2>{{ t("mission_briefing") }}</h2>
         {% if missions %}
           <div class="list">
             {% for mission in missions %}
               <a class="list-row" href="/app/missions/{{ mission.id }}">
                 <div>
                   <strong>{{ mission.title }}</strong>
-                  <div class="muted">{{ mission.summary or 'No summary yet.' }}</div>
+                  <div class="muted">{{ mission.summary or t("no_summary_yet") }}</div>
                 </div>
-                <span class="status">{{ mission.status }}</span>
+                <span class="status">{{ label(mission.status) }}</span>
               </a>
             {% endfor %}
           </div>
         {% else %}
-          <p class="muted">No missions yet.</p>
+          <p class="muted">{{ t("no_missions_yet") }}</p>
         {% endif %}
       </section>
 
       <section class="panel">
-        <h2>Quick links</h2>
+        <h2>{{ t("quick_links") }}</h2>
         <div class="mobile-actions">
           <a class="small-button" href="/app/praetor">Praetor</a>
-          <a class="small-button" href="/app/tasks">Tasks</a>
-          <a class="small-button" href="/app/models">Models</a>
+          <a class="small-button" href="/app/tasks">{{ t("nav_tasks") }}</a>
+          <a class="small-button" href="/app/models">{{ t("nav_models") }}</a>
           <form method="post" action="/app/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-            <button type="submit" class="small secondary">Logout</button>
+            <button type="submit" class="small secondary">{{ t("logout") }}</button>
           </form>
         </div>
       </section>

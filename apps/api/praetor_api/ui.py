@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
 from pathlib import Path
 from urllib.parse import quote
 
@@ -139,6 +141,100 @@ TRANSLATIONS = {
         "principle_2": "Decisions escalate upward.",
         "principle_3": "Memory belongs to the company, not individual agents.",
         "principle_4": "Praetor manages roles and hierarchy, not equal-agent debate.",
+        "page_overview": "Overview",
+        "page_tasks": "Tasks",
+        "page_activity": "Activity",
+        "page_settings": "Settings",
+        "page_memory": "Memory",
+        "page_decisions": "Decisions",
+        "page_models": "Models",
+        "page_meetings": "Meetings",
+        "page_mobile": "Mobile Briefing",
+        "active": "Active",
+        "paused": "Paused",
+        "approvals": "Approvals",
+        "total_missions": "Total missions",
+        "status_breakdown": "Status breakdown",
+        "recent_missions": "Recent missions",
+        "recent_audit_events": "Recent audit events",
+        "mission_board": "Mission board",
+        "mission": "Mission",
+        "status": "Status",
+        "priority": "Priority",
+        "domains": "Domains",
+        "updated": "Updated",
+        "run": "Run",
+        "activity_recent_runs": "Recent execution runs",
+        "audit_stream": "Audit stream",
+        "audit_trail": "Audit trail",
+        "event_detail": "Event detail",
+        "event_recorded": "Event recorded.",
+        "mission_related_event": "Mission-related event.",
+        "technical_details": "Technical details",
+        "decision_items": "Decision items",
+        "open": "Open",
+        "company_memory": "Company memory",
+        "company_memory_desc": "Shared wiki pages and the retrieval context Praetor can use during missions.",
+        "wiki_pages": "Wiki pages",
+        "recent_retrieval_previews": "Recent retrieval previews",
+        "runtime_health": "Runtime health",
+        "usage_by_executor": "Usage by executor",
+        "executor": "Executor",
+        "runs": "Runs",
+        "input": "Input",
+        "output": "Output",
+        "cost": "Cost",
+        "recent_runs": "Recent runs",
+        "structured_meetings": "Structured meetings",
+        "structured_meetings_desc": "Meeting summaries are generated from mission state, task logs, and execution records.",
+        "today": "Today",
+        "mission_briefing": "Mission briefing",
+        "quick_links": "Quick links",
+        "owner": "Owner",
+        "name": "Name",
+        "email": "Email",
+        "language": "Language",
+        "workspace": "Workspace",
+        "root": "Root",
+        "allow_read": "Allow read",
+        "allow_write": "Allow write",
+        "deny_write": "Deny write",
+        "governance": "Governance",
+        "autonomy": "Autonomy",
+        "require_approval": "Require approval",
+        "auto_execute": "Auto execute",
+        "never_allow": "Never allow",
+        "roles": "Roles",
+        "executor_health": "Executor health",
+        "configured": "Configured",
+        "healthy": "Healthy",
+        "error": "Error",
+        "bridge_url": "Bridge URL",
+        "none": "none",
+        "not_available": "n/a",
+        "no_missions_yet": "No missions yet.",
+        "no_missions_available": "No missions available.",
+        "no_recent_missions": "Praetor has not started any missions yet.",
+        "no_audit_events": "No audit events yet.",
+        "no_audit_events_recorded": "No audit events recorded yet.",
+        "no_execution_runs": "No execution runs recorded yet.",
+        "no_usage_records": "No usage records yet.",
+        "no_runs_recorded": "No runs recorded yet.",
+        "no_wiki_pages": "No wiki pages found.",
+        "no_retrieval_preview": "No retrieval preview recorded.",
+        "no_executors": "No executors reported by the bridge.",
+        "no_runs_yet": "No runs yet.",
+        "no_meetings": "No meetings have been generated yet.",
+        "no_structured_decisions": "No structured decisions recorded yet.",
+        "no_approvals_waiting": "No approvals waiting.",
+        "no_summary_yet": "No summary yet.",
+        "no_changed_files": "No changed files recorded.",
+        "auto": "auto",
+        "manual": "manual",
+        "enabled": "enabled",
+        "disabled": "disabled",
+        "yes": "yes",
+        "no": "no",
     },
     "zh-TW": {
         "nav_praetor": "Praetor",
@@ -245,6 +341,174 @@ TRANSLATIONS = {
         "principle_2": "決策向上升級。",
         "principle_3": "記憶屬於公司，不屬於個別 agent。",
         "principle_4": "Praetor 管理的是角色與階層，不是讓平等 agent 無限討論。",
+        "page_overview": "總覽",
+        "page_tasks": "任務",
+        "page_activity": "動態",
+        "page_settings": "設定",
+        "page_memory": "記憶",
+        "page_decisions": "決策",
+        "page_models": "模型與執行",
+        "page_meetings": "會議",
+        "page_mobile": "手機簡報",
+        "active": "進行中",
+        "paused": "已暫停",
+        "approvals": "待核准",
+        "total_missions": "任務總數",
+        "status_breakdown": "狀態分布",
+        "recent_missions": "近期任務",
+        "recent_audit_events": "近期系統紀錄",
+        "mission_board": "任務看板",
+        "mission": "任務",
+        "status": "狀態",
+        "priority": "優先級",
+        "domains": "領域",
+        "updated": "更新時間",
+        "run": "執行",
+        "activity_recent_runs": "近期執行紀錄",
+        "audit_stream": "系統活動",
+        "audit_trail": "決策紀錄",
+        "event_detail": "事件摘要",
+        "event_recorded": "已記錄事件。",
+        "mission_related_event": "任務相關事件。",
+        "technical_details": "技術細節",
+        "decision_items": "需要決策的事項",
+        "open": "打開",
+        "company_memory": "公司記憶",
+        "company_memory_desc": "Praetor 在任務中可以使用的共享 wiki 與檢索脈絡。",
+        "wiki_pages": "Wiki 頁面",
+        "recent_retrieval_previews": "近期檢索摘要",
+        "runtime_health": "執行環境狀態",
+        "usage_by_executor": "執行器使用量",
+        "executor": "執行器",
+        "runs": "執行次數",
+        "input": "輸入",
+        "output": "輸出",
+        "cost": "估計成本",
+        "recent_runs": "近期執行",
+        "structured_meetings": "結構化會議",
+        "structured_meetings_desc": "會議摘要會根據任務狀態、工作紀錄與執行紀錄產生。",
+        "today": "今日",
+        "mission_briefing": "任務簡報",
+        "quick_links": "快速連結",
+        "owner": "擁有者",
+        "name": "名稱",
+        "email": "Email",
+        "language": "語言",
+        "workspace": "工作區",
+        "root": "根目錄",
+        "allow_read": "可讀取範圍",
+        "allow_write": "可寫入範圍",
+        "deny_write": "禁止寫入範圍",
+        "governance": "治理規則",
+        "autonomy": "自主程度",
+        "require_approval": "需要批准",
+        "auto_execute": "可自動執行",
+        "never_allow": "永不允許",
+        "roles": "角色",
+        "executor_health": "執行器狀態",
+        "configured": "已設定",
+        "healthy": "健康",
+        "error": "錯誤",
+        "bridge_url": "Bridge 位址",
+        "none": "無",
+        "not_available": "未設定",
+        "no_missions_yet": "目前還沒有任務。",
+        "no_missions_available": "目前沒有可用任務。",
+        "no_recent_missions": "Praetor 尚未開始任何任務。",
+        "no_audit_events": "目前沒有系統紀錄。",
+        "no_audit_events_recorded": "目前尚未記錄系統活動。",
+        "no_execution_runs": "目前沒有執行紀錄。",
+        "no_usage_records": "目前沒有使用量紀錄。",
+        "no_runs_recorded": "目前沒有執行紀錄。",
+        "no_wiki_pages": "目前沒有 wiki 頁面。",
+        "no_retrieval_preview": "目前沒有檢索摘要。",
+        "no_executors": "Bridge 目前沒有回報可用的執行器。",
+        "no_runs_yet": "目前還沒有執行。",
+        "no_meetings": "目前還沒有產生會議摘要。",
+        "no_structured_decisions": "目前沒有結構化決策紀錄。",
+        "no_approvals_waiting": "目前沒有等待核准的事項。",
+        "no_summary_yet": "目前沒有摘要。",
+        "no_changed_files": "沒有記錄變更檔案。",
+        "auto": "自動",
+        "manual": "手動",
+        "enabled": "啟用",
+        "disabled": "停用",
+        "yes": "是",
+        "no": "否",
+    },
+}
+
+VALUE_LABELS = {
+    "en": {
+        "planned": "planned",
+        "active": "active",
+        "running": "running",
+        "paused": "paused",
+        "completed": "completed",
+        "failed": "failed",
+        "pending": "pending",
+        "approved": "approved",
+        "rejected": "rejected",
+        "high": "high",
+        "normal": "normal",
+        "low": "low",
+        "critical": "critical",
+        "api": "API",
+        "subscription_executor": "subscription executor",
+        "local_model": "local model",
+        "lean": "lean",
+        "structured": "structured",
+        "flexible": "flexible",
+        "true": "yes",
+        "false": "no",
+    },
+    "zh-TW": {
+        "planned": "已規劃",
+        "active": "進行中",
+        "running": "執行中",
+        "paused": "已暫停",
+        "completed": "已完成",
+        "failed": "失敗",
+        "pending": "待處理",
+        "approved": "已批准",
+        "rejected": "已拒絕",
+        "high": "高",
+        "normal": "一般",
+        "low": "低",
+        "critical": "關鍵",
+        "api": "API",
+        "subscription_executor": "訂閱執行器",
+        "local_model": "本地模型",
+        "lean": "精簡",
+        "structured": "結構化",
+        "flexible": "彈性",
+        "true": "是",
+        "false": "否",
+    },
+}
+
+EVENT_LABELS = {
+    "en": {
+        "owner_login": "Owner signed in",
+        "mission_created": "Mission created",
+        "mission_team_created": "AI team created",
+        "approval_created": "Approval request created",
+        "delegation_created": "Task delegated",
+        "decision_escalation_created": "Decision escalated",
+        "standing_order_created": "Standing order updated",
+        "ceo_conversation_message": "CEO conversation updated",
+        "onboarding_completed": "Company initialized",
+    },
+    "zh-TW": {
+        "owner_login": "擁有者已登入",
+        "mission_created": "建立任務",
+        "mission_team_created": "建立 AI 團隊",
+        "approval_created": "建立核准請求",
+        "delegation_created": "交辦任務",
+        "decision_escalation_created": "升級決策",
+        "standing_order_created": "更新常設規則",
+        "ceo_conversation_message": "CEO 對話更新",
+        "onboarding_completed": "公司初始化完成",
     },
 }
 
@@ -287,11 +551,90 @@ def _translator(language: str):
     return translate
 
 
+def _value_label(language: str):
+    labels = VALUE_LABELS.get(language, VALUE_LABELS["en"])
+    fallback = VALUE_LABELS["en"]
+
+    def label(value: Any) -> str:
+        if value is None:
+            return _translator(language)("not_available")
+        if isinstance(value, bool):
+            value = str(value).lower()
+        raw = str(value)
+        key = raw.strip().lower()
+        return labels.get(key, fallback.get(key, raw.replace("_", " ")))
+
+    return label
+
+
+def _event_label(language: str):
+    labels = EVENT_LABELS.get(language, EVENT_LABELS["en"])
+    fallback = EVENT_LABELS["en"]
+
+    def label(event_type: Any) -> str:
+        raw = str(event_type or "")
+        return labels.get(raw, fallback.get(raw, raw.replace("_", " ").title()))
+
+    return label
+
+
+def _format_datetime(language: str):
+    def format_value(value: Any) -> str:
+        if value is None:
+            return ""
+        parsed = value
+        if isinstance(value, str):
+            raw = value.strip()
+            if raw.endswith("Z"):
+                raw = raw[:-1] + "+00:00"
+            try:
+                parsed = datetime.fromisoformat(raw)
+            except ValueError:
+                return value
+        if isinstance(parsed, datetime):
+            if language == "zh-TW":
+                return parsed.strftime("%Y-%m-%d %H:%M")
+            return parsed.strftime("%Y-%m-%d %H:%M")
+        return str(value)
+
+    return format_value
+
+
+def _event_summary(language: str):
+    t = _translator(language)
+
+    def summarize(event_or_payload: Any) -> str:
+        event_type = ""
+        payload = event_or_payload
+        if isinstance(event_or_payload, dict) and "payload" in event_or_payload:
+            event_type = str(event_or_payload.get("type") or "")
+            payload = event_or_payload.get("payload")
+        if not isinstance(payload, dict):
+            return str(payload or t("event_recorded"))
+        for key in ("title", "mission_title", "reason", "content", "message", "summary", "category"):
+            value = payload.get(key)
+            if value:
+                return str(value)
+        if event_type in {"owner_login", "ceo_conversation_message", "standing_order_created", "onboarding_completed"}:
+            return t("event_recorded")
+        mission_id = payload.get("mission_id")
+        if mission_id:
+            return t("mission_related_event")
+        return t("event_recorded")
+
+    return summarize
+
+
+def _page_title(current_page: str, fallback: str, t) -> str:
+    return t(f"page_{current_page}") if current_page else fallback
+
+
 def _base_context(request: Request, current_page: str, page_title: str) -> dict:
     service = request.app.state.ctx.service
     initialized_settings = service.get_settings()
     ui_language = _ui_language(request, initialized_settings)
     t = _translator(ui_language)
+    display_title = _page_title(current_page, page_title, t)
     authenticated = bool(getattr(request.state, "authenticated", False))
     settings = initialized_settings if authenticated or initialized_settings is None else None
     briefing = None
@@ -305,10 +648,14 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "request": request,
         "current_url": f"{request.url.path}{'?' + request.url.query if request.url.query else ''}",
         "current_url_quoted": quote(f"{request.url.path}{'?' + request.url.query if request.url.query else ''}", safe=""),
-        "page_title": page_title,
+        "page_title": display_title,
         "current_page": current_page,
         "ui_language": ui_language,
         "t": t,
+        "label": _value_label(ui_language),
+        "event_label": _event_label(ui_language),
+        "event_summary": _event_summary(ui_language),
+        "format_time": _format_datetime(ui_language),
         "language_options": SUPPORTED_LANGUAGES,
         "settings": settings,
         "settings_initialized": initialized_settings is not None,

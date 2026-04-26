@@ -3,71 +3,75 @@
 {% block content %}
   <section class="grid cards">
     <section class="panel stat-card">
-      <h3>Active</h3>
+      <h3>{{ t("active") }}</h3>
       <strong>{{ briefing.active_missions }}</strong>
     </section>
     <section class="panel stat-card">
-      <h3>Paused</h3>
+      <h3>{{ t("paused") }}</h3>
       <strong>{{ briefing.paused_missions }}</strong>
     </section>
     <section class="panel stat-card">
-      <h3>Approvals</h3>
+      <h3>{{ t("approvals") }}</h3>
       <strong>{{ briefing.approvals_pending }}</strong>
     </section>
     <section class="panel stat-card">
-      <h3>Total missions</h3>
+      <h3>{{ t("total_missions") }}</h3>
       <strong>{{ missions|length }}</strong>
     </section>
   </section>
 
   <section class="grid two">
     <section class="panel">
-      <h3>Status breakdown</h3>
+      <h3>{{ t("status_breakdown") }}</h3>
       {% if status_counts %}
         <ul class="compact-list">
           {% for status, count in status_counts.items() %}
-            <li>{{ status }}: {{ count }}</li>
+            <li>{{ label(status) }}: {{ count }}</li>
           {% endfor %}
         </ul>
       {% else %}
-        <p class="muted">No missions yet.</p>
+        <p class="muted">{{ t("no_missions_yet") }}</p>
       {% endif %}
     </section>
     <section class="panel">
-      <h3>Recent missions</h3>
+      <h3>{{ t("recent_missions") }}</h3>
       {% if missions %}
         <div class="list">
           {% for mission in missions[:6] %}
             <a class="list-row" href="/app/missions/{{ mission.id }}">
               <div>
                 <strong>{{ mission.title }}</strong>
-                <div class="muted">{{ mission.priority }} priority · {{ mission.domains|join(', ') }}</div>
+                <div class="muted">{{ label(mission.priority) }} · {{ mission.domains|join(', ') }}</div>
               </div>
-              <span class="status">{{ mission.status }}</span>
+              <span class="status">{{ label(mission.status) }}</span>
             </a>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">Praetor has not started any missions yet.</p>
+        <p class="muted">{{ t("no_recent_missions") }}</p>
       {% endif %}
     </section>
   </section>
   <section class="panel">
-    <h3>Recent audit events</h3>
+    <h3>{{ t("recent_audit_events") }}</h3>
     {% if audit_events %}
       <div class="list">
         {% for event in audit_events %}
           <div class="list-row">
             <div>
-              <strong>{{ event.type }}</strong>
-              <div class="muted">{{ event.payload }}</div>
+              <strong>{{ event_label(event.type) }}</strong>
+              <div class="muted">{{ event_summary(event) }}</div>
+              <details>
+                <summary>{{ t("technical_details") }}</summary>
+                <pre class="payload">{{ event.payload|tojson(indent=2) }}</pre>
+              </details>
             </div>
-            <span class="status">{{ event.ts }}</span>
+            <span class="status">{{ format_time(event.ts) }}</span>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p class="muted">No audit events yet.</p>
+      <p class="muted">{{ t("no_audit_events") }}</p>
     {% endif %}
   </section>
 {% endblock %}

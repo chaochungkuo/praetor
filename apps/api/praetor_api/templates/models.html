@@ -3,25 +3,25 @@
 {% block content %}
   <section class="grid two">
     <section class="panel">
-      <h3>Runtime health</h3>
+      <h3>{{ t("runtime_health") }}</h3>
       <ul class="compact-list">
-        <li>Mode: {{ runtime_health.mode }}</li>
-        <li>Configured: {{ runtime_health.configured }}</li>
-        <li>Healthy: {{ runtime_health.healthy }}</li>
-        <li>Error: {{ runtime_health.error or 'none' }}</li>
+        <li>{{ t("mode") }}: {{ label(runtime_health.mode) }}</li>
+        <li>{{ t("configured") }}: {{ label(runtime_health.configured) }}</li>
+        <li>{{ t("healthy") }}: {{ label(runtime_health.healthy) }}</li>
+        <li>{{ t("error") }}: {{ runtime_health.error or t("none") }}</li>
       </ul>
     </section>
     <section class="panel">
-      <h3>Usage by executor</h3>
+      <h3>{{ t("usage_by_executor") }}</h3>
       {% if usage_summary.by_executor %}
         <table class="table">
           <thead>
             <tr>
-              <th>Executor</th>
-              <th>Runs</th>
-              <th>Input</th>
-              <th>Output</th>
-              <th>Cost</th>
+              <th>{{ t("executor") }}</th>
+              <th>{{ t("runs") }}</th>
+              <th>{{ t("input") }}</th>
+              <th>{{ t("output") }}</th>
+              <th>{{ t("cost") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -37,26 +37,26 @@
           </tbody>
         </table>
       {% else %}
-        <p class="muted">No usage records yet.</p>
+        <p class="muted">{{ t("no_usage_records") }}</p>
       {% endif %}
     </section>
   </section>
   <section class="panel">
-    <h3>Recent runs</h3>
+    <h3>{{ t("recent_runs") }}</h3>
     {% if usage_summary.runs %}
       <div class="list">
         {% for run in usage_summary.runs %}
           <div class="list-row">
             <div>
               <strong>{{ run.executor }}</strong>
-              <div class="muted">{{ run.changed_files|join(', ') or 'no changed files recorded' }}</div>
+              <div class="muted">{{ run.changed_files|join(', ') or t("no_changed_files") }}</div>
             </div>
-            <span class="status">{{ run.normalized_status }}</span>
+            <span class="status">{{ label(run.normalized_status) }}</span>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p class="muted">No runs recorded yet.</p>
+      <p class="muted">{{ t("no_runs_recorded") }}</p>
     {% endif %}
   </section>
 {% endblock %}

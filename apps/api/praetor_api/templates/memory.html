@@ -2,12 +2,12 @@
 
 {% block content %}
   <section class="panel">
-    <h2>Company memory</h2>
-    <p>Shared wiki pages and the retrieval context Praetor can use during missions.</p>
+    <h2>{{ t("company_memory") }}</h2>
+    <p>{{ t("company_memory_desc") }}</p>
   </section>
   <section class="grid two">
     <section class="panel">
-      <h3>Wiki pages</h3>
+      <h3>{{ t("wiki_pages") }}</h3>
       {% if wiki_pages %}
         <div class="list">
           {% for page in wiki_pages %}
@@ -18,25 +18,25 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No wiki pages found.</p>
+        <p class="muted">{{ t("no_wiki_pages") }}</p>
       {% endif %}
     </section>
     <section class="panel">
-      <h3>Recent retrieval previews</h3>
+      <h3>{{ t("recent_retrieval_previews") }}</h3>
       {% if recent_runs %}
         <div class="list">
           {% for run in recent_runs %}
             <div class="list-row">
               <div>
                 <strong>{{ run.executor }}</strong>
-                <div class="muted">{{ run.retrieval_preview|join(', ') or 'No retrieval preview recorded.' }}</div>
+                <div class="muted">{{ run.retrieval_preview|join(', ') or t("no_retrieval_preview") }}</div>
               </div>
-              <span class="status">{{ run.normalized_status }}</span>
+              <span class="status">{{ label(run.normalized_status) }}</span>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No runs yet.</p>
+        <p class="muted">{{ t("no_runs_yet") }}</p>
       {% endif %}
     </section>
   </section>

@@ -2,8 +2,8 @@
 
 {% block content %}
   <section class="panel">
-    <h2>Structured meetings</h2>
-    <p>Meeting summaries are generated from mission state, task logs, and execution records.</p>
+    <h2>{{ t("structured_meetings") }}</h2>
+    <p>{{ t("structured_meetings_desc") }}</p>
   </section>
   <section class="panel">
     {% if meetings %}
@@ -12,15 +12,15 @@
           <div class="list-row">
             <div>
               <strong>{{ meeting.type }}</strong>
-              <div class="muted">Mission: {{ meeting.mission_id }}</div>
+              <div class="muted">{{ t("mission") }}: {{ meeting.mission_id }}</div>
               <div class="muted">{{ meeting.outputs|join(' | ') }}</div>
             </div>
-            <span class="status">{{ meeting.created_at }}</span>
+            <span class="status">{{ format_time(meeting.created_at) }}</span>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p class="muted">No meetings have been generated yet.</p>
+      <p class="muted">{{ t("no_meetings") }}</p>
     {% endif %}
   </section>
 {% endblock %}

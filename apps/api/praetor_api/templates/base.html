@@ -33,7 +33,7 @@
           <div>
             <h1>{{ page_title }}</h1>
             {% if settings %}
-              <p>{{ settings.owner.name }} · {{ settings.company_dna.organization_style|replace('_', ' ') }} company</p>
+              <p>{{ settings.owner.name }} · {{ label(settings.company_dna.organization_style) }}</p>
             {% else %}
               <p>{{ t("founder_command_center") }}</p>
             {% endif %}

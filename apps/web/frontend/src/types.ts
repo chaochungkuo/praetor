@@ -153,6 +153,7 @@ export type Session = {
   initialized: boolean;
   authenticated: boolean;
   owner_name?: string | null;
+  ui_language?: string | null;
   csrf_token: string;
 };
 

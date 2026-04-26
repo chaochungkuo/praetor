@@ -3,43 +3,49 @@
 {% block content %}
   <section class="grid two activity-grid">
     <section class="panel">
-      <h3>Recent execution runs</h3>
+      <h3>{{ t("activity_recent_runs") }}</h3>
       {% if recent_runs %}
         <div class="list">
           {% for run in recent_runs %}
             <div class="list-row activity-row">
               <div>
                 <strong>{{ run.executor }}</strong>
-                <div class="muted">{{ run.changed_files|join(', ') or 'no changed files recorded' }}</div>
-                <div class="muted">{{ run.stdout_tail or 'no stdout summary' }}</div>
+                <div class="muted">{{ run.changed_files|join(', ') or t("no_changed_files") }}</div>
+                {% if run.stdout_tail %}
+                  <details>
+                    <summary>{{ t("technical_details") }}</summary>
+                    <pre class="payload">{{ run.stdout_tail }}</pre>
+                  </details>
+                {% endif %}
               </div>
-              <span class="status">{{ run.normalized_status }}</span>
+              <span class="status">{{ label(run.normalized_status) }}</span>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No execution runs recorded yet.</p>
+        <p class="muted">{{ t("no_execution_runs") }}</p>
       {% endif %}
     </section>
     <section class="panel">
-      <h3>Audit stream</h3>
+      <h3>{{ t("audit_stream") }}</h3>
       {% if audit_events %}
         <div class="list">
           {% for event in audit_events %}
             <div class="list-row activity-row">
               <div>
-                <strong>{{ event.type }}</strong>
+                <strong>{{ event_label(event.type) }}</strong>
+                <div class="muted">{{ event_summary(event) }}</div>
                 <details>
-                  <summary>Payload</summary>
+                  <summary>{{ t("technical_details") }}</summary>
                   <pre class="payload">{{ event.payload|tojson(indent=2) }}</pre>
                 </details>
               </div>
-              <span class="status">{{ event.ts }}</span>
+              <span class="status">{{ format_time(event.ts) }}</span>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No audit events recorded yet.</p>
+        <p class="muted">{{ t("no_audit_events_recorded") }}</p>
       {% endif %}
     </section>
   </section>

@@ -3,45 +3,45 @@
 {% block content %}
   <section class="grid two">
     <section class="panel">
-      <h3>Owner</h3>
+      <h3>{{ t("owner") }}</h3>
       <ul class="compact-list">
-        <li>Name: {{ settings.owner.name }}</li>
-        <li>Email: {{ settings.owner.email or 'n/a' }}</li>
-        <li>Language: {{ settings.owner.preferred_language }}</li>
+        <li>{{ t("name") }}: {{ settings.owner.name }}</li>
+        <li>{{ t("email") }}: {{ settings.owner.email or t("not_available") }}</li>
+        <li>{{ t("language") }}: {{ language_options.get(settings.owner.preferred_language, settings.owner.preferred_language) }}</li>
       </ul>
     </section>
     <section class="panel">
-      <h3>Runtime</h3>
+      <h3>{{ t("runtime") }}</h3>
       <ul class="compact-list">
-        <li>Mode: {{ settings.runtime.mode }}</li>
-        <li>Executor: {{ settings.runtime.executor or 'n/a' }}</li>
-        <li>Provider: {{ settings.runtime.provider or 'n/a' }}</li>
-        <li>Model: {{ settings.runtime.model or 'n/a' }}</li>
+        <li>{{ t("mode") }}: {{ label(settings.runtime.mode) }}</li>
+        <li>{{ t("executor") }}: {{ settings.runtime.executor or t("not_available") }}</li>
+        <li>{{ t("provider") }}: {{ settings.runtime.provider or t("not_available") }}</li>
+        <li>{{ t("model") }}: {{ settings.runtime.model or t("not_available") }}</li>
       </ul>
     </section>
   </section>
   <section class="grid two">
     <section class="panel">
-      <h3>Workspace</h3>
+      <h3>{{ t("workspace") }}</h3>
       <ul class="compact-list">
-        <li>Root: {{ settings.workspace.root }}</li>
-        <li>Allow read: {{ settings.workspace.permissions.allow_read|length }}</li>
-        <li>Allow write: {{ settings.workspace.permissions.allow_write|length }}</li>
-        <li>Deny write: {{ settings.workspace.permissions.deny_write|length }}</li>
+        <li>{{ t("root") }}: {{ settings.workspace.root }}</li>
+        <li>{{ t("allow_read") }}: {{ settings.workspace.permissions.allow_read|length }}</li>
+        <li>{{ t("allow_write") }}: {{ settings.workspace.permissions.allow_write|length }}</li>
+        <li>{{ t("deny_write") }}: {{ settings.workspace.permissions.deny_write|length }}</li>
       </ul>
     </section>
     <section class="panel">
-      <h3>Governance</h3>
+      <h3>{{ t("governance") }}</h3>
       <ul class="compact-list">
-        <li>Autonomy: {{ settings.governance.autonomy_mode }}</li>
-        <li>Require approval: {{ settings.governance.require_approval|join(', ') or 'none' }}</li>
-        <li>Auto execute: {{ settings.governance.auto_execute|join(', ') or 'none' }}</li>
-        <li>Never allow: {{ settings.governance.never_allow|join(', ') or 'none' }}</li>
+        <li>{{ t("autonomy") }}: {{ label(settings.governance.autonomy_mode) }}</li>
+        <li>{{ t("require_approval") }}: {{ settings.governance.require_approval|join(', ') or t("none") }}</li>
+        <li>{{ t("auto_execute") }}: {{ settings.governance.auto_execute|join(', ') or t("none") }}</li>
+        <li>{{ t("never_allow") }}: {{ settings.governance.never_allow|join(', ') or t("none") }}</li>
       </ul>
     </section>
   </section>
   <section class="panel">
-    <h3>Roles</h3>
+    <h3>{{ t("roles") }}</h3>
     <div class="list">
       {% for role in settings.roles %}
         <div class="list-row">
@@ -49,19 +49,19 @@
             <strong>{{ role.name }}</strong>
             <div class="muted">{{ role.responsibilities|join(', ') }}</div>
           </div>
-          <span class="status">{{ 'auto' if role.auto_created else 'manual' }}</span>
+          <span class="status">{{ t("auto") if role.auto_created else t("manual") }}</span>
         </div>
       {% endfor %}
     </div>
   </section>
   <section class="panel">
-    <h3>Executor health</h3>
+    <h3>{{ t("executor_health") }}</h3>
     {% if runtime_health.configured %}
       <ul class="compact-list">
-        <li>Mode: {{ runtime_health.mode }}</li>
-        <li>Bridge URL: {{ runtime_health.bridge_url }}</li>
-        <li>Healthy: {{ runtime_health.healthy }}</li>
-        <li>Error: {{ runtime_health.error or 'none' }}</li>
+        <li>{{ t("mode") }}: {{ label(runtime_health.mode) }}</li>
+        <li>{{ t("bridge_url") }}: {{ runtime_health.bridge_url }}</li>
+        <li>{{ t("healthy") }}: {{ label(runtime_health.healthy) }}</li>
+        <li>{{ t("error") }}: {{ runtime_health.error or t("none") }}</li>
       </ul>
       {% if runtime_health.executors %}
         <div class="list">
@@ -73,16 +73,16 @@
                   {% if executor.command is defined %}
                     {{ executor.command }} {{ executor.args|join(' ') }}
                   {% else %}
-                    model={{ executor.model or 'n/a' }}
+                    {{ t("model") }}={{ executor.model or t("not_available") }}
                   {% endif %}
                 </div>
               </div>
-              <span class="status">{{ 'enabled' if executor.enabled else 'disabled' }}</span>
+              <span class="status">{{ t("enabled") if executor.enabled else t("disabled") }}</span>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No executors reported by the bridge.</p>
+        <p class="muted">{{ t("no_executors") }}</p>
       {% endif %}
     {% else %}
       <p class="muted">{{ runtime_health.error }}</p>

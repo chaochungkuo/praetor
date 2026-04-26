@@ -191,11 +191,15 @@ def health():
 @app.get("/auth/session")
 def auth_session(request: Request):
     settings = get_ctx().service.get_settings()
+    ui_language = request.cookies.get("praetor_ui_lang")
+    if ui_language not in {"en", "zh-TW"}:
+        ui_language = settings.owner.preferred_language if settings is not None else "en"
     return ok(
         {
             "initialized": settings is not None,
             "authenticated": _is_authenticated(request),
             "owner_name": request.session.get("owner_name"),
+            "ui_language": ui_language,
             "csrf_token": csrf_token(request),
         }
     )
