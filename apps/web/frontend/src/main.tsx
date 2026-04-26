@@ -116,6 +116,8 @@ const OFFICE_TEXT: Record<Language, Record<string, string>> = {
     no_pending_approvals: "No pending approvals.",
     no_pending_escalations: "No pending escalations.",
     no_planner_actions: "No planner actions yet.",
+    ceo_line: "CEO line",
+    pm_line: "PM line",
     loading: "Loading Praetor Office...",
   },
   "zh-TW": {
@@ -189,6 +191,8 @@ const OFFICE_TEXT: Record<Language, Record<string, string>> = {
     no_pending_approvals: "目前沒有待核准事項。",
     no_pending_escalations: "目前沒有待處理升級事項。",
     no_planner_actions: "目前沒有 planner 行動。",
+    ceo_line: "CEO 線",
+    pm_line: "PM 線",
     loading: "正在載入 Praetor Office...",
   },
 };
@@ -422,7 +426,7 @@ function App() {
           {snapshot.approvals.length === 0 ? <p>{t("no_pending_approvals")}</p> : snapshot.approvals.map((approval) => (
             <div className="rail-item" key={approval.id}>
               <strong>{readableCategory(approval.category, language)}</strong>
-              <span>{approval.reason}</span>
+              <span>{phraseLabel(approval.reason, language)}</span>
             </div>
           ))}
         </RailSection>
@@ -430,7 +434,7 @@ function App() {
           {snapshot.organization.escalations.filter((item) => item.status === "pending").length === 0 ? <p>{t("no_pending_escalations")}</p> : snapshot.organization.escalations.filter((item) => item.status === "pending").slice(0, 6).map((item) => (
             <div className="rail-item action-skipped" key={item.id}>
               <strong>{labelize(item.to_level, language)}</strong>
-              <span>{item.reason}</span>
+              <span>{phraseLabel(item.reason, language)}</span>
               <small>{readableCategory(item.category, language)}</small>
             </div>
           ))}
@@ -439,7 +443,7 @@ function App() {
           {visibleActions.length === 0 ? <p>{t("no_planner_actions")}</p> : visibleActions.map((action) => (
             <div className={`rail-item action-${action.status}`} key={action.id}>
               <strong>{readableAction(action.type, language)}</strong>
-              <span>{action.title}</span>
+              <span>{phraseLabel(action.title, language)}</span>
               <small>{readableStatus(action.status, language)}{action.result_id ? ` · ${shortId(action.result_id)}` : ""}</small>
             </div>
           ))}
@@ -448,7 +452,7 @@ function App() {
           {snapshot.agent_activity.slice(0, 8).map((event) => (
             <div className="rail-item" key={event.id}>
               <strong>{labelize(event.actor, language)}</strong>
-              <span>{eventSummary(event)}</span>
+              <span>{eventSummary(event, language)}</span>
             </div>
           ))}
         </RailSection>
@@ -583,8 +587,8 @@ function MissionRoom({ mission, timeline, agentActivity, agentMessages, language
                     <div className="timeline-marker" />
                     <div>
                       <span className={`event-type event-${event.type}`}>{readableEventType(event.type, language)} · {labelize(event.actor, language)}</span>
-                      <strong>{readableEventTitle(event)}</strong>
-                      {event.body ? <p>{eventSummary(event)}</p> : null}
+                      <strong>{readableEventTitle(event, language)}</strong>
+                      {event.body ? <p>{eventSummary(event, language)}</p> : null}
                       {event.status ? <em>{readableStatus(event.status, language)}</em> : null}
                     </div>
                   </div>
@@ -597,7 +601,7 @@ function MissionRoom({ mission, timeline, agentActivity, agentMessages, language
                 {agentMessages.length === 0 ? <p>{t("no_agent_conversation")}</p> : agentMessages.map((message) => (
                   <div className={`agent-bubble ${message.role}`} key={message.id}>
                     <strong>{labelize(message.role, language)}</strong>
-                    <p>{agentMessageSummary(message)}</p>
+                    <p>{agentMessageSummary(message, language)}</p>
                   </div>
                 ))}
               </div>
@@ -643,12 +647,12 @@ function OrganizationPanel({ organization, selectedMissionId, language, t }: {
               <div className="agent-card" key={agent.id}>
                 <strong>{labelize(agent.role_name, language)}</strong>
                 <span>{t("reports_to")} {labelize(agent.supervisor_role, language)}</span>
-                <p>{agentSummary(agent)}</p>
-                <small>{agent.skills.slice(0, 3).join(" · ") || t("mission_context")}</small>
+                <p>{agentSummary(agent, language)}</p>
+                <small>{phraseList(agent.skills, language).slice(0, 3).join(" · ") || t("mission_context")}</small>
                 <details>
                   <summary>{t("authority")}</summary>
-                  <p>{agent.decision_authority.slice(0, 3).join("; ") || t("no_authority")}</p>
-                  <p>{agent.escalation_triggers.slice(0, 3).join("; ") || t("unclear_risk")}</p>
+                  <p>{phraseList(agent.decision_authority, language).slice(0, 3).join("; ") || t("no_authority")}</p>
+                  <p>{phraseList(agent.escalation_triggers, language).slice(0, 3).join("; ") || t("unclear_risk")}</p>
                 </details>
               </div>
             ))}
@@ -661,8 +665,8 @@ function OrganizationPanel({ organization, selectedMissionId, language, t }: {
               <div className="agent-card" key={delegation.id}>
                 <strong>{labelize(delegation.from_role, language)} → {labelize(delegation.to_role, language)}</strong>
                 <span>{readableStatus(delegation.status, language)}</span>
-                <p>{delegation.title}</p>
-                <small>{delegation.success_criteria.slice(0, 2).join(" · ") || t("report_blockers")}</small>
+                <p>{phraseLabel(delegation.title, language)}</p>
+                <small>{phraseList(delegation.success_criteria, language).slice(0, 2).join(" · ") || t("report_blockers")}</small>
               </div>
             ))}
           </div>
@@ -674,13 +678,13 @@ function OrganizationPanel({ organization, selectedMissionId, language, t }: {
               <div className="agent-card" key={order.id}>
                 <strong>{labelize(order.scope, language)}</strong>
                 <span>{labelize(order.effect, language)}</span>
-                <p>{order.instruction}</p>
+                <p>{phraseLabel(order.instruction, language)}</p>
               </div>
             )) : escalations.slice(0, 6).map((escalation) => (
               <div className="agent-card" key={escalation.id}>
                 <strong>{labelize(escalation.from_role, language)} → {labelize(escalation.to_level, language)}</strong>
                 <span>{readableStatus(escalation.status, language)}</span>
-                <p>{escalation.reason}</p>
+                <p>{phraseLabel(escalation.reason, language)}</p>
                 <small>{readableCategory(escalation.category, language)}</small>
               </div>
             ))}
@@ -706,7 +710,7 @@ function OrgChart({ agents, language, t }: { agents: OrganizationSnapshot["agent
         {[...ceoChildren, ...pmChildren, ...otherAgents].slice(0, 8).map((agent) => (
           <div className={`org-node ${normalizeRole(agent.role_name)}`} key={agent.id}>
             {labelize(agent.role_name, language)}
-            <span>{normalizeRole(agent.supervisor_role) === "project_manager" ? "PM line" : "CEO line"}</span>
+            <span>{normalizeRole(agent.supervisor_role) === "project_manager" ? t("pm_line") : t("ceo_line")}</span>
           </div>
         ))}
       </div>
@@ -751,6 +755,61 @@ function labelize(value: string, language: Language = "en") {
   if (labels[language][normalized]) return labels[language][normalized];
   if (labels.en[normalized]) return labels.en[normalized];
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function phraseLabel(value: string | undefined, language: Language = "en") {
+  const raw = value ?? "";
+  if (language !== "zh-TW") return raw;
+  const labels: Record<string, string> = {
+    "quality control": "品質控管",
+    "risk review": "風險審查",
+    "acceptance testing": "驗收測試",
+    "software engineering": "軟體工程",
+    "debugging": "除錯",
+    "local verification": "本機驗證",
+    "planning": "規劃",
+    "coordination": "協調",
+    "status reporting": "狀態回報",
+    "executive planning": "高階規劃",
+    "risk triage": "風險分流",
+    "memory stewardship": "公司記憶管理",
+    "privacy issue": "隱私問題",
+    "security issue": "安全問題",
+    "unsafe file operation": "不安全檔案操作",
+    "unclear requirement": "需求不清",
+    "scope conflict": "範圍衝突",
+    "blocked execution": "執行受阻",
+    "mission staffing": "任務編組",
+    "low-risk product execution": "低風險產品執行",
+    "internal prioritization": "內部優先級判斷",
+    "block mission closeout until criteria pass": "在條件通過前阻擋任務結案",
+    "local code structure within assigned scope": "指派範圍內的程式結構",
+    "task sequencing": "工作排序",
+    "low-risk implementation tradeoffs": "低風險實作取捨",
+    "Focus:": "重點：",
+    "Escalates:": "升級條件：",
+    "Responsibilities:": "職責：",
+    "Constraints:": "限制：",
+    "Charter:": "職責：",
+    "Mission:": "任務：",
+    "Role:": "角色：",
+    "This instruction touches authority boundaries or sensitive operating policy and should be visible as an escalation.": "這段指令涉及權限邊界或敏感營運政策，應作為升級事項讓董事長看見。",
+    "CEO raised a decision checkpoint from the chairman conversation.": "CEO 從董事長對話中提出決策檢查點。",
+    "Chairman decision checkpoint": "董事長決策檢查點",
+    "team roles are clear": "團隊角色清楚",
+    "work orders have owners": "工作單有明確負責人",
+    "review and escalation checkpoints are visible": "審查與升級檢查點可見",
+    "escalate safety, privacy, legal, spending, or destructive actions": "安全、隱私、法律、支出或破壞性操作必須升級",
+  };
+  let translated = labels[raw] ?? raw;
+  for (const [source, target] of Object.entries(labels)) {
+    translated = translated.replaceAll(source, target);
+  }
+  return translated;
+}
+
+function phraseList(values: string[], language: Language = "en") {
+  return values.map((value) => phraseLabel(value, language));
 }
 
 function normalizeRole(value: string) {
@@ -909,21 +968,25 @@ function readableEventType(value: string, language: Language = "en") {
   return labels[language][value] ?? labels.en[value] ?? labelize(value, language);
 }
 
-function readableEventTitle(event: TimelineEvent) {
-  if (event.type === "agent_message") return labelize(event.title);
-  if (event.type === "approval") return event.title.replace("Approval: change_strategy", "Approval: Strategy decision");
-  if (event.type === "escalation") return event.title.replace("chairman", "Chairman").replace("ceo", "CEO");
-  return readableBody(event.title);
+function readableEventTitle(event: TimelineEvent, language: Language = "en") {
+  if (event.type === "agent_message") return labelize(event.title, language);
+  if (event.type === "approval") return language === "zh-TW"
+    ? event.title.replace("Approval: change_strategy", "核准請求：策略變更")
+    : event.title.replace("Approval: change_strategy", "Approval: Strategy decision");
+  if (event.type === "escalation") return readableBody(event.title, language);
+  return readableBody(event.title, language);
 }
 
-function agentSummary(agent: OrganizationSnapshot["agents"][number]) {
-  const primarySkill = agent.skills[0] ? `Focus: ${agent.skills.slice(0, 2).join(", ")}.` : "";
-  const trigger = agent.escalation_triggers[0] ? `Escalates: ${agent.escalation_triggers.slice(0, 2).join(", ")}.` : "";
-  return [primarySkill, trigger].filter(Boolean).join(" ") || compactText(agent.charter, 160);
+function agentSummary(agent: OrganizationSnapshot["agents"][number], language: Language = "en") {
+  const skills = phraseList(agent.skills, language);
+  const triggers = phraseList(agent.escalation_triggers, language);
+  const primarySkill = skills[0] ? `${phraseLabel("Focus:", language)} ${skills.slice(0, 2).join(", ")}.` : "";
+  const trigger = triggers[0] ? `${phraseLabel("Escalates:", language)} ${triggers.slice(0, 2).join(", ")}.` : "";
+  return [primarySkill, trigger].filter(Boolean).join(" ") || compactText(phraseLabel(agent.charter, language), 160);
 }
 
-function readableBody(value: string) {
-  return value
+function readableBody(value: string, language: Language = "en") {
+  return phraseLabel(value, language)
     .replaceAll("praetor_direct", "CEO direct")
     .replaceAll("pm_auto", "PM managed")
     .replace(/mission_[a-f0-9]{12}/g, (match) => shortId(match))
@@ -931,22 +994,25 @@ function readableBody(value: string) {
     .trim();
 }
 
-function eventSummary(event: TimelineEvent) {
-  const body = readableBody(event.body ?? "");
+function eventSummary(event: TimelineEvent, language: Language = "en") {
+  const body = readableBody(event.body ?? "", language);
   if (event.type === "agent_message" && body.includes("Charter:")) {
     return compactText(body.split("Charter:")[0].trim() || body, 160);
   }
   return compactText(body, 190);
 }
 
-function agentMessageSummary(message: AgentMessage) {
-  const body = readableBody(message.body);
-  if (body.includes("Charter:")) {
-    const charter = body.split("Charter:")[1] ?? body;
-    const responsibility = charter.match(/Responsibilities: ([^.]+)/)?.[1];
-    const constraints = charter.match(/Constraints: ([^.]+)/)?.[1];
+function agentMessageSummary(message: AgentMessage, language: Language = "en") {
+  const body = readableBody(message.body, language);
+  const charterMarker = language === "zh-TW" ? "職責：" : "Charter:";
+  const responsibilitiesMarker = language === "zh-TW" ? "職責：" : "Responsibilities:";
+  const constraintsMarker = language === "zh-TW" ? "限制：" : "Constraints:";
+  if (body.includes(charterMarker)) {
+    const charter = body.split(charterMarker)[1] ?? body;
+    const responsibility = charter.match(new RegExp(`${responsibilitiesMarker} ([^.。]+)`))?.[1];
+    const constraints = charter.match(new RegExp(`${constraintsMarker} ([^.。]+)`))?.[1];
     return compactText(
-      [responsibility ? `Responsibilities: ${responsibility}.` : "", constraints ? `Constraints: ${constraints}.` : ""]
+      [responsibility ? `${responsibilitiesMarker} ${responsibility}.` : "", constraints ? `${constraintsMarker} ${constraints}.` : ""]
         .filter(Boolean)
         .join(" "),
       220

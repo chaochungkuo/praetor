@@ -142,7 +142,7 @@ def main() -> int:
                     "decisions_has_audit": "Audit trail" in decisions,
                     "models_has_usage": "Usage by executor" in models,
                     "meetings_has_title": "Structured meetings" in meetings,
-                    "mobile_has_briefing": "Praetor mobile briefing" in mobile,
+                    "mobile_has_briefing": "Mobile briefing" in mobile or "行動簡報" in mobile,
                     "settings_has_owner": "Owner" in settings,
                 },
                 ensure_ascii=True,

@@ -95,8 +95,8 @@
               {% for approval in approvals[:5] %}
                 <div class="list-row">
                   <div>
-                    <strong>{{ approval.category }}</strong>
-                    <div class="muted">{{ approval.reason }}</div>
+                    <strong>{{ label(approval.category) }}</strong>
+                    <div class="muted">{{ phrase_label(approval.reason) }}</div>
                   </div>
                   <div class="inline-actions">
                     <form method="post" action="/app/approvals/{{ approval.id }}/approved">

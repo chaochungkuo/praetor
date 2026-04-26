@@ -98,10 +98,10 @@
             <label class="full">
               <span>{{ t("risk_priority") }}</span>
               <select name="risk_priority">
-                <option value="avoid_wrong_decisions">Avoid wrong decisions</option>
-                <option value="avoid_being_slow">Avoid being slow</option>
-                <option value="avoid_losing_information">Avoid losing information</option>
-                <option value="avoid_acting_without_approval">Avoid acting without approval</option>
+                <option value="avoid_wrong_decisions">{{ label("avoid_wrong_decisions") }}</option>
+                <option value="avoid_being_slow">{{ label("avoid_being_slow") }}</option>
+                <option value="avoid_losing_information">{{ label("avoid_losing_information") }}</option>
+                <option value="avoid_acting_without_approval">{{ label("avoid_acting_without_approval") }}</option>
               </select>
             </label>
           </div>
@@ -315,7 +315,7 @@
       </section>
     </section>
     <section class="panel">
-      <h3>Suggested first tasks</h3>
+      <h3>{{ t("suggested_first_tasks") }}</h3>
       <div class="grid two">
         {% for starter in starter_missions %}
           <form class="panel" method="post" action="/app/missions">
@@ -328,28 +328,28 @@
             <input type="hidden" name="priority" value="{{ starter.priority }}" />
             <input type="hidden" name="requested_outputs" value="{{ starter.requested_outputs }}" />
             <div class="actions">
-              <button type="submit" class="secondary">Create starter mission</button>
+              <button type="submit" class="secondary">{{ t("create_starter_mission") }}</button>
             </div>
           </form>
         {% endfor %}
       </div>
     </section>
     <section class="panel">
-      <h3>Recent missions</h3>
+      <h3>{{ t("recent_missions") }}</h3>
       {% if missions %}
         <div class="list">
           {% for mission in missions %}
             <a class="list-row" href="/app/missions/{{ mission.id }}">
               <div>
                 <strong>{{ mission.title }}</strong>
-                <div class="muted">{{ mission.summary or 'No summary yet.' }}</div>
+                <div class="muted">{{ mission.summary or t("no_summary_yet") }}</div>
               </div>
-              <span class="status">{{ mission.status }}</span>
+              <span class="status">{{ label(mission.status) }}</span>
             </a>
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">No missions yet. Create the first one above.</p>
+        <p class="muted">{{ t("no_missions_create_from_ceo") }}</p>
       {% endif %}
     </section>
   {% endif %}

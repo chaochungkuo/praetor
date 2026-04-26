@@ -9,7 +9,7 @@
   <body class="mobile-body">
     <main class="mobile-shell">
       <section class="panel hero">
-        <h1>Praetor mobile briefing</h1>
+        <h1>{{ t("mobile_briefing_title") }}</h1>
         <p>{{ settings.owner.name }} · {{ t("founder_command_center") }}</p>
       </section>
 
@@ -33,8 +33,8 @@
             {% for approval in approvals[:5] %}
               <div class="list-row">
                 <div>
-                  <strong>{{ approval.category }}</strong>
-                  <div class="muted">{{ approval.reason }}</div>
+                  <strong>{{ label(approval.category) }}</strong>
+                  <div class="muted">{{ phrase_label(approval.reason) }}</div>
                 </div>
                 <div class="inline-actions">
                   <form method="post" action="/app/approvals/{{ approval.id }}/approved">

@@ -85,6 +85,15 @@ TRANSLATIONS = {
         "recent_ceo_conversation": "Recent CEO conversation",
         "no_ceo_messages": "No CEO conversation yet.",
         "ceo_message_sent": "CEO replied.",
+        "suggested_first_tasks": "Suggested first tasks",
+        "create_starter_mission": "Create starter mission",
+        "starter_create_project_title": "Create first project",
+        "starter_create_project_summary": "Set up a first project workspace and initial status files.",
+        "starter_build_wiki_title": "Build company wiki",
+        "starter_build_wiki_summary": "Summarize the current company operating context into wiki pages.",
+        "starter_review_inbox_title": "Review inbox",
+        "starter_review_inbox_summary": "Review the Inbox folder and prepare a concise summary.",
+        "no_missions_create_from_ceo": "No missions yet. Ask the CEO what to start first.",
         "runtime_settings": "Runtime settings",
         "runtime_settings_desc": "Choose the model runtime Praetor should use. API keys are stored locally as private secret files and are never displayed after saving.",
         "runtime_settings_saved": "Runtime settings saved.",
@@ -173,6 +182,7 @@ TRANSLATIONS = {
         "principle_2": "Decisions escalate upward.",
         "principle_3": "Memory belongs to the company, not individual agents.",
         "principle_4": "Praetor manages roles and hierarchy, not equal-agent debate.",
+        "page_praetor": "Praetor",
         "page_overview": "Overview",
         "page_inbox": "Inbox",
         "page_tasks": "Tasks",
@@ -248,6 +258,7 @@ TRANSLATIONS = {
         "structured_meetings_desc": "Meeting summaries are generated from mission state, task logs, and execution records.",
         "today": "Today",
         "mission_briefing": "Mission briefing",
+        "mobile_briefing_title": "Mobile briefing",
         "quick_links": "Quick links",
         "owner": "Owner",
         "name": "Name",
@@ -323,6 +334,7 @@ TRANSLATIONS = {
         "category": "Category",
         "reason": "Reason",
         "create_approval": "Create approval",
+        "manual_checkpoint_reason": "Manual checkpoint requested by owner.",
         "status_file": "Status file",
         "pm_report": "PM report",
         "tasks_file": "Tasks file",
@@ -372,6 +384,15 @@ TRANSLATIONS = {
         "recent_ceo_conversation": "最近 CEO 對話",
         "no_ceo_messages": "目前尚無 CEO 對話。",
         "ceo_message_sent": "CEO 已回覆。",
+        "suggested_first_tasks": "建議的第一批任務",
+        "create_starter_mission": "建立起始任務",
+        "starter_create_project_title": "建立第一個專案",
+        "starter_create_project_summary": "建立第一個專案工作區與初始狀態檔。",
+        "starter_build_wiki_title": "建立公司 Wiki",
+        "starter_build_wiki_summary": "把目前公司的運作脈絡整理成共享 wiki 頁面。",
+        "starter_review_inbox_title": "整理收件匣",
+        "starter_review_inbox_summary": "檢查 Inbox 資料夾，並準備一份精簡摘要。",
+        "no_missions_create_from_ceo": "目前還沒有任務。先問 CEO 應該從哪裡開始。",
         "runtime_settings": "執行環境設定",
         "runtime_settings_desc": "選擇 Praetor 要使用的模型執行環境。API key 會以私密檔案保存在本機，不會在儲存後回顯。",
         "runtime_settings_saved": "執行環境設定已儲存。",
@@ -460,6 +481,7 @@ TRANSLATIONS = {
         "principle_2": "決策向上升級。",
         "principle_3": "記憶屬於公司，不屬於個別 agent。",
         "principle_4": "Praetor 管理的是角色與階層，不是讓平等 agent 無限討論。",
+        "page_praetor": "Praetor",
         "page_overview": "總覽",
         "page_inbox": "收件匣",
         "page_tasks": "任務",
@@ -535,6 +557,7 @@ TRANSLATIONS = {
         "structured_meetings_desc": "會議摘要會根據任務狀態、工作紀錄與執行紀錄產生。",
         "today": "今日",
         "mission_briefing": "任務簡報",
+        "mobile_briefing_title": "行動簡報",
         "quick_links": "快速連結",
         "owner": "擁有者",
         "name": "名稱",
@@ -610,6 +633,7 @@ TRANSLATIONS = {
         "category": "類別",
         "reason": "原因",
         "create_approval": "建立批准",
+        "manual_checkpoint_reason": "擁有者手動要求決策檢查點。",
         "status_file": "狀態檔案",
         "pm_report": "PM 報告",
         "tasks_file": "工作檔案",
@@ -647,10 +671,26 @@ VALUE_LABELS = {
         "overwrite_important_files": "overwrite important files",
         "shell_commands": "shell commands",
         "spending_money": "spending money",
+        "delete_files": "delete files",
+        "external_communication": "external communication",
+        "create_files": "create files",
+        "draft_documents": "draft documents",
+        "summarize_documents": "summarize documents",
+        "organize_workspace": "organize workspace",
+        "access_outside_workspace": "access outside workspace",
+        "silent_destructive_actions": "silent destructive actions",
+        "external_send_without_explicit_rule": "external sending without an explicit rule",
         "operations": "operations",
         "lean": "lean",
         "structured": "structured",
         "flexible": "flexible",
+        "chairman": "chairman",
+        "ceo": "CEO",
+        "project_manager": "project manager",
+        "avoid_wrong_decisions": "avoid wrong decisions",
+        "avoid_being_slow": "avoid being slow",
+        "avoid_losing_information": "avoid losing information",
+        "avoid_acting_without_approval": "avoid acting without approval",
         "true": "yes",
         "false": "no",
     },
@@ -679,13 +719,147 @@ VALUE_LABELS = {
         "overwrite_important_files": "覆寫重要檔案",
         "shell_commands": "Shell 指令",
         "spending_money": "花費金錢",
+        "delete_files": "刪除檔案",
+        "external_communication": "對外溝通",
+        "create_files": "建立檔案",
+        "draft_documents": "草擬文件",
+        "summarize_documents": "摘要文件",
+        "organize_workspace": "整理工作區",
+        "access_outside_workspace": "存取工作區外部",
+        "silent_destructive_actions": "未告知的破壞性操作",
+        "external_send_without_explicit_rule": "未有明確規則的對外傳送",
         "operations": "營運",
         "lean": "精簡",
         "structured": "結構化",
         "flexible": "彈性",
+        "chairman": "董事長",
+        "ceo": "CEO",
+        "project_manager": "專案經理",
+        "avoid_wrong_decisions": "避免錯誤決策",
+        "avoid_being_slow": "避免行動太慢",
+        "avoid_losing_information": "避免資訊遺失",
+        "avoid_acting_without_approval": "避免未經批准就行動",
         "true": "是",
         "false": "否",
     },
+}
+
+ROLE_NAME_LABELS = {
+    "zh-TW": {
+        "CEO": "CEO",
+        "Project Manager": "專案經理",
+        "Developer": "開發者",
+        "Reviewer": "審查者",
+        "Security Officer": "資安主管",
+        "Legal Counsel": "法務顧問",
+        "Project Execution": "專案執行",
+    }
+}
+
+PHRASE_LABELS = {
+    "zh-TW": {
+        "Translate chairman intent into missions, teams, decisions, and durable company memory.": "將董事長意圖轉換成任務、團隊、決策與長期公司記憶。",
+        "set strategic intent": "設定策略方向",
+        "assign teams": "指派團隊",
+        "escalate sensitive decisions": "升級敏感決策",
+        "executive planning": "高階規劃",
+        "risk triage": "風險分流",
+        "memory stewardship": "公司記憶管理",
+        "mission staffing": "任務編組",
+        "low-risk product execution": "低風險產品執行",
+        "internal prioritization": "內部優先級判斷",
+        "privacy risk": "隱私風險",
+        "security risk": "安全風險",
+        "legal exposure": "法律暴露",
+        "external spending": "對外支出",
+        "Convert CEO direction into scoped work orders, progress tracking, and risk reports.": "將 CEO 方向轉換為明確工作單、進度追蹤與風險報告。",
+        "break down work": "拆解工作",
+        "coordinate agents": "協調 agent",
+        "surface blockers": "提出阻塞點",
+        "planning": "規劃",
+        "coordination": "協調",
+        "status reporting": "狀態回報",
+        "scope conflict": "範圍衝突",
+        "blocked execution": "執行受阻",
+        "role disagreement": "角色意見衝突",
+        "task sequencing": "工作排序",
+        "low-risk implementation tradeoffs": "低風險實作取捨",
+        "Implement scoped engineering tasks and report changed files, tests, and blockers.": "執行已定義範圍的工程任務，並回報變更檔案、測試與阻塞點。",
+        "implement": "實作",
+        "test": "測試",
+        "report": "回報",
+        "software engineering": "軟體工程",
+        "debugging": "除錯",
+        "local verification": "本機驗證",
+        "unsafe file operation": "不安全檔案操作",
+        "unclear requirement": "需求不清",
+        "test failure": "測試失敗",
+        "local code structure within assigned scope": "指派範圍內的程式結構",
+        "Validate outputs against mission intent, safety boundaries, and completion criteria.": "依任務意圖、安全邊界與完成條件驗證產出。",
+        "review outputs": "審查產出",
+        "check tests": "檢查測試",
+        "block incomplete closeout": "阻擋未完成的結案",
+        "quality control": "品質控管",
+        "risk review": "風險審查",
+        "acceptance testing": "驗收測試",
+        "privacy issue": "隱私問題",
+        "security issue": "安全問題",
+        "missing acceptance criteria": "缺少驗收條件",
+        "block mission closeout until criteria pass": "在條件通過前阻擋任務結案",
+        "Protect user privacy, files, credentials, and local computer safety.": "保護使用者隱私、檔案、憑證與本機安全。",
+        "security review": "安全審查",
+        "privacy review": "隱私審查",
+        "permission boundary checks": "權限邊界檢查",
+        "threat modeling": "威脅建模",
+        "secure defaults": "安全預設",
+        "data handling review": "資料處理審查",
+        "credential exposure": "憑證暴露",
+        "user file access": "使用者檔案存取",
+        "network data sharing": "網路資料分享",
+        "block risky release until mitigated": "在風險緩解前阻擋發布",
+        "Identify legal, licensing, contractual, and external communication risks.": "辨識法律、授權、合約與對外溝通風險。",
+        "license review": "授權審查",
+        "policy review": "政策審查",
+        "legal risk memo": "法律風險 memo",
+        "legal triage": "法律分流",
+        "license classification": "授權分類",
+        "policy drafting": "政策草擬",
+        "contract": "合約",
+        "non-permissive license": "非寬鬆授權",
+        "external claim": "外部主張",
+        "request legal escalation": "請求法律升級",
+        "create and maintain project structure": "建立並維護專案結構",
+        "update project status and tasks": "更新專案狀態與工作",
+        "review outputs for quality and completeness": "審查產出的品質與完整性",
+        "identify missing information or risky changes": "辨識缺漏資訊或高風險變更",
+        "own mission context": "掌握任務脈絡",
+        "coordinate task sequencing and reporting": "協調工作排序與回報",
+        "chairman": "董事長",
+        "ceo": "CEO",
+        "project_manager": "專案經理",
+        "Mission:": "任務：",
+        "Role:": "角色：",
+        "Responsibilities:": "職責：",
+        "Constraints:": "限制：",
+        "Onboarded as": "已加入角色：",
+        "Charter:": "職責：",
+        "must record unresolved risks": "必須記錄未解決風險",
+        "cannot approve high-risk policy or privacy changes": "不能批准高風險政策或隱私變更",
+        "cannot silently delete or overwrite important user files": "不能靜默刪除或覆寫重要使用者檔案",
+        "must escalate privacy, safety, legal, spending, and destructive actions": "必須升級隱私、安全、法律、支出與破壞性操作",
+        "must escalate user-data and host-safety risks to chairman": "必須將使用者資料與本機安全風險升級給董事長",
+        "cannot provide final legal approval without chairman instruction": "沒有董事長指示時不能提供最終法律批准",
+        "CEO raised a decision checkpoint from the chairman conversation.": "CEO 從董事長對話中提出決策檢查點。",
+        "Chairman decision checkpoint": "董事長決策檢查點",
+        "Mission Resumed": "任務已繼續",
+        "Mission Paused": "任務已暫停",
+        "Mission Created": "建立任務",
+        "Mission Team Created": "建立 AI 團隊",
+        "Approval Created": "建立核准請求",
+        "Delegation Created": "交辦任務",
+        "Decision Escalation Created": "升級決策",
+        "Standing Order Created": "更新常設規則",
+    }
 }
 
 EVENT_LABELS = {
@@ -697,6 +871,10 @@ EVENT_LABELS = {
         "delegation_created": "Task delegated",
         "decision_escalation_created": "Decision escalated",
         "standing_order_created": "Standing order updated",
+        "mission_resumed": "Mission resumed",
+        "mission_paused": "Mission paused",
+        "mission_stopped": "Mission stopped",
+        "mission_completed": "Mission completed",
         "ceo_conversation_message": "CEO conversation updated",
         "onboarding_completed": "Company initialized",
     },
@@ -708,6 +886,10 @@ EVENT_LABELS = {
         "delegation_created": "交辦任務",
         "decision_escalation_created": "升級決策",
         "standing_order_created": "更新常設規則",
+        "mission_resumed": "任務已繼續",
+        "mission_paused": "任務已暫停",
+        "mission_stopped": "任務已停止",
+        "mission_completed": "任務已完成",
         "ceo_conversation_message": "CEO 對話更新",
         "onboarding_completed": "公司初始化完成",
     },
@@ -796,6 +978,31 @@ def _value_label(language: str):
     return label
 
 
+def _role_label(language: str):
+    labels = ROLE_NAME_LABELS.get(language, {})
+
+    def label(value: Any) -> str:
+        raw = str(value or "")
+        return labels.get(raw, raw)
+
+    return label
+
+
+def _phrase_label(language: str):
+    labels = PHRASE_LABELS.get(language, {})
+
+    def label(value: Any) -> str:
+        raw = str(value or "")
+        translated = labels.get(raw)
+        if translated is not None:
+            return translated
+        for source, target in labels.items():
+            raw = raw.replace(source, target)
+        return raw
+
+    return label
+
+
 def _event_label(language: str):
     labels = EVENT_LABELS.get(language, EVENT_LABELS["en"])
     fallback = EVENT_LABELS["en"]
@@ -831,6 +1038,8 @@ def _format_datetime(language: str):
 
 def _event_summary(language: str):
     t = _translator(language)
+    phrase_label = _phrase_label(language)
+    value_label = _value_label(language)
 
     def summarize(event_or_payload: Any) -> str:
         event_type = ""
@@ -843,7 +1052,9 @@ def _event_summary(language: str):
         for key in ("title", "mission_title", "reason", "content", "message", "summary", "category"):
             value = payload.get(key)
             if value:
-                return str(value)
+                if key == "category":
+                    return value_label(value)
+                return phrase_label(value)
         if event_type in {"owner_login", "ceo_conversation_message", "standing_order_created", "onboarding_completed"}:
             return t("event_recorded")
         mission_id = payload.get("mission_id")
@@ -884,6 +1095,8 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "ui_language": ui_language,
         "t": t,
         "label": _value_label(ui_language),
+        "role_label": _role_label(ui_language),
+        "phrase_label": _phrase_label(ui_language),
         "event_label": _event_label(ui_language),
         "event_summary": _event_summary(ui_language),
         "format_time": _format_datetime(ui_language),
@@ -937,25 +1150,25 @@ def _default_onboarding() -> dict:
     }
 
 
-def _starter_missions() -> list[dict[str, str]]:
+def _starter_missions(t) -> list[dict[str, str]]:
     return [
         {
-            "title": "Create first project",
-            "summary": "Set up a first project workspace and initial status files.",
+            "title": t("starter_create_project_title"),
+            "summary": t("starter_create_project_summary"),
             "domain": "operations",
             "priority": "high",
             "requested_outputs": "/workspace/Projects/Alpha/PROJECT.md\n/workspace/Projects/Alpha/STATUS.md",
         },
         {
-            "title": "Build company wiki",
-            "summary": "Summarize the current company operating context into wiki pages.",
+            "title": t("starter_build_wiki_title"),
+            "summary": t("starter_build_wiki_summary"),
             "domain": "operations",
             "priority": "normal",
             "requested_outputs": "/workspace/Wiki/Company.md\n/workspace/Wiki/Strategy.md",
         },
         {
-            "title": "Review inbox",
-            "summary": "Review the Inbox folder and prepare a concise summary.",
+            "title": t("starter_review_inbox_title"),
+            "summary": t("starter_review_inbox_summary"),
             "domain": "operations",
             "priority": "normal",
             "requested_outputs": "/workspace/Inbox/INBOX_SUMMARY.md",
@@ -967,7 +1180,7 @@ def _mission_by_id(missions: list) -> dict[str, Any]:
     return {mission.id: mission for mission in missions}
 
 
-def _build_inbox_items(service, t, label, event_summary) -> dict[str, list[dict[str, Any]]]:
+def _build_inbox_items(service, t, label, phrase_label, event_label, event_summary) -> dict[str, list[dict[str, Any]]]:
     missions = service.list_missions()
     missions_by_id = _mission_by_id(missions)
     approvals = service.list_approvals(status="pending")
@@ -980,7 +1193,7 @@ def _build_inbox_items(service, t, label, event_summary) -> dict[str, list[dict[
         pending_decisions.append(
             {
                 "title": label(approval.category),
-                "body": approval.reason,
+                "body": phrase_label(approval.reason),
                 "status": label(approval.status),
                 "href": f"/app/missions/{approval.mission_id}" if approval.mission_id else "/app/decisions",
                 "kind": t("pending_decisions"),
@@ -1032,7 +1245,7 @@ def _build_inbox_items(service, t, label, event_summary) -> dict[str, list[dict[
         if event.get("type") in risk_event_types:
             risk_signals.append(
                 {
-                    "title": t(event.get("type") or "event_recorded"),
+                    "title": event_label(event.get("type") or "event_recorded"),
                     "body": event_summary(event),
                     "status": t("review_item"),
                     "href": "/app/decisions",
@@ -1158,7 +1371,7 @@ def praetor_page(request: Request):
             "missions": missions[:8],
             "ceo_messages": ceo_messages,
             "onboarding_defaults": _default_onboarding(),
-            "starter_missions": _starter_missions(),
+            "starter_missions": _starter_missions(ctx["t"]),
         },
     )
 
@@ -1175,7 +1388,14 @@ def inbox_page(request: Request):
         name="inbox.html",
         context={
             **ctx,
-            "inbox_items": _build_inbox_items(service, ctx["t"], ctx["label"], ctx["event_summary"]),
+            "inbox_items": _build_inbox_items(
+                service,
+                ctx["t"],
+                ctx["label"],
+                ctx["phrase_label"],
+                ctx["event_label"],
+                ctx["event_summary"],
+            ),
         },
     )
 

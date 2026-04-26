@@ -67,9 +67,27 @@
       <h3>{{ t("governance") }}</h3>
       <ul class="compact-list">
         <li>{{ t("autonomy") }}: {{ label(settings.governance.autonomy_mode) }}</li>
-        <li>{{ t("require_approval") }}: {{ settings.governance.require_approval|join(', ') or t("none") }}</li>
-        <li>{{ t("auto_execute") }}: {{ settings.governance.auto_execute|join(', ') or t("none") }}</li>
-        <li>{{ t("never_allow") }}: {{ settings.governance.never_allow|join(', ') or t("none") }}</li>
+        <li>{{ t("require_approval") }}:
+          {% for item in settings.governance.require_approval %}
+            {{ label(item) }}{{ ", " if not loop.last else "" }}
+          {% else %}
+            {{ t("none") }}
+          {% endfor %}
+        </li>
+        <li>{{ t("auto_execute") }}:
+          {% for item in settings.governance.auto_execute %}
+            {{ label(item) }}{{ ", " if not loop.last else "" }}
+          {% else %}
+            {{ t("none") }}
+          {% endfor %}
+        </li>
+        <li>{{ t("never_allow") }}:
+          {% for item in settings.governance.never_allow %}
+            {{ label(item) }}{{ ", " if not loop.last else "" }}
+          {% else %}
+            {{ t("none") }}
+          {% endfor %}
+        </li>
       </ul>
     </section>
   </section>
@@ -79,8 +97,14 @@
       {% for role in settings.roles %}
         <div class="list-row">
           <div>
-            <strong>{{ role.name }}</strong>
-            <div class="muted">{{ role.responsibilities|join(', ') }}</div>
+            <strong>{{ role_label(role.name) }}</strong>
+            <div class="muted">
+              {% for responsibility in role.responsibilities %}
+                {{ phrase_label(responsibility) }}{{ ", " if not loop.last else "" }}
+              {% else %}
+                {{ t("not_available") }}
+              {% endfor %}
+            </div>
           </div>
           <span class="status">{{ t("auto") if role.auto_created else t("manual") }}</span>
         </div>
