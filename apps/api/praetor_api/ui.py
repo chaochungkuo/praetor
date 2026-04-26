@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -35,6 +35,7 @@ from .security import csrf_token, login_rate_limiter, require_csrf, require_setu
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
+WEB_DIST_DIR = BASE_DIR.parents[1] / "web" / "dist"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(include_in_schema=False)
@@ -54,7 +55,7 @@ TRANSLATIONS = {
         "nav_activity": "Activity",
         "nav_memory": "Memory",
         "nav_decisions": "Decisions",
-        "nav_models": "Models",
+        "nav_models": "Models & API",
         "nav_meetings": "Meetings",
         "nav_settings": "Settings",
         "brand_tag": "Run your company with an AI CEO",
@@ -97,6 +98,13 @@ TRANSLATIONS = {
         "runtime_settings": "Runtime settings",
         "runtime_settings_desc": "Choose the model runtime Praetor should use. API keys are stored locally as private secret files and are never displayed after saving.",
         "runtime_settings_saved": "Runtime settings saved.",
+        "model_connection_center": "Model and API connection",
+        "model_connection_desc": "Connect Praetor to the AI provider it should use for CEO planning and mission execution. You can start without a key and add it later.",
+        "connection_step_title": "Connect your AI provider",
+        "connection_step_help": "Example: choose OpenAI, keep the suggested model, paste your API key, then continue. If you do not have a key yet, leave it blank and Praetor will remind you later.",
+        "workspace_step_help": "Example: ~/Praetor Workspace. Praetor will create Projects, Wiki, Decisions, and Missions folders inside this workspace.",
+        "governance_step_help": "Balanced mode is recommended: Praetor can organize low-risk work, but asks before deleting files, spending money, sending external messages, or changing strategy.",
+        "skip_api_key": "You can leave this blank and add it later from Models.",
         "api_key": "API key",
         "api_key_placeholder": "Leave blank to keep the existing key",
         "api_key_help": "Paste a provider key only in this browser form. Praetor stores it under the local state directory with private file permissions.",
@@ -191,7 +199,7 @@ TRANSLATIONS = {
         "page_settings": "Settings",
         "page_memory": "Memory",
         "page_decisions": "Decisions",
-        "page_models": "Models",
+        "page_models": "Models & API",
         "page_meetings": "Meetings",
         "page_mobile": "Mobile Briefing",
         "active": "Active",
@@ -353,7 +361,7 @@ TRANSLATIONS = {
         "nav_activity": "動態",
         "nav_memory": "記憶",
         "nav_decisions": "決策",
-        "nav_models": "模型",
+        "nav_models": "模型與 API",
         "nav_meetings": "會議",
         "nav_settings": "設定",
         "brand_tag": "用 AI CEO 經營你的公司",
@@ -396,6 +404,13 @@ TRANSLATIONS = {
         "runtime_settings": "執行環境設定",
         "runtime_settings_desc": "選擇 Praetor 要使用的模型執行環境。API key 會以私密檔案保存在本機，不會在儲存後回顯。",
         "runtime_settings_saved": "執行環境設定已儲存。",
+        "model_connection_center": "模型與 API 連接",
+        "model_connection_desc": "把 Praetor 連到 CEO 規劃與任務執行要使用的 AI 供應商。你也可以先不填 key，之後再補。",
+        "connection_step_title": "連接你的 AI 供應商",
+        "connection_step_help": "例如：選 OpenAI、保留建議模型、貼上 API key，然後繼續。如果你還沒有 key，先留空，Praetor 之後會提醒你。",
+        "workspace_step_help": "例如：~/Praetor Workspace。Praetor 會在裡面建立 Projects、Wiki、Decisions、Missions 等資料夾。",
+        "governance_step_help": "建議使用平衡模式：Praetor 可以整理低風險工作，但刪檔、花錢、對外傳訊或改策略前要先問你。",
+        "skip_api_key": "可以先留空，之後在「模型」頁補上。",
         "api_key": "API key",
         "api_key_placeholder": "留空表示保留既有 key",
         "api_key_help": "請只在這個瀏覽器表單貼上供應商 key。Praetor 會用私密檔案權限保存在本機 state 目錄。",
@@ -490,7 +505,7 @@ TRANSLATIONS = {
         "page_settings": "設定",
         "page_memory": "記憶",
         "page_decisions": "決策",
-        "page_models": "模型與執行",
+        "page_models": "模型與 API",
         "page_meetings": "會議",
         "page_mobile": "手機簡報",
         "active": "進行中",
@@ -898,6 +913,8 @@ EVENT_LABELS = {
 
 def install_ui(app) -> None:
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    if (WEB_DIST_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(WEB_DIST_DIR / "assets")), name="office_assets")
     app.include_router(router)
 
 
@@ -910,6 +927,14 @@ def _redirect(path: str, flash: str | None = None, level: str = "info") -> Redir
         sep = "&" if "?" in path else "?"
         path = f"{path}{sep}flash={quote(flash)}&level={quote(level)}"
     return RedirectResponse(url=path, status_code=303)
+
+
+def _safe_redirect_path(value: str | None, fallback: str) -> str:
+    if not value:
+        return fallback
+    if not value.startswith("/") or value.startswith("//"):
+        return fallback
+    return value
 
 
 def _friendly_runtime_error(exc_or_message: Exception | str, t) -> str:
@@ -1134,7 +1159,7 @@ def _default_onboarding() -> dict:
         "organization_style": "lean",
         "autonomy_mode": "hybrid",
         "risk_priority": "avoid_wrong_decisions",
-        "workspace_root": "/tmp/praetor-workspace",
+        "workspace_root": "~/Praetor Workspace",
         "runtime_mode": "api",
         "runtime_provider": "openai",
         "runtime_model": "gpt-4.1-mini",
@@ -1313,6 +1338,14 @@ def set_language(request: Request, language_code: str):
         samesite="lax",
     )
     return response
+
+
+@router.get("/office")
+def office_page():
+    index = WEB_DIST_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return _redirect("/app/praetor", "Praetor Office frontend has not been built yet.", "error")
 
 
 @router.get("/app/welcome", response_class=HTMLResponse)
@@ -1513,7 +1546,8 @@ async def update_runtime_submit(request: Request):
             _save_provider_api_key(provider, str(form.get("api_key", "")))
     except Exception as exc:
         return _redirect("/app/settings", str(exc), "error")
-    return _redirect("/app/settings", t("runtime_settings_saved"), "success")
+    next_path = _safe_redirect_path(str(form.get("next_path", "/app/settings")), "/app/settings")
+    return _redirect(next_path, t("runtime_settings_saved"), "success")
 
 
 @router.post("/app/ceo/conversation")
@@ -1581,6 +1615,10 @@ def models_page(request: Request):
             **_base_context(request, "models", "Models"),
             "usage_summary": service.usage_summary(),
             "runtime_health": service.runtime_health(),
+            "provider_keys": {
+                "openai": bool(get_openai_api_key()),
+                "anthropic": bool(get_anthropic_api_key()),
+            },
         },
     )
 
@@ -1674,12 +1712,15 @@ async def onboarding_submit(request: Request):
         return _redirect("/app/praetor", "Password confirmation does not match.", "error")
     try:
         settings = request.app.state.ctx.service.complete_onboarding(answers)
+        provider = answers.runtime.get("provider") if isinstance(answers.runtime, dict) else answers.runtime.provider
+        if provider:
+            _save_provider_api_key(str(provider), str(form.get("api_key", "")))
     except Exception as exc:
         return _redirect("/app/praetor", str(exc), "error")
     request.session["authenticated"] = True
     request.session["owner_name"] = settings.owner.name
     request.session["owner_email"] = settings.owner.email
-    return _redirect("/app/praetor", "Praetor is initialized.", "success")
+    return _redirect("/office", "Praetor is initialized.", "success")
 
 
 @router.post("/app/login")

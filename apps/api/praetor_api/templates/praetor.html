@@ -111,6 +111,7 @@
           <div class="message praetor-message">
             <strong>Praetor</strong>
             <p>{{ t("step3_prompt") }}</p>
+            <p class="muted">{{ t("workspace_step_help") }}</p>
           </div>
           <div class="form-grid">
             <label class="full">
@@ -124,8 +125,12 @@
           <div class="message praetor-message">
             <strong>Praetor</strong>
             <p>{{ t("step4_prompt") }}</p>
+            <p class="muted">{{ t("connection_step_help") }}</p>
           </div>
           <div class="form-grid">
+            <div class="full">
+              <h3>{{ t("connection_step_title") }}</h3>
+            </div>
             <label>
               <span>{{ t("runtime_mode") }}</span>
               <select name="runtime_mode">
@@ -145,6 +150,11 @@
               <span>{{ t("model") }}</span>
               <input type="text" name="runtime_model" value="{{ onboarding_defaults.runtime_model }}" />
             </label>
+            <label class="full">
+              <span>{{ t("api_key") }}</span>
+              <input type="password" name="api_key" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
+              <span class="muted">{{ t("skip_api_key") }}</span>
+            </label>
             <label>
               <span>{{ t("executor") }}</span>
               <select name="runtime_executor">
@@ -159,6 +169,7 @@
           <div class="message praetor-message">
             <strong>Praetor</strong>
             <p>{{ t("step5_prompt") }}</p>
+            <p class="muted">{{ t("governance_step_help") }}</p>
           </div>
           <fieldset class="full">
             <legend>{{ t("always_require_approval") }}</legend>
@@ -166,7 +177,7 @@
               {% for item in onboarding_defaults.require_approval %}
                 <label class="check">
                   <input type="checkbox" name="require_approval" value="{{ item }}" checked />
-                  <span>{{ item }}</span>
+                  <span>{{ label(item) }}</span>
                 </label>
               {% endfor %}
             </div>

@@ -54,6 +54,17 @@ That means:
 
 ## Quick Start
 
+The recommended first-run path is:
+
+1. start Praetor
+2. open the setup page
+3. create the owner account
+4. connect an AI provider, or skip the key and add it later from **Models & API**
+5. choose a workspace, for example `~/Praetor Workspace`
+6. review approval rules and enter the Praetor Office
+
+Non-developers should not need to edit source files. The only values they normally choose are the owner password, optional provider API key, and workspace folder.
+
 ### 1. Install the workspace environment
 
 ```bash
@@ -95,6 +106,10 @@ Then open:
 
 - [http://127.0.0.1:9741/app/praetor](http://127.0.0.1:9741/app/praetor)
 - [http://127.0.0.1:9741/m/briefing](http://127.0.0.1:9741/m/briefing)
+
+On first launch, Praetor guides you through owner account creation, model/API connection, workspace selection, and approval rules. If you do not have an API key ready, leave that field blank and configure it later from **Models & API**.
+
+For a fresh local reinstall, stop Praetor and remove the state directory you started it with. If you did not set `PRAETOR_STATE_DIR`, the default local state is `/tmp/praetor-app-state`. This removes the owner account, missions, memory, approvals, and locally stored provider keys.
 
 ### 5b. Run with Docker
 
