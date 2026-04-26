@@ -18,8 +18,10 @@
         </div>
         <nav class="nav">
           <a class="{{ 'active' if current_page == 'praetor' else '' }}" href="/app/praetor">{{ t("nav_praetor") }}</a>
+          <a class="{{ 'active' if current_page == 'inbox' else '' }}" href="/app/inbox">{{ t("nav_inbox") }}</a>
           <a class="{{ 'active' if current_page == 'overview' else '' }}" href="/app/overview">{{ t("nav_overview") }}</a>
           <a class="{{ 'active' if current_page == 'tasks' else '' }}" href="/app/tasks">{{ t("nav_tasks") }}</a>
+          <a class="{{ 'active' if current_page == 'agents' else '' }}" href="/app/agents">{{ t("nav_agents") }}</a>
           <a class="{{ 'active' if current_page == 'activity' else '' }}" href="/app/activity">{{ t("nav_activity") }}</a>
           <a class="{{ 'active' if current_page == 'memory' else '' }}" href="/app/memory">{{ t("nav_memory") }}</a>
           <a class="{{ 'active' if current_page == 'decisions' else '' }}" href="/app/decisions">{{ t("nav_decisions") }}</a>

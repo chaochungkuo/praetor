@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% macro inbox_section(title, items) %}
+  <section class="panel command-panel">
+    <div class="section-heading">
+      <div>
+        <h3>{{ title }}</h3>
+        <p>{{ items|length }} {{ t("needs_attention") }}</p>
+      </div>
+      <span class="status">{{ title }}</span>
+    </div>
+    {% if items %}
+      <div class="command-list">
+        {% for item in items %}
+          <a class="command-card" href="{{ item.href }}">
+            <div>
+              <div class="eyebrow">{{ item.kind }}</div>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.body }}</p>
+            </div>
+            <span class="status">{{ item.status }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("all_clear") }}</p>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{% block content %}
+  <section class="panel hero">
+    <div class="hero-row">
+      <div>
+        <h2>{{ t("chairman_inbox") }}</h2>
+        <p>{{ t("chairman_inbox_desc") }}</p>
+      </div>
+      <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
+    </div>
+  </section>
+
+  <section class="grid cards command-metrics">
+    <section class="panel stat-card">
+      <span>{{ t("pending_decisions") }}</span>
+      <strong>{{ inbox_items.pending_decisions|length }}</strong>
+    </section>
+    <section class="panel stat-card">
+      <span>{{ t("blocked_work") }}</span>
+      <strong>{{ inbox_items.blocked_work|length }}</strong>
+    </section>
+    <section class="panel stat-card">
+      <span>{{ t("risk_signals") }}</span>
+      <strong>{{ inbox_items.risk_signals|length }}</strong>
+    </section>
+    <section class="panel stat-card">
+      <span>{{ t("completed_for_review") }}</span>
+      <strong>{{ inbox_items.completed_for_review|length }}</strong>
+    </section>
+  </section>
+
+  <section class="grid two">
+    {{ inbox_section(t("pending_decisions"), inbox_items.pending_decisions) }}
+    {{ inbox_section(t("blocked_work"), inbox_items.blocked_work) }}
+    {{ inbox_section(t("risk_signals"), inbox_items.risk_signals) }}
+    {{ inbox_section(t("completed_for_review"), inbox_items.completed_for_review) }}
+  </section>
+{% endblock %}

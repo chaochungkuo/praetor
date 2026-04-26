@@ -295,6 +295,92 @@ pre {
   font-size: 2rem;
   color: var(--accent-2);
 }
+.stat-card span {
+  color: var(--muted);
+}
+.command-metrics .panel {
+  margin-bottom: 0;
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.section-heading p {
+  font-size: 0.95rem;
+}
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.command-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.command-list.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.command-card,
+.agent-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.022);
+}
+.command-card:hover,
+.agent-card:hover {
+  border-color: rgba(213,179,106,0.28);
+  background: rgba(213,179,106,0.045);
+}
+.command-card > div,
+.agent-card > div {
+  min-width: 0;
+}
+.command-card strong {
+  display: block;
+  margin: 0.25rem 0 0.35rem;
+}
+.command-card .status {
+  flex: 0 0 auto;
+}
+.agent-role-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+.agent-card {
+  display: grid;
+}
+.agent-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.agent-meta {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.4rem 0 0;
+}
+.agent-meta div {
+  display: grid;
+  gap: 0.2rem;
+}
+.agent-meta dt {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+}
+.agent-meta dd {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
 
 .form-grid {
   display: grid;
@@ -477,6 +563,9 @@ details summary {
   .grid.cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .command-list.three {
+    grid-template-columns: 1fr;
+  }
   .wizard-summary {
     grid-template-columns: 1fr;
   }
@@ -524,6 +613,11 @@ details summary {
     flex-direction: column;
   }
   .list-row {
+    flex-direction: column;
+  }
+  .section-heading,
+  .agent-card-header,
+  .command-card {
     flex-direction: column;
   }
   .status {

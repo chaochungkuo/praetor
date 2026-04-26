@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel hero">
+    <div class="hero-row">
+      <div>
+        <h2>{{ t("agent_directory") }}</h2>
+        <p>{{ t("agent_directory_desc") }}</p>
+      </div>
+      <span class="status">{{ organization.agent_roles|length }} {{ t("role_charter") }}</span>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("team_operating_model") }}</h3>
+          <p>{{ t("active_agents") }}: {{ organization.agents|length }}</p>
+        </div>
+        <span class="status">{{ t("supervisor") }} / {{ t("authority") }}</span>
+      </div>
+      <div class="agent-role-grid">
+        {% for role in organization.agent_roles %}
+          <article class="agent-card">
+            <div class="agent-card-header">
+              <div>
+                <div class="eyebrow">{{ t("role_charter") }}</div>
+                <h3>{{ role.name }}</h3>
+              </div>
+              <span class="status">{{ agents_by_role.get(role.name, [])|length }} {{ t("instances") }}</span>
+            </div>
+            <p>{{ role.purpose }}</p>
+            <dl class="agent-meta">
+              <div>
+                <dt>{{ t("supervisor") }}</dt>
+                <dd>{{ role.default_supervisor_role }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("skills") }}</dt>
+                <dd>{{ role.skills|join(', ') or t("not_available") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("authority") }}</dt>
+                <dd>{{ role.decision_authority|join(', ') or t("not_available") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("escalates_on") }}</dt>
+                <dd>{{ role.escalation_triggers|join(', ') or t("not_available") }}</dd>
+              </div>
+            </dl>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("active_agents") }}</h3>
+          <p>{{ t("agent_directory_desc") }}</p>
+        </div>
+      </div>
+      {% if organization.agents %}
+        <div class="command-list">
+          {% for agent in organization.agents %}
+            <a class="command-card" href="{{ '/app/missions/' ~ agent.mission_id if agent.mission_id else '/app/agents' }}">
+              <div>
+                <div class="eyebrow">{{ agent.role_name }}</div>
+                <strong>{{ agent.display_name }}</strong>
+                <p>{{ agent.charter }}</p>
+              </div>
+              <span class="status">{{ label(agent.status) }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_active_agents") }}</p>
+      {% endif %}
+    </section>
+  </section>
+
+  <section class="panel command-panel">
+    <div class="section-heading">
+      <div>
+        <h3>{{ t("recent_agent_activity") }}</h3>
+        <p>{{ t("no_agent_activity") if not recent_activity else recent_activity|length }}</p>
+      </div>
+      <a class="small-button" href="/app/activity">{{ t("audit_stream") }}</a>
+    </div>
+    {% if recent_activity %}
+      <div class="command-list three">
+        {% for event in recent_activity[:12] %}
+          <a class="command-card" href="{{ '/app/missions/' ~ event.mission_id if event.mission_id else '/app/activity' }}">
+            <div>
+              <div class="eyebrow">{{ event.actor }}</div>
+              <strong>{{ event.title }}</strong>
+              <p>{{ event.body or t("event_recorded") }}</p>
+            </div>
+            <span class="status">{{ format_time(event.created_at) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_agent_activity") }}</p>
+    {% endif %}
+  </section>
+{% endblock %}

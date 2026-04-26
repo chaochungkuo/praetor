@@ -113,8 +113,10 @@ def main() -> int:
         )
         anon_text = urllib.request.urlopen(f"{BASE_URL}/app/overview", timeout=30).read().decode("utf-8")
         praetor = get_text("/app/praetor")
+        inbox = get_text("/app/inbox")
         overview = get_text("/app/overview")
         tasks = get_text("/app/tasks")
+        agents = get_text("/app/agents")
         activity = get_text("/app/activity")
         memory = get_text("/app/memory")
         decisions = get_text("/app/decisions")
@@ -131,8 +133,10 @@ def main() -> int:
                     "anon_redirects_to_login": "Owner login" in anon_text,
                     "praetor_has_briefing": "Praetor briefing" in praetor,
                     "praetor_has_starters": "Suggested first tasks" in praetor,
+                    "inbox_has_chairman_inbox": "Chairman Inbox" in inbox,
                     "overview_has_total": "Total missions" in overview,
                     "tasks_has_board": "Mission board" in tasks,
+                    "agents_has_directory": "Agent Directory" in agents,
                     "activity_has_audit": "Audit stream" in activity,
                     "memory_has_wiki": "Company memory" in memory,
                     "decisions_has_audit": "Audit trail" in decisions,

@@ -47,8 +47,10 @@ SUPPORTED_LANGUAGES = {
 TRANSLATIONS = {
     "en": {
         "nav_praetor": "Praetor",
+        "nav_inbox": "Inbox",
         "nav_overview": "Overview",
         "nav_tasks": "Tasks",
+        "nav_agents": "Agents",
         "nav_activity": "Activity",
         "nav_memory": "Memory",
         "nav_decisions": "Decisions",
@@ -172,7 +174,9 @@ TRANSLATIONS = {
         "principle_3": "Memory belongs to the company, not individual agents.",
         "principle_4": "Praetor manages roles and hierarchy, not equal-agent debate.",
         "page_overview": "Overview",
+        "page_inbox": "Inbox",
         "page_tasks": "Tasks",
+        "page_agents": "Agents",
         "page_activity": "Activity",
         "page_settings": "Settings",
         "page_memory": "Memory",
@@ -187,6 +191,31 @@ TRANSLATIONS = {
         "status_breakdown": "Status breakdown",
         "recent_missions": "Recent missions",
         "recent_audit_events": "Recent audit events",
+        "chairman_inbox": "Chairman Inbox",
+        "chairman_inbox_desc": "Everything that needs owner attention: approvals, blocked work, runtime risk, and completed missions waiting for review.",
+        "needs_attention": "Needs attention",
+        "pending_decisions": "Pending decisions",
+        "blocked_work": "Blocked work",
+        "risk_signals": "Risk signals",
+        "completed_for_review": "Completed for review",
+        "runtime_watch": "Runtime watch",
+        "all_clear": "All clear.",
+        "open_mission": "Open mission",
+        "review_item": "Review item",
+        "agent_directory": "Agent Directory",
+        "agent_directory_desc": "The AI organization: roles, active workers, skills, authority, supervisors, and recent internal activity.",
+        "role_charter": "Role charter",
+        "active_agents": "Active agents",
+        "recent_agent_activity": "Recent agent activity",
+        "skills": "Skills",
+        "authority": "Authority",
+        "supervisor": "Supervisor",
+        "instances": "Instances",
+        "constraints": "Constraints",
+        "escalates_on": "Escalates on",
+        "no_active_agents": "No active agents yet.",
+        "no_agent_activity": "No agent activity yet.",
+        "team_operating_model": "Team operating model",
         "mission_board": "Mission board",
         "mission": "Mission",
         "status": "Status",
@@ -305,8 +334,10 @@ TRANSLATIONS = {
     },
     "zh-TW": {
         "nav_praetor": "Praetor",
+        "nav_inbox": "收件匣",
         "nav_overview": "總覽",
         "nav_tasks": "任務",
+        "nav_agents": "AI 組織",
         "nav_activity": "動態",
         "nav_memory": "記憶",
         "nav_decisions": "決策",
@@ -430,7 +461,9 @@ TRANSLATIONS = {
         "principle_3": "記憶屬於公司，不屬於個別 agent。",
         "principle_4": "Praetor 管理的是角色與階層，不是讓平等 agent 無限討論。",
         "page_overview": "總覽",
+        "page_inbox": "收件匣",
         "page_tasks": "任務",
+        "page_agents": "AI 組織",
         "page_activity": "動態",
         "page_settings": "設定",
         "page_memory": "記憶",
@@ -445,6 +478,31 @@ TRANSLATIONS = {
         "status_breakdown": "狀態分布",
         "recent_missions": "近期任務",
         "recent_audit_events": "近期系統紀錄",
+        "chairman_inbox": "董事長收件匣",
+        "chairman_inbox_desc": "集中處理需要你注意的事項：批准、卡住的工作、執行環境風險，以及已完成待驗收的任務。",
+        "needs_attention": "需要注意",
+        "pending_decisions": "待裁示",
+        "blocked_work": "卡住的工作",
+        "risk_signals": "風險訊號",
+        "completed_for_review": "已完成待驗收",
+        "runtime_watch": "執行環境監看",
+        "all_clear": "目前無需處理。",
+        "open_mission": "打開任務",
+        "review_item": "查看項目",
+        "agent_directory": "AI 組織名錄",
+        "agent_directory_desc": "公司的 AI 組織：角色、工作中的 agent、技能、權限、主管與近期內部活動。",
+        "role_charter": "角色職責",
+        "active_agents": "工作中的 Agent",
+        "recent_agent_activity": "近期 AI 內部活動",
+        "skills": "技能",
+        "authority": "權限",
+        "supervisor": "主管",
+        "instances": "實例",
+        "constraints": "限制",
+        "escalates_on": "升級條件",
+        "no_active_agents": "目前沒有工作中的 agent。",
+        "no_agent_activity": "目前沒有 AI 內部活動。",
+        "team_operating_model": "團隊運作模型",
         "mission_board": "任務看板",
         "mission": "任務",
         "status": "狀態",
@@ -905,6 +963,122 @@ def _starter_missions() -> list[dict[str, str]]:
     ]
 
 
+def _mission_by_id(missions: list) -> dict[str, Any]:
+    return {mission.id: mission for mission in missions}
+
+
+def _build_inbox_items(service, t, label, event_summary) -> dict[str, list[dict[str, Any]]]:
+    missions = service.list_missions()
+    missions_by_id = _mission_by_id(missions)
+    approvals = service.list_approvals(status="pending")
+    recent_runs = service.list_recent_runs(limit=20)
+    audit_events = service.list_audit_events(limit=20)
+    runtime_health = service.runtime_health()
+
+    pending_decisions = []
+    for approval in approvals:
+        pending_decisions.append(
+            {
+                "title": label(approval.category),
+                "body": approval.reason,
+                "status": label(approval.status),
+                "href": f"/app/missions/{approval.mission_id}" if approval.mission_id else "/app/decisions",
+                "kind": t("pending_decisions"),
+                "created_at": approval.created_at,
+            }
+        )
+
+    blocked_work = []
+    for mission in missions:
+        if mission.status in {"failed", "paused"}:
+            blocked_work.append(
+                {
+                    "title": mission.title,
+                    "body": mission.summary or label(mission.status),
+                    "status": label(mission.status),
+                    "href": f"/app/missions/{mission.id}",
+                    "kind": t("blocked_work"),
+                    "created_at": mission.updated_at,
+                }
+            )
+    for run in recent_runs:
+        status = str(run.get("normalized_status") or run.get("status") or "").lower()
+        if status in {"failed", "error"}:
+            blocked_work.append(
+                {
+                    "title": str(run.get("executor") or t("executor")),
+                    "body": str(run.get("stderr_tail") or run.get("stdout_tail") or t("event_recorded"))[:320],
+                    "status": label(status),
+                    "href": "/app/activity",
+                    "kind": t("blocked_work"),
+                    "created_at": run.get("finished_at") or run.get("started_at"),
+                }
+            )
+
+    risk_signals = []
+    if not runtime_health.get("healthy"):
+        risk_signals.append(
+            {
+                "title": t("runtime_watch"),
+                "body": runtime_health.get("error") or t("runtime_not_configured"),
+                "status": label(runtime_health.get("mode") or "runtime"),
+                "href": "/app/settings",
+                "kind": t("risk_signals"),
+                "created_at": None,
+            }
+        )
+    risk_event_types = {"approval_created", "decision_escalation_created", "standing_order_created"}
+    for event in audit_events:
+        if event.get("type") in risk_event_types:
+            risk_signals.append(
+                {
+                    "title": t(event.get("type") or "event_recorded"),
+                    "body": event_summary(event),
+                    "status": t("review_item"),
+                    "href": "/app/decisions",
+                    "kind": t("risk_signals"),
+                    "created_at": event.get("ts"),
+                }
+            )
+
+    completed_for_review = [
+        {
+            "title": mission.title,
+            "body": mission.summary or t("review_item"),
+            "status": label(mission.status),
+            "href": f"/app/missions/{mission.id}",
+            "kind": t("completed_for_review"),
+            "created_at": mission.updated_at,
+        }
+        for mission in missions
+        if mission.status == "completed"
+    ]
+
+    return {
+        "pending_decisions": pending_decisions[:8],
+        "blocked_work": blocked_work[:8],
+        "risk_signals": risk_signals[:8],
+        "completed_for_review": completed_for_review[:8],
+    }
+
+
+def _build_agent_directory(service) -> dict[str, Any]:
+    organization = service.organization_snapshot()
+    activity = service.office_snapshot().agent_activity
+    agents_by_role: dict[str, list[Any]] = {}
+    for agent in organization.agents:
+        agents_by_role.setdefault(agent.role_name, []).append(agent)
+    activity_by_role: dict[str, list[Any]] = {}
+    for event in activity:
+        activity_by_role.setdefault(event.actor.replace("_", " ").title(), []).append(event)
+    return {
+        "organization": organization,
+        "agents_by_role": agents_by_role,
+        "activity_by_role": activity_by_role,
+        "recent_activity": activity,
+    }
+
+
 def _require_initialized(request: Request):
     settings = request.app.state.ctx.service.get_settings()
     if settings is None:
@@ -985,6 +1159,39 @@ def praetor_page(request: Request):
             "ceo_messages": ceo_messages,
             "onboarding_defaults": _default_onboarding(),
             "starter_missions": _starter_missions(),
+        },
+    )
+
+
+@router.get("/app/inbox", response_class=HTMLResponse)
+def inbox_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    ctx = _base_context(request, "inbox", "Inbox")
+    return templates.TemplateResponse(
+        request=request,
+        name="inbox.html",
+        context={
+            **ctx,
+            "inbox_items": _build_inbox_items(service, ctx["t"], ctx["label"], ctx["event_summary"]),
+        },
+    )
+
+
+@router.get("/app/agents", response_class=HTMLResponse)
+def agents_page(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    service = request.app.state.ctx.service
+    return templates.TemplateResponse(
+        request=request,
+        name="agents.html",
+        context={
+            **_base_context(request, "agents", "Agents"),
+            **_build_agent_directory(service),
         },
     )
 
