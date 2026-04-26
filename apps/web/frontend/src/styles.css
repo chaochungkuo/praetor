@@ -849,3 +849,441 @@ dd {
     margin-left: 18px;
   }
 }
+
+/* Executive workspace refresh */
+:root {
+  color-scheme: light;
+  --bg: #f6f2ea;
+  --panel: #fffdf8;
+  --panel-2: #fbf7ef;
+  --line: #e2dbcf;
+  --text: #201d19;
+  --muted: #716b61;
+  --gold: #a87928;
+  --green: #4f8f75;
+  --red: #b85f5f;
+  --blue: #557aa8;
+  --brand: #11100f;
+  --brand-2: #191714;
+  --shadow: 0 18px 48px rgba(42, 34, 22, 0.08);
+  --soft-shadow: 0 10px 28px rgba(42, 34, 22, 0.06);
+}
+
+body {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.68), transparent 34%),
+    radial-gradient(circle at 86% 0%, rgba(199,154,67,0.14), transparent 28%),
+    var(--bg);
+  color: var(--text);
+}
+
+.office-shell {
+  grid-template-columns: 248px minmax(0, 1fr) minmax(300px, 340px);
+  background: transparent;
+}
+
+.office-shell.rail-collapsed {
+  grid-template-columns: 248px minmax(0, 1fr);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 40%),
+    linear-gradient(180deg, var(--brand), #080808);
+  color: #f7f0e3;
+  box-shadow: 18px 0 46px rgba(21, 16, 11, 0.16);
+}
+
+.executive-rail {
+  border-left: 1px solid var(--line);
+  background: rgba(255,253,248,0.74);
+  backdrop-filter: blur(18px);
+}
+
+.brand-mark {
+  border-radius: 14px;
+  border-color: rgba(225,197,132,0.44);
+  color: #f2d79a;
+  background: linear-gradient(145deg, rgba(199,154,67,0.24), rgba(255,255,255,0.035));
+}
+
+.brand strong {
+  color: #fffaf0;
+}
+
+.brand span,
+.sidebar-footer span {
+  color: rgba(247,240,227,0.72);
+}
+
+.sidebar-footer {
+  border-top-color: rgba(255,255,255,0.09);
+}
+
+.sidebar-footer strong {
+  color: #fffaf0;
+}
+
+.nav a {
+  min-height: 44px;
+  border-radius: 12px;
+  color: rgba(247,240,227,0.72);
+}
+
+.nav a.active,
+.nav a:hover {
+  color: #fffaf0;
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(225,197,132,0.22);
+}
+
+.main {
+  padding: clamp(20px, 3vw, 38px);
+}
+
+.office-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.office-header h1 {
+  color: #24201a;
+  font-size: clamp(38px, 4.2vw, 58px);
+  max-width: 14em;
+}
+
+.office-header p,
+.surface p,
+.metric span,
+.rail-item span,
+.mission-card small,
+.mission-card em,
+dt,
+.agent-card span,
+.agent-card small,
+.rail-section p,
+.timeline-event span,
+.timeline-event em {
+  color: var(--muted);
+}
+
+.eyebrow,
+.surface-header svg,
+.thread-title,
+.rail-section h3,
+.agent-card summary,
+.open-link,
+.gate-panel a {
+  color: var(--gold);
+}
+
+.header-actions {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.status-badge,
+.rail-toggle,
+.surface,
+.metric,
+.mission-card,
+.org-chart,
+.org-node,
+.agent-card,
+.timeline-event .event-type,
+.agent-bubble,
+.rail-item,
+.error-banner,
+.gate-panel {
+  border-color: var(--line);
+  background: rgba(255,253,248,0.86);
+  border-radius: 18px;
+  box-shadow: var(--soft-shadow);
+}
+
+.surface,
+.metric,
+.gate-panel {
+  box-shadow: var(--shadow);
+}
+
+.status-badge {
+  min-width: 120px;
+}
+
+.status-badge strong {
+  color: #2a2115;
+}
+
+.rail-toggle {
+  color: #3b352d;
+  background: #fff7e7;
+  border-color: rgba(168,121,40,0.25);
+}
+
+.metric {
+  background:
+    linear-gradient(135deg, rgba(255,253,248,0.98), rgba(248,241,229,0.88)),
+    radial-gradient(circle at 100% 0%, rgba(199,154,67,0.12), transparent 42%);
+}
+
+.metric svg {
+  color: var(--gold);
+}
+
+.metric strong {
+  color: #221d16;
+}
+
+.metric-risk {
+  border-color: rgba(184,95,95,0.24);
+  background: linear-gradient(135deg, #fff8f3, #f9ece7);
+}
+
+.metric-risk svg,
+.metric-risk strong {
+  color: var(--red);
+}
+
+.surface {
+  background: rgba(255,253,248,0.9);
+}
+
+.ceo-chat {
+  background:
+    linear-gradient(135deg, rgba(255,253,248,0.98), rgba(249,242,229,0.9)),
+    radial-gradient(circle at 100% 0%, rgba(199,154,67,0.16), transparent 42%);
+}
+
+.chat-scroll,
+.mission-list,
+.agent-thread {
+  scrollbar-color: #cdbfaa transparent;
+}
+
+.chat-message {
+  border-color: #eadfce;
+  background: #f8f2e8;
+  border-radius: 18px 18px 18px 6px;
+}
+
+.chat-message.chairman {
+  border-color: rgba(168,121,40,0.28);
+  background: #fff3d7;
+  border-radius: 18px 18px 6px 18px;
+}
+
+.composer textarea {
+  border-color: var(--line);
+  background: #fffdf8;
+  color: var(--text);
+  border-radius: 16px;
+}
+
+.composer textarea:focus {
+  outline: 3px solid rgba(199,154,67,0.18);
+  border-color: rgba(168,121,40,0.4);
+}
+
+.icon-button,
+.send-button,
+.open-link,
+.gate-panel a {
+  border-radius: 999px;
+}
+
+.icon-button {
+  border-color: var(--line);
+  background: #fffdf8;
+  color: #4d453a;
+}
+
+.send-button {
+  color: #fff8e9;
+  background: #1c1914;
+  border-color: #1c1914;
+  box-shadow: 0 8px 18px rgba(31, 26, 18, 0.14);
+}
+
+.icon-button.listening {
+  color: #2d7258;
+  background: #e5f2eb;
+  border-color: rgba(79,143,117,0.28);
+}
+
+.mission-card {
+  background: #fffdf8;
+}
+
+.mission-card.selected {
+  border-color: rgba(168,121,40,0.3);
+  background: #fff4dc;
+}
+
+.status-dot.active,
+.status-dot.resumed {
+  background: var(--green);
+}
+
+.status-dot.waiting_approval,
+.status-dot.paused {
+  background: var(--gold);
+}
+
+.status-dot.failed {
+  background: var(--red);
+}
+
+.mission-brief {
+  border-right-color: var(--line);
+}
+
+dl div {
+  border-bottom-color: #e7dfd2;
+}
+
+.org-chart,
+.agent-card,
+.rail-item,
+.agent-bubble {
+  background: #fffdf8;
+}
+
+.org-node {
+  border-color: rgba(168,121,40,0.22);
+  background: #fff7e7;
+}
+
+.org-node.chairman {
+  border-color: rgba(168,121,40,0.38);
+  background: #f7e5bd;
+}
+
+.org-node.ceo {
+  background: #f2eadc;
+}
+
+.org-line,
+.timeline-event:not(:last-child)::before {
+  background: var(--line);
+}
+
+.timeline-marker {
+  background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(168,121,40,0.11);
+}
+
+.timeline-event .event-type {
+  background: #f8f2e8;
+  box-shadow: none;
+}
+
+.timeline-event .event-escalation,
+.timeline-event .event-approval {
+  color: var(--red);
+  border-color: rgba(184,95,95,0.24);
+  background: #fff2ee;
+}
+
+.timeline-event .event-delegation,
+.timeline-event .event-team {
+  color: #2d7258;
+  border-color: rgba(79,143,117,0.24);
+  background: #edf7f1;
+}
+
+.agent-bubble.ceo {
+  border-color: rgba(168,121,40,0.28);
+  background: #fff7e7;
+}
+
+.agent-bubble.project_manager {
+  border-color: rgba(79,143,117,0.24);
+  background: #f0f8f4;
+}
+
+.agent-bubble.developer {
+  border-color: rgba(85,122,168,0.24);
+  background: #f2f6fb;
+}
+
+.agent-bubble.reviewer {
+  border-color: rgba(184,95,95,0.22);
+  background: #fff4f0;
+}
+
+.open-link,
+.gate-panel a {
+  border-color: rgba(168,121,40,0.28);
+  background: #fff7e7;
+}
+
+.rail-item.action-applied {
+  border-color: rgba(79,143,117,0.25);
+  background: #f0f8f4;
+}
+
+.rail-item.action-skipped,
+.error-banner {
+  border-color: rgba(184,95,95,0.26);
+  color: #8e3939;
+  background: #fff2ee;
+}
+
+.gate {
+  background:
+    radial-gradient(circle at 82% 0%, rgba(199,154,67,0.16), transparent 34%),
+    var(--bg);
+}
+
+.gate-panel {
+  background: #fffdf8;
+}
+
+@media (max-width: 1160px) {
+  .office-shell {
+    grid-template-columns: 236px minmax(0, 1fr);
+  }
+
+  .executive-rail {
+    border-top: 1px solid var(--line);
+    background: rgba(255,253,248,0.9);
+  }
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    position: static;
+    height: auto;
+    border-bottom: 0;
+    box-shadow: 0 12px 34px rgba(21, 16, 11, 0.14);
+  }
+
+  .office-header {
+    align-items: stretch;
+  }
+
+  .mission-brief {
+    border-bottom-color: var(--line);
+  }
+}
+
+@media (max-width: 560px) {
+  .surface,
+  .metric,
+  .mission-card,
+  .agent-card,
+  .agent-bubble,
+  .rail-item {
+    border-radius: 14px;
+  }
+
+  .nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
