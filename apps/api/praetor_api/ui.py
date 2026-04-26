@@ -10,7 +10,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .config import get_bridge_base_url
+from .config import (
+    ANTHROPIC_STATE_SECRET,
+    OPENAI_STATE_SECRET,
+    get_anthropic_api_key,
+    get_bridge_base_url,
+    get_openai_api_key,
+    get_state_dir,
+)
 from .models import (
     ApprovalCreateRequest,
     LoginRequest,
@@ -19,6 +26,7 @@ from .models import (
     MissionPauseRequest,
     MissionStopRequest,
     OnboardingAnswers,
+    RuntimeSelection,
 )
 from .security import csrf_token, login_rate_limiter, require_csrf, require_setup_token
 
@@ -63,6 +71,16 @@ TRANSLATIONS = {
         "approve": "Approve",
         "reject": "Reject",
         "runtime": "Runtime",
+        "runtime_settings": "Runtime settings",
+        "runtime_settings_desc": "Choose the model runtime Praetor should use. API keys are stored locally as private secret files and are never displayed after saving.",
+        "runtime_settings_saved": "Runtime settings saved.",
+        "api_key": "API key",
+        "api_key_placeholder": "Leave blank to keep the existing key",
+        "api_key_help": "Paste a provider key only in this browser form. Praetor stores it under the local state directory with private file permissions.",
+        "provider_key": "Provider key",
+        "configured": "configured",
+        "missing": "missing",
+        "save_runtime_settings": "Save runtime settings",
         "bridge_url": "Bridge URL",
         "mode": "Mode",
         "principles": "Principles",
@@ -300,6 +318,16 @@ TRANSLATIONS = {
         "approve": "批准",
         "reject": "拒絕",
         "runtime": "執行環境",
+        "runtime_settings": "執行環境設定",
+        "runtime_settings_desc": "選擇 Praetor 要使用的模型執行環境。API key 會以私密檔案保存在本機，不會在儲存後回顯。",
+        "runtime_settings_saved": "執行環境設定已儲存。",
+        "api_key": "API key",
+        "api_key_placeholder": "留空表示保留既有 key",
+        "api_key_help": "請只在這個瀏覽器表單貼上供應商 key。Praetor 會用私密檔案權限保存在本機 state 目錄。",
+        "provider_key": "供應商 key",
+        "configured": "已設定",
+        "missing": "尚未設定",
+        "save_runtime_settings": "儲存執行環境設定",
         "bridge_url": "Bridge 位址",
         "mode": "模式",
         "principles": "運作原則",
@@ -628,6 +656,25 @@ def _friendly_runtime_error(exc_or_message: Exception | str, t) -> str:
     if "api.openai.com" in message and "Unauthorized" in message:
         return t("runtime_auth_error")
     return message
+
+
+def _save_provider_api_key(provider: str, api_key: str) -> None:
+    key = api_key.strip()
+    if not key:
+        return
+    secret_files = {
+        "openai": OPENAI_STATE_SECRET,
+        "anthropic": ANTHROPIC_STATE_SECRET,
+    }
+    filename = secret_files.get(provider)
+    if filename is None:
+        raise ValueError("Unsupported provider.")
+    secrets_dir = get_state_dir() / "secrets"
+    secrets_dir.mkdir(parents=True, exist_ok=True)
+    secrets_dir.chmod(0o700)
+    path = secrets_dir / filename
+    path.write_text(f"{key}\n", encoding="utf-8")
+    path.chmod(0o600)
 
 
 def _ui_language(request: Request, initialized_settings) -> str:
@@ -985,8 +1032,36 @@ def settings_page(request: Request):
         context={
             **_base_context(request, "settings", "Settings"),
             "runtime_health": runtime_health,
+            "provider_keys": {
+                "openai": bool(get_openai_api_key()),
+                "anthropic": bool(get_anthropic_api_key()),
+            },
         },
     )
+
+
+@router.post("/app/settings/runtime")
+async def update_runtime_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    provider = str(form.get("runtime_provider", "")).strip().lower() or None
+    runtime = RuntimeSelection(
+        mode=str(form.get("runtime_mode", "api")).strip() or "api",
+        provider=provider,
+        model=str(form.get("runtime_model", "")).strip() or None,
+        executor=str(form.get("runtime_executor", "")).strip() or None,
+    )
+    try:
+        request.app.state.ctx.service.update_runtime(runtime)
+        if provider is not None:
+            _save_provider_api_key(provider, str(form.get("api_key", "")))
+    except Exception as exc:
+        return _redirect("/app/settings", str(exc), "error")
+    return _redirect("/app/settings", t("runtime_settings_saved"), "success")
 
 
 @router.get("/app/memory", response_class=HTMLResponse)

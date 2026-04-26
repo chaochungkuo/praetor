@@ -4,8 +4,14 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
-from .models import PlannerAction, PlannerPlan
-from .config import get_ceo_planner_mode, get_ceo_planner_model, get_ceo_planner_provider
+from .models import PlannerAction, PlannerPlan, RuntimeSelection
+from .config import (
+    get_anthropic_api_key,
+    get_ceo_planner_mode,
+    get_ceo_planner_model,
+    get_ceo_planner_provider,
+    get_openai_api_key,
+)
 from .providers import ApiProviderError, generate_json_response, parse_generation_payload
 
 
@@ -444,7 +450,14 @@ class LLMCEOPlanner:
         return bool(path)
 
 
-def default_ceo_planner() -> CEOPlanner:
-    if get_ceo_planner_mode() == "llm":
+def default_ceo_planner(runtime: RuntimeSelection | None = None) -> CEOPlanner:
+    mode = get_ceo_planner_mode()
+    if mode == "llm":
         return LLMCEOPlanner(provider=get_ceo_planner_provider(), model=get_ceo_planner_model())
+    if mode == "auto" and runtime is not None and runtime.mode == "api":
+        provider = (runtime.provider or get_ceo_planner_provider()).lower()
+        model = runtime.model or get_ceo_planner_model()
+        api_key = get_openai_api_key() if provider == "openai" else get_anthropic_api_key()
+        if api_key and api_key != "fake-key":
+            return LLMCEOPlanner(provider=provider, model=model)
     return DeterministicCEOPlanner()

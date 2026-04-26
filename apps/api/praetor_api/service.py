@@ -221,6 +221,22 @@ class PraetorService:
     def get_settings(self) -> AppSettings | None:
         return self.storage.load_settings()
 
+    def update_runtime(self, runtime: RuntimeSelection) -> AppSettings:
+        settings = self._require_settings()
+        settings.runtime = runtime
+        settings.updated_at = utc_now()
+        self.storage.save_settings(settings)
+        self._audit(
+            "runtime_settings_updated",
+            {
+                "mode": runtime.mode,
+                "provider": runtime.provider,
+                "model": runtime.model,
+                "executor": runtime.executor,
+            },
+        )
+        return settings
+
     def create_mission(self, request: MissionCreateRequest) -> MissionDefinition:
         settings = self._require_settings()
         self._ensure_default_agent_roles()
@@ -764,7 +780,7 @@ class PraetorService:
         text = request.body.strip()
         if not text:
             raise ValueError("Message body is required.")
-        planner = self.planner or default_ceo_planner()
+        planner = self.planner or default_ceo_planner(settings.runtime)
         plan = planner.plan(
             CEOPlannerContext(
                 instruction=text,

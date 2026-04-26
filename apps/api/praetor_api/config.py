@@ -25,6 +25,8 @@ LOGIN_WINDOW_SECONDS_ENV = "PRAETOR_LOGIN_WINDOW_SECONDS"
 CEO_PLANNER_MODE_ENV = "PRAETOR_CEO_PLANNER_MODE"
 CEO_PLANNER_PROVIDER_ENV = "PRAETOR_CEO_PLANNER_PROVIDER"
 CEO_PLANNER_MODEL_ENV = "PRAETOR_CEO_PLANNER_MODEL"
+OPENAI_STATE_SECRET = "openai_api_key.txt"
+ANTHROPIC_STATE_SECRET = "anthropic_api_key.txt"
 
 
 def get_state_dir() -> Path:
@@ -46,6 +48,14 @@ def _get_env_or_file(name: str, default: str | None = None) -> str | None:
     return default
 
 
+def _get_state_secret(filename: str) -> str | None:
+    path = get_state_dir() / "secrets" / filename
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    return value or None
+
+
 def get_bridge_base_url() -> str | None:
     return os.getenv(BRIDGE_BASE_URL_ENV)
 
@@ -55,11 +65,11 @@ def get_bridge_token() -> str | None:
 
 
 def get_openai_api_key() -> str | None:
-    return _get_env_or_file(OPENAI_API_KEY_ENV)
+    return _get_env_or_file(OPENAI_API_KEY_ENV) or _get_state_secret(OPENAI_STATE_SECRET)
 
 
 def get_anthropic_api_key() -> str | None:
-    return _get_env_or_file(ANTHROPIC_API_KEY_ENV)
+    return _get_env_or_file(ANTHROPIC_API_KEY_ENV) or _get_state_secret(ANTHROPIC_STATE_SECRET)
 
 
 def get_openai_base_url() -> str:
@@ -118,7 +128,7 @@ def get_login_window_seconds() -> int:
 
 
 def get_ceo_planner_mode() -> str:
-    return os.getenv(CEO_PLANNER_MODE_ENV, "deterministic").lower()
+    return os.getenv(CEO_PLANNER_MODE_ENV, "auto").lower()
 
 
 def get_ceo_planner_provider() -> str:
