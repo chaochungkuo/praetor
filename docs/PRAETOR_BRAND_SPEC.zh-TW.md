@@ -128,9 +128,8 @@ Praetor 的 UI 應和這個 logo 對齊：
 
 接下來建議正式整理出三種 repo 資產：
 
-1. [branding/praetor-logo-dark.svg](branding/praetor-logo-dark.svg)
-2. [branding/praetor-monogram-dark.svg](branding/praetor-monogram-dark.svg)
-3. 後續再補 PNG 導出版
+1. [branding/praetor-logo-dark.png](branding/praetor-logo-dark.png)
+2. [branding/praetor-mark-dark.png](branding/praetor-mark-dark.png)
 
 如果未來要做網站與 favicon，應從這個版本導出，而不是重新畫一個不同的 mark。
 
@@ -154,5 +153,5 @@ Praetor 的 UI 應和這個 logo 對齊：
 
 目前已完成：
 
-- README header 已接上正式 logo SVG
-- monogram SVG 已建立，可供 favicon / app icon 後續導出
+- README header 已接上正式 PNG logo
+- mark PNG 已建立，並用於 app favicon / app icon

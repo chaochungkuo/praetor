@@ -10,6 +10,11 @@
       <form class="panel onboarding-wizard" id="onboarding-wizard" method="post" action="/app/onboarding">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <input type="hidden" name="setup_token" value="{{ setup_token }}" />
+        <input type="hidden" name="leadership_style" value="{{ onboarding_defaults.leadership_style }}" />
+        <input type="hidden" name="decision_style" value="{{ onboarding_defaults.decision_style }}" />
+        <input type="hidden" name="organization_style" value="{{ onboarding_defaults.organization_style }}" />
+        <input type="hidden" name="autonomy_mode" value="{{ onboarding_defaults.autonomy_mode }}" />
+        <input type="hidden" name="risk_priority" value="{{ onboarding_defaults.risk_priority }}" />
         <div class="wizard-header">
           <div>
             <h3>{{ t("founder_to_praetor") }}</h3>
@@ -17,11 +22,6 @@
           </div>
           <div class="wizard-meta">
             <div class="pill">6 {{ t("steps") }}</div>
-            <div class="language-grid compact">
-              {% for code, label in language_options.items() %}
-                <a class="small-button {{ 'active-language' if code == ui_language else '' }}" href="/app/set-language/{{ code }}?next=%2Fapp%2Fpraetor">{{ label }}</a>
-              {% endfor %}
-            </div>
           </div>
         </div>
 
@@ -62,48 +62,35 @@
             <strong>Praetor</strong>
             <p>{{ t("step2_prompt") }}</p>
           </div>
-          <div class="form-grid">
-            <label>
-              <span>{{ t("leadership") }}</span>
-              <select name="leadership_style">
-                <option value="strategic">{{ t("opt_strategic") }}</option>
-                <option value="hands_on">{{ t("opt_hands_on") }}</option>
-                <option value="delegator">{{ t("opt_delegator") }}</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t("decision_style") }}</span>
-              <select name="decision_style">
-                <option value="balanced">{{ t("opt_balanced") }}</option>
-                <option value="careful">{{ t("opt_careful") }}</option>
-                <option value="fast">{{ t("opt_fast") }}</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t("organization_style") }}</span>
-              <select name="organization_style">
-                <option value="lean">{{ t("opt_lean") }}</option>
-                <option value="structured">{{ t("opt_structured") }}</option>
-                <option value="flexible">{{ t("opt_flexible") }}</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t("autonomy") }}</span>
-              <select name="autonomy_mode">
-                <option value="hybrid">{{ t("opt_hybrid") }}</option>
-                <option value="strict">{{ t("opt_strict") }}</option>
-                <option value="autonomous">{{ t("opt_autonomous") }}</option>
-              </select>
-            </label>
-            <label class="full">
-              <span>{{ t("risk_priority") }}</span>
-              <select name="risk_priority">
-                <option value="avoid_wrong_decisions">{{ label("avoid_wrong_decisions") }}</option>
-                <option value="avoid_being_slow">{{ label("avoid_being_slow") }}</option>
-                <option value="avoid_losing_information">{{ label("avoid_losing_information") }}</option>
-                <option value="avoid_acting_without_approval">{{ label("avoid_acting_without_approval") }}</option>
-              </select>
-            </label>
+          <div class="questionnaire">
+            <div class="question-block">
+              <h3>{{ t("work_style_questions") }}</h3>
+              <p class="muted">{{ t("work_style_questions_help") }}</p>
+            </div>
+            <fieldset class="question-block">
+              <legend>{{ t("q_interrupt") }}</legend>
+              <div class="option-grid three">
+                <label class="option-card"><input type="radio" name="q_interrupt" value="hands_on" data-target="leadership_style" data-value="hands_on" /><span>{{ t("q_interrupt_hands_on") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_interrupt" value="strategic" data-target="leadership_style" data-value="strategic" checked /><span>{{ t("q_interrupt_strategic") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_interrupt" value="delegator" data-target="leadership_style" data-value="delegator" /><span>{{ t("q_interrupt_delegator") }}</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="question-block">
+              <legend>{{ t("q_direction") }}</legend>
+              <div class="option-grid three">
+                <label class="option-card"><input type="radio" name="q_direction" value="careful" data-target="decision_style" data-value="careful" /><span>{{ t("q_direction_careful") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_direction" value="balanced" data-target="decision_style" data-value="balanced" checked /><span>{{ t("q_direction_balanced") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_direction" value="fast" data-target="decision_style" data-value="fast" /><span>{{ t("q_direction_fast") }}</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="question-block">
+              <legend>{{ t("q_autonomy") }}</legend>
+              <div class="option-grid three">
+                <label class="option-card"><input type="radio" name="q_autonomy" value="strict" data-target="autonomy_mode" data-value="strict" /><span>{{ t("q_autonomy_strict") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_autonomy" value="hybrid" data-target="autonomy_mode" data-value="hybrid" checked /><span>{{ t("q_autonomy_hybrid") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_autonomy" value="autonomous" data-target="autonomy_mode" data-value="autonomous" /><span>{{ t("q_autonomy_autonomous") }}</span></label>
+              </div>
+            </fieldset>
           </div>
         </section>
 
@@ -113,7 +100,24 @@
             <p>{{ t("step3_prompt") }}</p>
             <p class="muted">{{ t("workspace_step_help") }}</p>
           </div>
-          <div class="form-grid">
+          <div class="questionnaire">
+            <fieldset class="question-block">
+              <legend>{{ t("q_team") }}</legend>
+              <div class="option-grid three">
+                <label class="option-card"><input type="radio" name="q_team" value="lean" data-target="organization_style" data-value="lean" checked /><span>{{ t("q_team_lean") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_team" value="structured" data-target="organization_style" data-value="structured" /><span>{{ t("q_team_structured") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_team" value="flexible" data-target="organization_style" data-value="flexible" /><span>{{ t("q_team_flexible") }}</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="question-block">
+              <legend>{{ t("q_risk") }}</legend>
+              <div class="option-grid two">
+                <label class="option-card"><input type="radio" name="q_risk" value="avoid_wrong_decisions" data-target="risk_priority" data-value="avoid_wrong_decisions" checked /><span>{{ t("q_risk_wrong") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_risk" value="avoid_being_slow" data-target="risk_priority" data-value="avoid_being_slow" /><span>{{ t("q_risk_slow") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_risk" value="avoid_losing_information" data-target="risk_priority" data-value="avoid_losing_information" /><span>{{ t("q_risk_memory") }}</span></label>
+                <label class="option-card"><input type="radio" name="q_risk" value="avoid_acting_without_approval" data-target="risk_priority" data-value="avoid_acting_without_approval" /><span>{{ t("q_risk_approval") }}</span></label>
+              </div>
+            </fieldset>
             <label class="full">
               <span>{{ t("workspace_root") }}</span>
               <input type="text" name="workspace_root" value="{{ onboarding_defaults.workspace_root }}" required />
@@ -144,6 +148,7 @@
               <select name="runtime_provider">
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
+                <option value="openai_compatible">{{ t("opt_openai_compatible") }}</option>
               </select>
             </label>
             <label>
@@ -155,6 +160,15 @@
               <input type="password" name="api_key" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
               <span class="muted">{{ t("skip_api_key") }}</span>
             </label>
+            <details class="full advanced-settings">
+              <summary>{{ t("advanced_provider") }}</summary>
+              <label>
+                <span>{{ t("base_url") }}</span>
+                <input type="url" name="runtime_base_url" value="{{ onboarding_defaults.runtime_base_url }}" placeholder="https://api.openai.com/v1" />
+                <span class="muted">{{ t("base_url_help") }}</span>
+              </label>
+              <p class="muted">{{ t("openai_compatible_notice") }}</p>
+            </details>
             <label>
               <span>{{ t("executor") }}</span>
               <select name="runtime_executor">
@@ -189,6 +203,11 @@
             <strong>Praetor</strong>
             <p>{{ t("step6_prompt") }}</p>
           </div>
+          <div class="message founder-message">
+            <strong>{{ t("plain_summary") }}</strong>
+            <p data-summary-text>{{ t("plain_summary_default") }}</p>
+          </div>
+          <h3>{{ t("technical_summary") }}</h3>
           <div class="wizard-summary">
             <div><span>{{ t("summary_language") }}</span><strong data-summary="language">{{ ui_language }}</strong></div>
             <div><span>{{ t("summary_leadership") }}</span><strong data-summary="leadership_style">strategic</strong></div>
@@ -247,13 +266,33 @@
         ];
         let index = 0;
 
+        function syncDerivedFields() {
+          wizard.querySelectorAll("input[type='radio'][data-target]").forEach((input) => {
+            input.closest(".option-card")?.classList.toggle("selected", input.checked);
+            if (!input.checked) return;
+            const target = wizard.elements.namedItem(input.dataset.target);
+            if (target) target.value = input.dataset.value || input.value;
+          });
+        }
+
+        function updatePlainSummary() {
+          const target = wizard.querySelector("[data-summary-text]");
+          if (!target) return;
+          const selected = Array.from(wizard.querySelectorAll("input[type='radio'][data-target]:checked"))
+            .map((input) => input.closest(".option-card")?.innerText.trim())
+            .filter(Boolean);
+          target.textContent = selected.length ? selected.join(" ") : target.textContent;
+        }
+
         function updateSummary() {
+          syncDerivedFields();
           for (const key of summaryKeys) {
             const target = wizard.querySelector(`[data-summary="${key}"]`);
             const source = wizard.elements.namedItem(key);
             if (!target || !source) continue;
             target.textContent = source.value || "-";
           }
+          updatePlainSummary();
         }
 
         function render() {

@@ -55,6 +55,8 @@ def generate_governance(answers: OnboardingAnswers) -> GovernancePolicy:
         "access_outside_workspace",
         "silent_destructive_actions",
         "external_send_without_explicit_rule",
+        "store_raw_credentials_or_tokens",
+        "persist_sensitive_personal_data_without_explicit_need",
     ]
     return GovernancePolicy(
         autonomy_mode=answers.autonomy_mode,

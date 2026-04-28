@@ -16,6 +16,8 @@ PAGES = [
     ("SECURITY.md", "Security"),
     ("CONTRIBUTING.md", "Contributing"),
     ("docs/INDEX.zh-TW.md", "Docs Index"),
+    ("docs/DEVELOPER_SETUP.md", "Developer Setup"),
+    ("docs/ADVANCED_DEPLOYMENT.md", "Advanced Deployment"),
     ("docs/PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md", "Open Source Success"),
     ("docs/PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md", "Public Security Review"),
     ("docs/PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md", "Privacy Boundaries"),

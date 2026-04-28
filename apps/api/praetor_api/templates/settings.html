@@ -29,11 +29,17 @@
           <select name="runtime_provider">
             <option value="openai" {{ 'selected' if settings.runtime.provider == 'openai' else '' }}>OpenAI</option>
             <option value="anthropic" {{ 'selected' if settings.runtime.provider == 'anthropic' else '' }}>Anthropic</option>
+            <option value="openai_compatible" {{ 'selected' if settings.runtime.provider == 'openai_compatible' else '' }}>{{ t("opt_openai_compatible") }}</option>
           </select>
         </label>
         <label>
           {{ t("model") }}
           <input type="text" name="runtime_model" value="{{ settings.runtime.model or 'gpt-4.1-mini' }}" />
+        </label>
+        <label>
+          {{ t("base_url") }}
+          <input type="url" name="runtime_base_url" value="{{ settings.runtime.base_url or '' }}" placeholder="https://api.openai.com/v1" />
+          <span class="muted">{{ t("base_url_help") }}</span>
         </label>
         <label>
           {{ t("executor") }}

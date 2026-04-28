@@ -21,6 +21,7 @@ class CEOPlannerContext:
     related_mission_id: str | None
     mission_count: int
     pending_approvals: int
+    safety_policy: str = ""
 
 
 class CEOPlanner(Protocol):
@@ -317,6 +318,7 @@ class LLMCEOPlanner:
                 "You are the Praetor CEO planner.",
                 "Return valid JSON only. Do not include markdown.",
                 "Your job is to convert the chairman instruction into explicit planner actions.",
+                "Apply the safety policy before proposing actions. If protected data or authority boundaries are involved, create an approval_request or decision_escalation instead of silent execution.",
                 "",
                 "Allowed action types:",
                 "- mission_draft: create a planned mission for execution.",
@@ -358,6 +360,8 @@ class LLMCEOPlanner:
                 f"Existing mission count: {context.mission_count}",
                 f"Pending approvals: {context.pending_approvals}",
                 f"Related mission id: {context.related_mission_id or 'none'}",
+                "",
+                context.safety_policy or "No additional safety policy supplied.",
                 "",
                 "Chairman instruction:",
                 context.instruction,

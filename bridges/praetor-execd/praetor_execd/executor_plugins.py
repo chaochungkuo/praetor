@@ -47,6 +47,10 @@ def build_task_prompt(request: CreateRunRequest, host_workdir: str) -> str:
         "Constraints:",
         f"- Shell commands allowed: {'yes' if approval.allow_shell else 'no'}",
         f"- Destructive writes allowed: {'yes' if approval.allow_destructive_write else 'no'}",
+        "- Do not read or write outside the mapped workspace or working directory.",
+        "- Do not expose credentials, tokens, private keys, personal data, private file contents, or raw transcripts.",
+        "- Do not send, upload, publish, email, or otherwise share data externally unless the task explicitly says it is approved.",
+        "- If safety, privacy, legal, credential, or destructive-file risk appears, stop and report the escalation need.",
         "- Do not ask interactive approval questions; finish non-interactively.",
         "- Prefer direct file changes and concise final reporting.",
     ]

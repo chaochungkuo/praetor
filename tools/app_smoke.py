@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -12,21 +13,31 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 STATE_DIR = pathlib.Path("/tmp/praetor-app-smoke-state")
 TEST_ROOT = pathlib.Path("/tmp/praetor-app-smoke-runtime")
-PORT = 9741
+
+def find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+PORT = find_free_port()
 BASE_URL = f"http://127.0.0.1:{PORT}"
-BRIDGE_PORT = 9418
+BRIDGE_PORT = find_free_port()
 BRIDGE_URL = f"http://127.0.0.1:{BRIDGE_PORT}"
 BRIDGE_TOKEN = "app-smoke-token-for-local-security-tests"
+SETUP_TOKEN = "setup-token-for-app-smoke"
 COOKIE_JAR = http.cookiejar.CookieJar()
 OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(COOKIE_JAR))
 CSRF_TOKEN = None
 
 
-def request(method: str, path: str, payload: dict | None = None) -> dict:
+def request(method: str, path: str, payload: dict | None = None, *, setup: bool = False) -> dict:
     global CSRF_TOKEN
     headers = {"Content-Type": "application/json"}
     if CSRF_TOKEN and method.upper() not in {"GET", "HEAD", "OPTIONS"}:
         headers["X-CSRF-Token"] = CSRF_TOKEN
+    if setup:
+        headers["X-Praetor-Setup-Token"] = SETUP_TOKEN
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
     with OPENER.open(req, timeout=30) as resp:
@@ -118,6 +129,7 @@ def main() -> int:
     app_env = env.copy()
     app_env["PRAETOR_BRIDGE_BASE_URL"] = BRIDGE_URL
     app_env["PRAETOR_BRIDGE_TOKEN"] = BRIDGE_TOKEN
+    app_env["PRAETOR_SETUP_TOKEN"] = SETUP_TOKEN
 
     bridge_proc = subprocess.Popen(
         [
@@ -181,6 +193,7 @@ def main() -> int:
                     "shell_commands",
                 ],
             },
+            setup=True,
         )
         complete = request(
             "POST",
@@ -203,6 +216,7 @@ def main() -> int:
                     "shell_commands",
                 ],
             },
+            setup=True,
         )
         CSRF_TOKEN = request("GET", "/auth/session")["data"]["csrf_token"]
         mission = request(
