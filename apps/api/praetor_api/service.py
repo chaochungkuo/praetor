@@ -43,6 +43,7 @@ from .models import (
     utc_now,
 )
 from .planner import CEOPlanner, CEOPlannerContext, default_ceo_planner
+from .providers import test_provider_connection
 from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
@@ -1308,6 +1309,19 @@ class PraetorService:
     def runtime_health(self) -> dict:
         runtime = MissionRuntime()
         return runtime.probe(self._require_settings().runtime)
+
+    def test_runtime_connection(self, runtime: RuntimeSelection | None = None, api_key: str | None = None) -> dict:
+        selected = runtime or self._require_settings().runtime
+        if selected.mode != "api":
+            return MissionRuntime().probe(selected)
+        provider = selected.provider or "openai"
+        model = selected.model or ("claude-3-5-sonnet-latest" if provider == "anthropic" else "gpt-4.1-mini")
+        return test_provider_connection(
+            provider=provider,
+            model=model,
+            base_url=selected.base_url,
+            api_key=api_key.strip() if api_key else None,
+        )
 
     def export_schemas(self, output_dir: Path) -> list[Path]:
         from .schemas import export_json_schemas

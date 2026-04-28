@@ -330,18 +330,19 @@
       <p>{{ t("praetor_briefing_desc") }}</p>
     </section>
     <section class="grid two">
-      <section class="panel">
+      <section class="panel ceo-chat-panel" id="ceo-chat">
         <h3>{{ t("ceo_chat") }}</h3>
         <p class="muted">{{ t("ceo_chat_desc") }}</p>
-        <form class="form-grid" method="post" action="/app/ceo/conversation">
+        <form class="form-grid ceo-chat-form" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <label class="full">
             <span>{{ t("message_to_ceo") }}</span>
-            <textarea name="body" rows="5" placeholder="{{ t('message_to_ceo_placeholder') }}" required></textarea>
+            <textarea name="body" rows="6" placeholder="{{ t('message_to_ceo_placeholder') }}" required autofocus></textarea>
+            <span class="muted">{{ t("ceo_chat_hint") }}</span>
           </label>
           <div class="full actions">
             <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
-            <button type="submit">{{ t("send_to_ceo") }}</button>
+            <button type="submit" data-default-label="{{ t('send_to_ceo') }}">{{ t("send_to_ceo") }}</button>
           </div>
         </form>
       </section>
@@ -402,5 +403,20 @@
         <p class="muted">{{ t("no_missions_create_from_ceo") }}</p>
       {% endif %}
     </section>
+    <script>
+      (() => {
+        const form = document.querySelector(".ceo-chat-form");
+        if (!form) return;
+        form.addEventListener("submit", () => {
+          const button = form.querySelector("button[type='submit']");
+          if (!button) return;
+          button.disabled = true;
+          button.textContent = form.dataset.sendingLabel || button.dataset.defaultLabel || button.textContent;
+        });
+        if (new URLSearchParams(window.location.search).get("focus") === "ceo-chat") {
+          document.getElementById("ceo-chat")?.scrollIntoView({ block: "start" });
+        }
+      })();
+    </script>
   {% endif %}
 {% endblock %}

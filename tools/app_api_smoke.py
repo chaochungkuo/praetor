@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 import http.cookiejar
+import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -28,6 +30,21 @@ def request(method: str, path: str, payload: dict | None = None) -> dict:
     req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
     with OPENER.open(req, timeout=30) as resp:
         return json.load(resp)
+
+
+def post_form(path: str, payload: dict) -> tuple[int, str]:
+    data = urllib.parse.urlencode(payload).encode()
+    req = urllib.request.Request(
+        BASE_URL + path,
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with OPENER.open(req, timeout=30) as resp:
+            return resp.status, resp.geturl()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.geturl()
 
 
 def wait_for(url: str) -> None:
@@ -99,6 +116,19 @@ def main() -> int:
             },
         )
         CSRF_TOKEN = request("GET", "/auth/session")["data"]["csrf_token"]
+        test_status, test_url = post_form(
+            "/app/settings/runtime/test",
+            {
+                "csrf_token": CSRF_TOKEN,
+                "next_path": "/app/models",
+                "runtime_mode": "api",
+                "runtime_provider": "openai",
+                "runtime_model": "fake-gpt",
+                "runtime_base_url": FAKE_OPENAI_URL,
+                "runtime_executor": "codex",
+                "api_key": "fake-key",
+            },
+        )
         mission = request(
             "POST",
             "/missions",
@@ -119,6 +149,7 @@ def main() -> int:
             json.dumps(
                 {
                     "onboarding_ok": onboarding["ok"],
+                    "connection_test_redirected": test_status == 200 and "flash=Connection" in test_url,
                     "mission_status": mission_detail["data"]["status"],
                     "task_status": run_result["data"]["task"]["status"],
                     "run_executor": run_result["data"]["bridge_run"]["executor"],

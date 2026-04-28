@@ -966,6 +966,20 @@ button.secondary,
   box-shadow: none;
 }
 
+.ceo-chat-panel {
+  border-color: rgba(168,121,40,0.24);
+}
+
+.ceo-chat-form textarea {
+  min-height: 11rem;
+}
+
+button:disabled,
+.ceo-chat-form button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .small-button:hover,
 .text-button:hover,
 button.secondary:hover {
@@ -1006,6 +1020,10 @@ button.secondary:hover {
 }
 
 @media (max-width: 840px) {
+  .shell {
+    display: block;
+  }
+
   .sidebar {
     position: static;
     height: auto;
@@ -1023,6 +1041,44 @@ button.secondary:hover {
 
   .topbar {
     align-items: stretch;
+  }
+
+  .nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.45rem;
+    padding-bottom: 0.2rem;
+  }
+
+  .nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .actions,
+  .wizard-actions,
+  .hero-actions {
+    justify-content: stretch;
+  }
+
+  .actions > *,
+  .wizard-actions > *,
+  .hero-actions > *,
+  button,
+  .small-button {
+    width: 100%;
+  }
+
+  .status,
+  .pill,
+  .runtime-chip,
+  .user-chip {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .ceo-chat-form textarea {
+    min-height: 13rem;
   }
 }
 
