@@ -87,8 +87,13 @@ def parse_generation_payload(payload_text: str) -> dict[str, Any]:
     return json.loads(text)
 
 
-def _openai_chat_completion(model: str, prompt: str, base_url: str | None = None) -> tuple[str, UsageSummary]:
-    api_key = get_openai_api_key()
+def _openai_chat_completion(
+    model: str,
+    prompt: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> tuple[str, UsageSummary]:
+    api_key = api_key or get_openai_api_key()
     if not api_key:
         raise ApiProviderError("OPENAI_API_KEY is not configured.")
     url = f"{(base_url or get_openai_base_url()).rstrip('/')}/chat/completions"
@@ -118,8 +123,13 @@ def _openai_chat_completion(model: str, prompt: str, base_url: str | None = None
     )
 
 
-def _anthropic_messages(model: str, prompt: str, base_url: str | None = None) -> tuple[str, UsageSummary]:
-    api_key = get_anthropic_api_key()
+def _anthropic_messages(
+    model: str,
+    prompt: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> tuple[str, UsageSummary]:
+    api_key = api_key or get_anthropic_api_key()
     if not api_key:
         raise ApiProviderError("ANTHROPIC_API_KEY is not configured.")
     url = f"{(base_url or get_anthropic_base_url()).rstrip('/')}/messages"
@@ -157,6 +167,43 @@ def generate_json_response(*, provider: str, model: str, prompt: str, base_url: 
     if provider == "anthropic":
         return _anthropic_messages(model, prompt, base_url=base_url)
     raise ApiProviderError(f"Unsupported API provider: {provider}")
+
+
+def test_provider_connection(
+    *,
+    provider: str,
+    model: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    try:
+        if provider in {"openai", "openai_compatible"}:
+            content, usage = _openai_chat_completion(
+                model,
+                "Return only this JSON object: {\"ok\": true}",
+                base_url=base_url,
+                api_key=api_key,
+            )
+        elif provider == "anthropic":
+            content, usage = _anthropic_messages(
+                model,
+                "Return only this JSON object: {\"ok\": true}",
+                base_url=base_url,
+                api_key=api_key,
+            )
+        else:
+            raise ApiProviderError(f"Unsupported API provider: {provider}")
+        return {
+            "ok": True,
+            "provider": provider,
+            "model": model,
+            "base_url": base_url,
+            "duration_ms": usage.duration_ms or int((time.monotonic() - started) * 1000),
+            "response_preview": content[:160],
+        }
+    except Exception as exc:
+        raise ApiProviderError(str(exc)) from exc
 
 
 def run_api_mission(

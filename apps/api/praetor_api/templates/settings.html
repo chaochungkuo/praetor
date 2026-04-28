@@ -55,6 +55,7 @@
           <span>{{ t("provider_key") }} Anthropic: {{ t("configured") if provider_keys.anthropic else t("missing") }}</span>
         </div>
         <div class="full actions">
+          <button type="submit" class="secondary" formaction="/app/settings/runtime/test" data-loading-label="{{ t('testing_connection') }}">{{ t("test_api_connection") }}</button>
           <button type="submit">{{ t("save_runtime_settings") }}</button>
         </div>
       </form>

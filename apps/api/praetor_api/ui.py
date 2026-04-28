@@ -82,10 +82,12 @@ TRANSLATIONS = {
         "message_to_ceo": "Message to CEO",
         "message_to_ceo_placeholder": "Tell the CEO what you want to understand, decide, remember, or turn into a mission.",
         "send_to_ceo": "Send to CEO",
+        "sending_to_ceo": "Sending...",
         "open_chairman_office": "Open Chairman's Office",
         "recent_ceo_conversation": "Recent CEO conversation",
         "no_ceo_messages": "No CEO conversation yet.",
         "ceo_message_sent": "CEO replied.",
+        "ceo_chat_hint": "Praetor may create a mission draft, approval request, memory update, or staffing proposal from this message.",
         "suggested_first_tasks": "Suggested first tasks",
         "create_starter_mission": "Create starter mission",
         "starter_create_project_title": "Create first project",
@@ -112,6 +114,13 @@ TRANSLATIONS = {
         "configured": "configured",
         "missing": "missing",
         "save_runtime_settings": "Save runtime settings",
+        "test_api_connection": "Test connection",
+        "testing_connection": "Testing...",
+        "api_connection_ok": "Connection verified. Praetor can reach the selected model provider.",
+        "api_connection_failed": "Connection test failed. Check the provider, model, key, and base URL.",
+        "runtime_auth_error": "The model provider rejected the API key. Check the key in Models & API, then test the connection again.",
+        "runtime_network_error": "Praetor could not reach the model provider. Check the Base URL and your network connection.",
+        "runtime_not_found_error": "The model provider did not recognize this endpoint or model. Check the Base URL and model name.",
         "bridge_url": "Bridge URL",
         "mode": "Mode",
         "principles": "Principles",
@@ -378,7 +387,6 @@ TRANSLATIONS = {
         "status_file": "Status file",
         "pm_report": "PM report",
         "tasks_file": "Tasks file",
-        "runtime_auth_error": "The mission could not run because the model provider rejected the API key. Check the runtime settings or use a valid provider key.",
         "mission_run_completed": "Mission run completed.",
         "mission_paused": "Mission paused.",
         "mission_resumed": "Mission resumed.",
@@ -420,10 +428,12 @@ TRANSLATIONS = {
         "message_to_ceo": "給 CEO 的訊息",
         "message_to_ceo_placeholder": "告訴 CEO 你想了解、決定、記住，或轉成任務的事情。",
         "send_to_ceo": "送給 CEO",
+        "sending_to_ceo": "傳送中...",
         "open_chairman_office": "進入董事長辦公室",
         "recent_ceo_conversation": "最近 CEO 對話",
         "no_ceo_messages": "目前尚無 CEO 對話。",
         "ceo_message_sent": "CEO 已回覆。",
+        "ceo_chat_hint": "Praetor 可能會從這段訊息建立任務草稿、核准請求、記憶更新或 AI 編組建議。",
         "suggested_first_tasks": "建議的第一批任務",
         "create_starter_mission": "建立起始任務",
         "starter_create_project_title": "建立第一個專案",
@@ -450,6 +460,13 @@ TRANSLATIONS = {
         "configured": "已設定",
         "missing": "尚未設定",
         "save_runtime_settings": "儲存執行環境設定",
+        "test_api_connection": "測試連線",
+        "testing_connection": "測試中...",
+        "api_connection_ok": "連線已確認。Praetor 可以連到目前選擇的模型供應商。",
+        "api_connection_failed": "連線測試失敗。請檢查供應商、模型、key 與 Base URL。",
+        "runtime_auth_error": "模型供應商拒絕目前的 API key。請在「模型與 API」檢查 key，然後再測試連線。",
+        "runtime_network_error": "Praetor 無法連到模型供應商。請檢查 Base URL 與網路連線。",
+        "runtime_not_found_error": "模型供應商找不到這個 endpoint 或模型。請檢查 Base URL 與模型名稱。",
         "bridge_url": "Bridge 位址",
         "mode": "模式",
         "principles": "運作原則",
@@ -716,7 +733,6 @@ TRANSLATIONS = {
         "status_file": "狀態檔案",
         "pm_report": "PM 報告",
         "tasks_file": "工作檔案",
-        "runtime_auth_error": "任務無法執行，因為模型供應商拒絕目前的 API key。請檢查執行環境設定，或改用有效的 provider key。",
         "mission_run_completed": "任務執行完成。",
         "mission_paused": "任務已暫停。",
         "mission_resumed": "任務已繼續。",
@@ -1005,10 +1021,15 @@ def _safe_redirect_path(value: str | None, fallback: str) -> str:
 
 def _friendly_runtime_error(exc_or_message: Exception | str, t) -> str:
     message = str(exc_or_message)
-    if "401 Unauthorized" in message and "api.openai.com" in message:
+    lowered = message.lower()
+    if "401" in message or "unauthorized" in lowered or "invalid api key" in lowered:
         return t("runtime_auth_error")
-    if "api.openai.com" in message and "Unauthorized" in message:
-        return t("runtime_auth_error")
+    if "404" in message or "not found" in lowered:
+        return t("runtime_not_found_error")
+    if "connecterror" in lowered or "connection refused" in lowered or "name or service not known" in lowered:
+        return t("runtime_network_error")
+    if "timed out" in lowered or "timeout" in lowered:
+        return t("runtime_network_error")
     return message
 
 
@@ -1619,6 +1640,30 @@ async def update_runtime_submit(request: Request):
     return _redirect(next_path, t("runtime_settings_saved"), "success")
 
 
+@router.post("/app/settings/runtime/test")
+async def test_runtime_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    provider = str(form.get("runtime_provider", "")).strip().lower() or None
+    runtime = RuntimeSelection(
+        mode=str(form.get("runtime_mode", settings.runtime.mode)).strip() or settings.runtime.mode,
+        provider=provider,
+        model=str(form.get("runtime_model", "")).strip() or settings.runtime.model,
+        executor=str(form.get("runtime_executor", "")).strip() or settings.runtime.executor,
+        base_url=str(form.get("runtime_base_url", "")).strip() or None,
+    )
+    next_path = _safe_redirect_path(str(form.get("next_path", "/app/models")), "/app/models")
+    try:
+        request.app.state.ctx.service.test_runtime_connection(runtime, str(form.get("api_key", "")))
+    except Exception as exc:
+        return _redirect(next_path, f"{t('api_connection_failed')} {_friendly_runtime_error(exc, t)}", "error")
+    return _redirect(next_path, t("api_connection_ok"), "success")
+
+
 @router.post("/app/ceo/conversation")
 async def create_ceo_conversation_submit(request: Request):
     settings = _require_initialized(request)
@@ -1634,7 +1679,7 @@ async def create_ceo_conversation_submit(request: Request):
         request.app.state.ctx.service.create_ceo_message(ConversationCreateRequest(body=body))
     except Exception as exc:
         return _redirect("/app/praetor", _friendly_runtime_error(exc, t), "error")
-    return _redirect("/app/praetor", t("ceo_message_sent"), "success")
+    return _redirect("/app/praetor?focus=ceo-chat", t("ceo_message_sent"), "success")
 
 
 @router.get("/app/memory", response_class=HTMLResponse)
@@ -1790,7 +1835,7 @@ async def onboarding_submit(request: Request):
     request.session["authenticated"] = True
     request.session["owner_name"] = settings.owner.name
     request.session["owner_email"] = settings.owner.email
-    return _redirect("/office", "Praetor is initialized.", "success")
+    return _redirect("/app/praetor?focus=ceo-chat", "Praetor is initialized. Start by talking with the CEO.", "success")
 
 
 @router.post("/app/login")
