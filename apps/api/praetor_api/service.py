@@ -45,6 +45,7 @@ from .models import (
 from .planner import CEOPlanner, CEOPlannerContext, default_ceo_planner
 from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
+from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
 from .storage import AppStorage
 from .workspace import bootstrap_workspace
 
@@ -185,13 +186,22 @@ class PraetorService:
                 self.storage.save_agent_role(role)
 
     def _ensure_default_standing_orders(self) -> None:
-        if self.storage.list_standing_orders():
-            return
+        existing = {(order.scope, order.effect) for order in self.storage.list_standing_orders()}
         defaults = [
             StandingOrder(
                 scope="security",
                 instruction="Any action that can affect user files, credentials, privacy, or host safety must be escalated to the chairman with options.",
                 effect="requires_chairman_escalation",
+            ),
+            StandingOrder(
+                scope="privacy",
+                instruction="Never store raw credentials, tokens, private keys, payment data, or unnecessary personal file contents in memory, logs, reports, or agent messages.",
+                effect="data_minimization_required",
+            ),
+            StandingOrder(
+                scope="privacy",
+                instruction="Do not send, upload, publish, email, or share user data outside Praetor unless the chairman explicitly approved that exact action.",
+                effect="external_sharing_requires_approval",
             ),
             StandingOrder(
                 scope="engineering",
@@ -200,7 +210,8 @@ class PraetorService:
             ),
         ]
         for order in defaults:
-            self.storage.save_standing_order(order)
+            if (order.scope, order.effect) not in existing:
+                self.storage.save_standing_order(order)
 
     def has_owner_auth(self) -> bool:
         return self.storage.load_auth() is not None
@@ -367,14 +378,21 @@ class PraetorService:
         )
         return agent
 
-    @staticmethod
-    def _agent_charter(role: AgentRoleSpec, mission: MissionDefinition) -> str:
+    def _agent_charter(self, role: AgentRoleSpec, mission: MissionDefinition) -> str:
+        settings = self._require_settings()
         responsibilities = "; ".join(role.responsibilities[:4]) or "complete assigned work"
         constraints = "; ".join(role.constraints[:3]) or "stay within mission scope and escalation rules"
-        return (
+        base = (
             f"You are the {role.name} for mission {mission.id}. Mission: {mission.title}. "
             f"Responsibilities: {responsibilities}. Constraints: {constraints}."
         )
+        safety_policy = build_prompt_safety_policy(
+            settings=settings,
+            standing_orders=self.storage.list_standing_orders(),
+            mission=mission,
+            role_name=role.name,
+        ).text
+        return append_safety_policy(base, safety_policy)
 
     @staticmethod
     def _agent_message_role(role_name: str) -> str:
@@ -617,8 +635,15 @@ class PraetorService:
 
     def run_mission(self, mission_id: str) -> dict:
         settings = self._require_settings()
+        self._ensure_default_standing_orders()
         mission = self.get_mission(mission_id)
         runtime_engine = MissionRuntime()
+        safety_policy = build_prompt_safety_policy(
+            settings=settings,
+            standing_orders=self.storage.list_standing_orders(),
+            mission=mission,
+            role_name="Project Execution",
+        ).text
 
         mission.status = "active"
         mission.updated_at = utc_now()
@@ -630,6 +655,7 @@ class PraetorService:
             mission=mission,
             runtime=settings.runtime,
             permissions=settings.workspace.permissions,
+            safety_policy=safety_policy,
         )
         self.storage.save_task(workspace_root, primary_result.task)
         self.storage.save_bridge_run(workspace_root, mission.id, primary_result.run_record.model_dump(mode="json"))
@@ -665,6 +691,7 @@ class PraetorService:
                     mission=mission,
                     runtime=fallback_runtime,
                     permissions=settings.workspace.permissions,
+                    safety_policy=safety_policy,
                 )
                 self.storage.save_task(workspace_root, fallback_result.task)
                 self.storage.save_bridge_run(
@@ -777,16 +804,23 @@ class PraetorService:
 
     def create_ceo_message(self, request: ConversationCreateRequest) -> ConversationCreateResult:
         settings = self._require_settings()
+        self._ensure_default_standing_orders()
         text = request.body.strip()
         if not text:
             raise ValueError("Message body is required.")
         planner = self.planner or default_ceo_planner(settings.runtime)
+        safety_policy = build_prompt_safety_policy(
+            settings=settings,
+            standing_orders=self.storage.list_standing_orders(),
+            role_name="CEO",
+        ).text
         plan = planner.plan(
             CEOPlannerContext(
                 instruction=text,
                 related_mission_id=request.related_mission_id,
                 mission_count=len(self.storage.list_missions(Path(settings.workspace.root))),
                 pending_approvals=len([item for item in self.storage.list_approvals() if item.status == "pending"]),
+                safety_policy=safety_policy,
             )
         )
         created_mission: MissionDefinition | None = None
@@ -1014,6 +1048,27 @@ class PraetorService:
 
         if action.type == "memory_update":
             settings = self._require_settings()
+            memory_text = action.body or instruction
+            if contains_sensitive_material(memory_text):
+                escalation = EscalationRecord(
+                    mission_id=action.mission_id or related_mission_id,
+                    from_role="ceo",
+                    to_level="chairman",
+                    category="privacy",
+                    reason="Memory update blocked because it appears to contain credentials, tokens, private keys, or similarly sensitive material.",
+                )
+                self.storage.save_escalation(escalation)
+                self._audit(
+                    "memory_update_blocked_sensitive_material",
+                    {"escalation_id": escalation.id, "mission_id": escalation.mission_id},
+                )
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "result_id": escalation.id,
+                        "metadata": {**action.metadata, "skip_reason": "sensitive material cannot be stored in memory"},
+                    }
+                )
             path = self.storage.append_wiki_page(
                 Path(settings.workspace.root),
                 str(action.metadata.get("page") or "CEO Memory.md"),
@@ -1021,7 +1076,7 @@ class PraetorService:
                     [
                         f"## {utc_now().isoformat().replace('+00:00', 'Z')}",
                         "",
-                        action.body or instruction,
+                        memory_text,
                     ]
                 ),
             )
@@ -1076,6 +1131,7 @@ class PraetorService:
                     }
                 )
             to_role = str(action.metadata.get("to_role") or "Project Manager")
+            mission = self.get_mission(mission_id)
             to_agent = next(
                 (agent for agent in self.storage.list_agents(mission_id=mission_id) if agent.role_name == to_role),
                 None,
@@ -1086,7 +1142,15 @@ class PraetorService:
                 from_role=str(action.metadata.get("from_role") or "ceo"),
                 to_role=to_role,
                 title=action.title,
-                instructions=action.body or instruction,
+                instructions=append_safety_policy(
+                    action.body or instruction,
+                    build_prompt_safety_policy(
+                        settings=self._require_settings(),
+                        standing_orders=self.storage.list_standing_orders(),
+                        mission=mission,
+                        role_name=to_role,
+                    ).text,
+                ),
                 success_criteria=list(action.metadata.get("success_criteria") or []),
                 constraints=list(action.metadata.get("constraints") or []),
             )

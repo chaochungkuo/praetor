@@ -14,6 +14,7 @@ from .config import (
 )
 from .models import MissionDefinition, RunRecord, RuntimeSelection, TaskDefinition, WorkspacePermissions, generate_id
 from .providers import ApiProviderError, run_api_mission
+from .safety_policy import append_safety_policy
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -67,7 +68,7 @@ class MissionRuntime:
                 return payload
         if runtime.mode == "api":
             provider = runtime.provider or "openai"
-            key_present = bool(get_openai_api_key()) if provider == "openai" else bool(get_anthropic_api_key())
+            key_present = bool(get_openai_api_key()) if provider in {"openai", "openai_compatible"} else bool(get_anthropic_api_key())
             payload.update(
                 {
                     "configured": key_present,
@@ -97,12 +98,14 @@ class MissionRuntime:
         mission: MissionDefinition,
         runtime: RuntimeSelection,
         permissions: WorkspacePermissions,
+        safety_policy: str | None = None,
     ) -> MissionRuntimeResult:
         if runtime.mode == "subscription_executor":
             return self._run_subscription_executor(
                 workspace_root=workspace_root,
                 mission=mission,
                 executor=runtime.executor or "codex",
+                safety_policy=safety_policy,
             )
         if runtime.mode == "api":
             return self._run_api_mode(
@@ -110,6 +113,7 @@ class MissionRuntime:
                 mission=mission,
                 runtime=runtime,
                 permissions=permissions,
+                safety_policy=safety_policy,
             )
         raise RuntimeError(f"Unsupported runtime mode: {runtime.mode}")
 
@@ -119,6 +123,7 @@ class MissionRuntime:
         workspace_root: Path,
         mission: MissionDefinition,
         executor: str,
+        safety_policy: str | None = None,
     ) -> MissionRuntimeResult:
         if not (self.base_url and self.token):
             raise RuntimeError("Bridge runtime is not configured.")
@@ -148,7 +153,10 @@ class MissionRuntime:
             },
             "task_spec": {
                 "title": task.title,
-                "instructions": mission.summary or f"Complete mission: {mission.title}",
+                "instructions": append_safety_policy(
+                    mission.summary or f"Complete mission: {mission.title}",
+                    safety_policy,
+                ),
                 "input_files": [],
                 "expected_outputs": mission.requested_outputs,
                 "approval_policy": {
@@ -174,6 +182,7 @@ class MissionRuntime:
         mission: MissionDefinition,
         runtime: RuntimeSelection,
         permissions: WorkspacePermissions,
+        safety_policy: str | None = None,
     ) -> MissionRuntimeResult:
         provider = runtime.provider or "openai"
         model = runtime.model or ("gpt-4.1-mini" if provider == "openai" else "claude-3-5-sonnet-latest")
@@ -192,6 +201,8 @@ class MissionRuntime:
                 workspace_root=workspace_root,
                 provider=provider,
                 model=model,
+                base_url=runtime.base_url,
+                safety_policy=safety_policy,
             )
         except ApiProviderError as exc:
             failed = RunRecord(

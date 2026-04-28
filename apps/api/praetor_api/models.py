@@ -124,6 +124,7 @@ class RuntimeSelection(BaseModel):
     provider: str | None = None
     model: str | None = None
     executor: str | None = None
+    base_url: str | None = None
 
 
 class WorkspacePermissions(BaseModel):

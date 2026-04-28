@@ -44,6 +44,7 @@ def build_generation_prompt(
     *,
     mission: MissionDefinition,
     retrieval_contents: dict[str, str],
+    safety_policy: str | None = None,
 ) -> str:
     wiki_section = "\n\n".join(
         f"## Source: {path}\n{text}" for path, text in retrieval_contents.items()
@@ -69,6 +70,8 @@ def build_generation_prompt(
             "Requested outputs:",
             requested_outputs,
             "",
+            safety_policy or "No additional safety policy supplied.",
+            "",
             "Use the company memory below when relevant.",
             wiki_section or "No wiki context available.",
         ]
@@ -84,11 +87,11 @@ def parse_generation_payload(payload_text: str) -> dict[str, Any]:
     return json.loads(text)
 
 
-def _openai_chat_completion(model: str, prompt: str) -> tuple[str, UsageSummary]:
+def _openai_chat_completion(model: str, prompt: str, base_url: str | None = None) -> tuple[str, UsageSummary]:
     api_key = get_openai_api_key()
     if not api_key:
         raise ApiProviderError("OPENAI_API_KEY is not configured.")
-    url = f"{get_openai_base_url().rstrip('/')}/chat/completions"
+    url = f"{(base_url or get_openai_base_url()).rstrip('/')}/chat/completions"
     started = time.monotonic()
     with httpx.Client(timeout=60.0) as client:
         response = client.post(
@@ -115,11 +118,11 @@ def _openai_chat_completion(model: str, prompt: str) -> tuple[str, UsageSummary]
     )
 
 
-def _anthropic_messages(model: str, prompt: str) -> tuple[str, UsageSummary]:
+def _anthropic_messages(model: str, prompt: str, base_url: str | None = None) -> tuple[str, UsageSummary]:
     api_key = get_anthropic_api_key()
     if not api_key:
         raise ApiProviderError("ANTHROPIC_API_KEY is not configured.")
-    url = f"{get_anthropic_base_url().rstrip('/')}/messages"
+    url = f"{(base_url or get_anthropic_base_url()).rstrip('/')}/messages"
     started = time.monotonic()
     with httpx.Client(timeout=60.0) as client:
         response = client.post(
@@ -148,11 +151,11 @@ def _anthropic_messages(model: str, prompt: str) -> tuple[str, UsageSummary]:
     )
 
 
-def generate_json_response(*, provider: str, model: str, prompt: str) -> tuple[str, UsageSummary]:
-    if provider == "openai":
-        return _openai_chat_completion(model, prompt)
+def generate_json_response(*, provider: str, model: str, prompt: str, base_url: str | None = None) -> tuple[str, UsageSummary]:
+    if provider in {"openai", "openai_compatible"}:
+        return _openai_chat_completion(model, prompt, base_url=base_url)
     if provider == "anthropic":
-        return _anthropic_messages(model, prompt)
+        return _anthropic_messages(model, prompt, base_url=base_url)
     raise ApiProviderError(f"Unsupported API provider: {provider}")
 
 
@@ -162,10 +165,16 @@ def run_api_mission(
     workspace_root: Path,
     provider: str,
     model: str,
+    base_url: str | None = None,
+    safety_policy: str | None = None,
 ) -> tuple[dict[str, Any], ApiMissionResult]:
     preview, contents = collect_retrieval_preview(workspace_root)
-    prompt = build_generation_prompt(mission=mission, retrieval_contents=contents)
-    response_text, usage = generate_json_response(provider=provider, model=model, prompt=prompt)
+    prompt = build_generation_prompt(
+        mission=mission,
+        retrieval_contents=contents,
+        safety_policy=safety_policy,
+    )
+    response_text, usage = generate_json_response(provider=provider, model=model, prompt=prompt, base_url=base_url)
     payload = parse_generation_payload(response_text)
     run_record = RunRecord(
         run_id=generate_id("run"),

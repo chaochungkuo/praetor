@@ -9,8 +9,8 @@ Current official direction:
 
 Current repo assets:
 
-- [praetor-logo-dark.svg](/Users/jovesus/glasrocks/praetor/branding/praetor-logo-dark.svg)
-- [praetor-monogram-dark.svg](/Users/jovesus/glasrocks/praetor/branding/praetor-monogram-dark.svg)
+- [praetor-logo-dark.png](/Users/jovesus/glasrocks/praetor/branding/praetor-logo-dark.png)
+- [praetor-mark-dark.png](/Users/jovesus/glasrocks/praetor/branding/praetor-mark-dark.png)
 
 Once exported, these should be used consistently across:
 
