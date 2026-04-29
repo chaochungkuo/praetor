@@ -67,6 +67,19 @@ Remove the app, local state, and workspace:
 
 Praetor runs locally by default. It does not expose the app publicly unless you change the bind host or deploy it yourself.
 
+## Optional Telegram CEO Access
+
+Praetor can connect a Telegram bot as an owner-only mobile channel for CEO chat, briefings, and approval notifications. Configure it from **Settings -> Telegram CEO access** after first-run onboarding.
+
+Short version:
+
+1. Create a Telegram bot with `@BotFather`.
+2. Paste the bot token and a long webhook secret into Praetor Settings.
+3. Expose Praetor over HTTPS and set Telegram's webhook to `https://YOUR_DOMAIN/integrations/telegram/webhook`.
+4. Generate a pairing code in Praetor and send `/link CODE` to your bot from your Telegram account.
+
+See [docs/TELEGRAM_SETUP.md](docs/TELEGRAM_SETUP.md) for the exact commands and safety notes.
+
 ## For Developers
 
 Developer setup, Pixi commands, smoke tests, bridge development, and source workflows live in:

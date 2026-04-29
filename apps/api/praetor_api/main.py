@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import secrets
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -9,7 +10,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__
-from .config import get_require_login, get_secure_cookie, get_session_max_age_seconds, get_session_secret, get_state_dir
+from .config import (
+    get_require_login,
+    get_secure_cookie,
+    get_session_max_age_seconds,
+    get_session_secret,
+    get_state_dir,
+    get_telegram_webhook_secret,
+)
 from .models import (
     ApiEnvelope,
     ApprovalCreateRequest,
@@ -99,6 +107,8 @@ def _is_authenticated(request: Request) -> bool:
 def _is_public_path(path: str) -> bool:
     if path in {"/health", "/", "/app", "/app/welcome", "/app/login", "/auth/login", "/auth/logout", "/auth/session"}:
         return True
+    if path == "/integrations/telegram/webhook":
+        return True
     if path.startswith("/app/set-language/"):
         return True
     if path.startswith("/static/"):
@@ -151,7 +161,7 @@ class ApiCSRFMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if path.startswith("/app/") or path.startswith("/m/"):
             return await call_next(request)
-        if path in {"/auth/login", "/onboarding/complete"}:
+        if path in {"/auth/login", "/onboarding/complete", "/integrations/telegram/webhook"}:
             return await call_next(request)
         if path.startswith("/static/"):
             return await call_next(request)
@@ -418,6 +428,22 @@ def create_office_conversation(payload: ConversationCreateRequest):
     except ValueError as exc:
         fail(400, "invalid_request", str(exc))
     return ok(result)
+
+
+@app.post("/integrations/telegram/webhook")
+async def telegram_webhook(request: Request):
+    expected = get_telegram_webhook_secret()
+    supplied = request.headers.get("x-telegram-bot-api-secret-token")
+    if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+        fail(403, "telegram_webhook_forbidden", "Valid Telegram webhook secret required.")
+    try:
+        payload = await request.json()
+        results = get_ctx().service.handle_telegram_update(payload)
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except Exception as exc:
+        fail(400, "telegram_webhook_error", str(exc))
+    return ok({"delivered": len(results)})
 
 
 @app.get("/api/missions/{mission_id}/timeline")
