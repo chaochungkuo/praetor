@@ -444,6 +444,21 @@ class OfficeSnapshot(BaseModel):
     organization: OrganizationSnapshot = Field(default_factory=OrganizationSnapshot)
 
 
+class TelegramIntegrationSettings(BaseModel):
+    enabled: bool = False
+    bot_token_set: bool = False
+    webhook_secret_set: bool = False
+    allowed_user_id: int | None = None
+    linked_chat_id: int | None = None
+    linked_user_id: int | None = None
+    linked_username: str | None = None
+    notify_approvals: bool = True
+    allow_low_risk_approval: bool = True
+    pairing_code_hash: str | None = None
+    pairing_code_expires_at: datetime | None = None
+    linked_at: datetime | None = None
+
+
 class AppSettings(BaseModel):
     owner: OwnerProfile
     runtime: RuntimeSelection
@@ -451,6 +466,7 @@ class AppSettings(BaseModel):
     governance: GovernancePolicy
     company_dna: CompanyDNA
     roles: list[RoleDefinition] = Field(default_factory=list)
+    telegram: TelegramIntegrationSettings = Field(default_factory=TelegramIntegrationSettings)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

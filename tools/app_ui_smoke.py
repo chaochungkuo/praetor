@@ -147,6 +147,7 @@ def main() -> int:
                     "meetings_has_title": "Structured meetings" in meetings,
                     "mobile_has_briefing": "Mobile briefing" in mobile or "行動簡報" in mobile,
                     "settings_has_owner": "Owner" in settings,
+                    "settings_has_telegram": "Telegram CEO access" in settings,
                 },
                 ensure_ascii=True,
             )

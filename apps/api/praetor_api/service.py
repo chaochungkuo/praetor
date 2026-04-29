@@ -38,6 +38,7 @@ from .models import (
     RuntimeSelection,
     StandingOrder,
     TaskDefinition,
+    TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
     utc_now,
@@ -48,6 +49,7 @@ from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
 from .storage import AppStorage
+from .telegram import generate_pairing_code, new_pairing_settings, process_update, send_approval_notification
 from .workspace import bootstrap_workspace
 
 
@@ -248,6 +250,72 @@ class PraetorService:
             },
         )
         return settings
+
+    def update_telegram_settings(self, telegram: TelegramIntegrationSettings) -> AppSettings:
+        settings = self._require_settings()
+        current = settings.telegram
+        settings.telegram = current.model_copy(
+            update={
+                "enabled": telegram.enabled,
+                "bot_token_set": telegram.bot_token_set,
+                "webhook_secret_set": telegram.webhook_secret_set,
+                "allowed_user_id": telegram.allowed_user_id,
+                "notify_approvals": telegram.notify_approvals,
+                "allow_low_risk_approval": telegram.allow_low_risk_approval,
+            }
+        )
+        settings.updated_at = utc_now()
+        self.storage.save_settings(settings)
+        self._audit(
+            "telegram_settings_updated",
+            {
+                "enabled": settings.telegram.enabled,
+                "allowed_user_id": settings.telegram.allowed_user_id,
+                "notify_approvals": settings.telegram.notify_approvals,
+                "allow_low_risk_approval": settings.telegram.allow_low_risk_approval,
+            },
+        )
+        return settings
+
+    def create_telegram_pairing_code(self) -> str:
+        settings = self._require_settings()
+        code = generate_pairing_code()
+        settings.telegram = new_pairing_settings(settings.telegram, code)
+        settings.updated_at = utc_now()
+        self.storage.save_settings(settings)
+        self._audit("telegram_pairing_code_created", {"expires_at": settings.telegram.pairing_code_expires_at.isoformat()})
+        return code
+
+    def link_telegram_chat(self, *, chat_id: int, user_id: int, username: str | None = None) -> AppSettings:
+        settings = self._require_settings()
+        settings.telegram = settings.telegram.model_copy(
+            update={
+                "enabled": True,
+                "linked_chat_id": chat_id,
+                "linked_user_id": user_id,
+                "linked_username": username,
+                "pairing_code_hash": None,
+                "pairing_code_expires_at": None,
+                "linked_at": utc_now(),
+            }
+        )
+        settings.updated_at = utc_now()
+        self.storage.save_settings(settings)
+        self._audit("telegram_chat_linked", {"chat_id": chat_id, "user_id": user_id, "username": username})
+        return settings
+
+    def handle_telegram_update(self, update: dict[str, Any]) -> list[dict[str, Any]]:
+        replies = process_update(self, update)
+        results = []
+        from .telegram import TelegramClient
+
+        client = TelegramClient()
+        for reply in replies:
+            if reply.chat_id is None:
+                continue
+            results.append(client.send_message(reply.chat_id, reply.text, reply_markup=reply.reply_markup))
+        self._audit("telegram_update_processed", {"update_id": update.get("update_id"), "replies": len(results)})
+        return results
 
     def create_mission(self, request: MissionCreateRequest) -> MissionDefinition:
         settings = self._require_settings()
@@ -593,6 +661,7 @@ class PraetorService:
             reason=request.reason,
         )
         self.storage.save_approval(approval)
+        self._notify_telegram_approval(approval)
         self._audit("approval_created", {"approval_id": approval.id, "mission_id": request.mission_id})
         return approval
 
@@ -773,6 +842,7 @@ class PraetorService:
                 reason=final_result.run_record.pause_reason or f"Run stopped with status: {final_status}",
             )
             self.storage.save_approval(approval)
+            self._notify_telegram_approval(approval)
             self._audit(
                 "approval_requested",
                 {"approval_id": approval.id, "mission_id": mission.id, "category": approval.category},
@@ -782,6 +852,21 @@ class PraetorService:
             "task": final_result.task,
             "bridge_run": final_result.run_record,
         }
+
+    def _notify_telegram_approval(self, approval: ApprovalRequest) -> None:
+        settings = self._require_settings()
+        try:
+            result = send_approval_notification(settings.telegram, approval)
+            self._audit(
+                "telegram_approval_notification",
+                {
+                    "approval_id": approval.id,
+                    "sent": bool(result.get("ok")),
+                    "skipped": bool(result.get("skipped")),
+                },
+            )
+        except Exception as exc:
+            self._audit("telegram_approval_notification_failed", {"approval_id": approval.id, "error": str(exc)})
 
     def office_snapshot(self) -> OfficeSnapshot:
         settings = self._require_settings()

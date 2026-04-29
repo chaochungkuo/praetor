@@ -59,8 +59,80 @@
           <button type="submit">{{ t("save_runtime_settings") }}</button>
         </div>
       </form>
-    </section>
-  </section>
+	  </section>
+	  <section class="panel">
+	    <div class="hero-row">
+	      <div>
+	        <h3>{{ t("telegram_settings") }}</h3>
+	        <p class="muted">{{ t("telegram_settings_desc") }}</p>
+	      </div>
+	      <span class="pill {{ 'ok' if settings.telegram.enabled and settings.telegram.linked_chat_id else 'warn' }}">
+	        {{ t("telegram_linked") if settings.telegram.linked_chat_id else t("telegram_not_linked") }}
+	      </span>
+	    </div>
+	    <form class="form-grid" method="post" action="/app/settings/telegram">
+	      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+	      <label class="check full">
+	        <input type="checkbox" name="telegram_enabled" value="1" {{ 'checked' if settings.telegram.enabled else '' }} />
+	        {{ t("telegram_enabled") }}
+	      </label>
+	      <label>
+	        {{ t("telegram_bot_token") }}
+	        <input type="password" name="telegram_bot_token" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
+	        <span class="muted">{{ t("configured") if telegram_secrets.bot_token or settings.telegram.bot_token_set else t("missing") }} · {{ t("telegram_bot_token_help") }}</span>
+	      </label>
+	      <label>
+	        {{ t("telegram_webhook_secret") }}
+	        <input type="password" name="telegram_webhook_secret" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
+	        <span class="muted">{{ t("configured") if telegram_secrets.webhook_secret or settings.telegram.webhook_secret_set else t("missing") }} · {{ t("telegram_webhook_secret_help") }}</span>
+	      </label>
+	      <label>
+	        {{ t("telegram_allowed_user_id") }}
+	        <input type="number" name="telegram_allowed_user_id" value="{{ settings.telegram.allowed_user_id or '' }}" />
+	        <span class="muted">{{ t("telegram_allowed_user_id_help") }}</span>
+	      </label>
+	      <label>
+	        {{ t("telegram_webhook_url") }}
+	        <input type="url" value="{{ telegram_webhook_url }}" readonly />
+	      </label>
+	      <label class="check">
+	        <input type="checkbox" name="telegram_notify_approvals" value="1" {{ 'checked' if settings.telegram.notify_approvals else '' }} />
+	        {{ t("telegram_notify_approvals") }}
+	      </label>
+	      <label class="check">
+	        <input type="checkbox" name="telegram_allow_low_risk_approval" value="1" {{ 'checked' if settings.telegram.allow_low_risk_approval else '' }} />
+	        {{ t("telegram_allow_low_risk_approval") }}
+	      </label>
+	      <div class="full actions">
+	        <button type="submit">{{ t("telegram_save_settings") }}</button>
+	      </div>
+	    </form>
+	    <div class="grid two">
+	      <section class="message praetor-message">
+	        <strong>{{ t("telegram_setup_steps") }}</strong>
+	        <ul class="compact-list">
+	          <li>{{ t("telegram_setup_step_1") }}</li>
+	          <li>{{ t("telegram_setup_step_2") }}</li>
+	          <li>{{ t("telegram_setup_step_3") }}</li>
+	          <li>{{ t("telegram_setup_step_4") }}</li>
+	        </ul>
+	      </section>
+	      <section class="message">
+	        <strong>{{ t("telegram_pairing_code") }}</strong>
+	        {% if telegram_pairing_code %}
+	          <p class="status">{{ telegram_pairing_code }}</p>
+	          <p class="muted">{{ t("telegram_pairing_help").replace("CODE", telegram_pairing_code) }}</p>
+	        {% else %}
+	          <p class="muted">{{ t("telegram_pairing_help") }}</p>
+	        {% endif %}
+	        <form method="post" action="/app/settings/telegram/pairing-code" class="actions">
+	          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+	          <button type="submit" class="secondary">{{ t("telegram_create_pairing_code") }}</button>
+	        </form>
+	      </section>
+	    </div>
+	  </section>
+	</section>
   <section class="grid two">
     <section class="panel">
       <h3>{{ t("workspace") }}</h3>

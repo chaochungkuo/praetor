@@ -13,10 +13,14 @@ from fastapi.templating import Jinja2Templates
 from .config import (
     ANTHROPIC_STATE_SECRET,
     OPENAI_STATE_SECRET,
+    TELEGRAM_BOT_TOKEN_STATE_SECRET,
+    TELEGRAM_WEBHOOK_SECRET_STATE_SECRET,
     get_anthropic_api_key,
     get_bridge_base_url,
     get_openai_api_key,
-    get_state_dir,
+    get_telegram_bot_token,
+    get_telegram_webhook_secret,
+    write_state_secret,
 )
 from .models import (
     ApprovalCreateRequest,
@@ -75,6 +79,32 @@ TRANSLATIONS = {
         "approve": "Approve",
         "reject": "Reject",
         "runtime": "Runtime",
+        "telegram": "Telegram",
+        "telegram_settings": "Telegram CEO access",
+        "telegram_settings_desc": "Connect a Telegram bot as an owner-only mobile channel for CEO chat, briefings, and approval notifications.",
+        "telegram_enabled": "Enable Telegram integration",
+        "telegram_bot_token": "Bot token",
+        "telegram_bot_token_help": "Create a bot with @BotFather and paste the token here. Praetor stores it as a local private secret file.",
+        "telegram_webhook_secret": "Webhook secret",
+        "telegram_webhook_secret_help": "Use a long random value. Telegram sends it in X-Telegram-Bot-Api-Secret-Token so Praetor can reject forged webhooks.",
+        "telegram_allowed_user_id": "Allowed Telegram user ID",
+        "telegram_allowed_user_id_help": "Optional but recommended. Get it from @userinfobot, then only this account can link and control Praetor.",
+        "telegram_notify_approvals": "Send approval notifications",
+        "telegram_allow_low_risk_approval": "Allow low-risk approve/reject buttons",
+        "telegram_save_settings": "Save Telegram settings",
+        "telegram_create_pairing_code": "Create pairing code",
+        "telegram_pairing_code": "Pairing code",
+        "telegram_pairing_help": "Send /link CODE to your Telegram bot within 15 minutes. Example: /link ABCD1234",
+        "telegram_webhook_url": "Webhook URL",
+        "telegram_setup_steps": "Configuration steps",
+        "telegram_setup_step_1": "1. Create a bot in Telegram with @BotFather.",
+        "telegram_setup_step_2": "2. Paste the bot token and a webhook secret here, then save.",
+        "telegram_setup_step_3": "3. Expose Praetor over HTTPS and set the Telegram webhook to the URL below.",
+        "telegram_setup_step_4": "4. Create a pairing code and send /link CODE to the bot from your Telegram account.",
+        "telegram_linked": "Linked",
+        "telegram_not_linked": "Not linked",
+        "telegram_settings_saved": "Telegram settings saved.",
+        "telegram_pairing_created": "Telegram pairing code created.",
         "praetor_briefing_title": "Praetor briefing",
         "praetor_briefing_desc": "Talk to the CEO first. Praetor can turn the conversation into missions, approvals, memory, or staffing plans when needed.",
         "ceo_chat": "Chat with CEO",
@@ -421,6 +451,32 @@ TRANSLATIONS = {
         "approve": "批准",
         "reject": "拒絕",
         "runtime": "執行環境",
+        "telegram": "Telegram",
+        "telegram_settings": "Telegram CEO 入口",
+        "telegram_settings_desc": "把 Telegram bot 連成只有擁有者可用的手機通道，用來和 CEO 對話、看簡報、收 approval 通知。",
+        "telegram_enabled": "啟用 Telegram integration",
+        "telegram_bot_token": "Bot token",
+        "telegram_bot_token_help": "先用 @BotFather 建立 bot，再把 token 貼在這裡。Praetor 會用本機私密檔案保存。",
+        "telegram_webhook_secret": "Webhook secret",
+        "telegram_webhook_secret_help": "請使用夠長的隨機值。Telegram 會用 X-Telegram-Bot-Api-Secret-Token 傳給 Praetor，避免偽造 webhook。",
+        "telegram_allowed_user_id": "允許的 Telegram user ID",
+        "telegram_allowed_user_id_help": "選填但建議填。可用 @userinfobot 查詢；填了之後只有這個帳號能綁定與控制 Praetor。",
+        "telegram_notify_approvals": "傳送 approval 通知",
+        "telegram_allow_low_risk_approval": "允許低風險 approve/reject 按鈕",
+        "telegram_save_settings": "儲存 Telegram 設定",
+        "telegram_create_pairing_code": "產生配對碼",
+        "telegram_pairing_code": "配對碼",
+        "telegram_pairing_help": "15 分鐘內把 /link CODE 傳給你的 Telegram bot。例如：/link ABCD1234",
+        "telegram_webhook_url": "Webhook URL",
+        "telegram_setup_steps": "設定步驟",
+        "telegram_setup_step_1": "1. 在 Telegram 用 @BotFather 建立 bot。",
+        "telegram_setup_step_2": "2. 把 bot token 和 webhook secret 填到這裡並儲存。",
+        "telegram_setup_step_3": "3. 用 HTTPS 對外開放 Praetor，並把 Telegram webhook 設到下面的 URL。",
+        "telegram_setup_step_4": "4. 產生配對碼，從你的 Telegram 帳號傳 /link CODE 給 bot。",
+        "telegram_linked": "已綁定",
+        "telegram_not_linked": "尚未綁定",
+        "telegram_settings_saved": "Telegram 設定已儲存。",
+        "telegram_pairing_created": "Telegram 配對碼已產生。",
         "praetor_briefing_title": "Praetor 簡報",
         "praetor_briefing_desc": "先跟 CEO 對話。Praetor 會在需要時把對話轉成任務、批准請求、公司記憶或 AI 編組計畫。",
         "ceo_chat": "與 CEO 對話",
@@ -1045,12 +1101,7 @@ def _save_provider_api_key(provider: str, api_key: str) -> None:
     filename = secret_files.get(provider)
     if filename is None:
         raise ValueError("Unsupported provider.")
-    secrets_dir = get_state_dir() / "secrets"
-    secrets_dir.mkdir(parents=True, exist_ok=True)
-    secrets_dir.chmod(0o700)
-    path = secrets_dir / filename
-    path.write_text(f"{key}\n", encoding="utf-8")
-    path.chmod(0o600)
+    write_state_secret(filename, key)
 
 
 def _ui_language(request: Request, initialized_settings) -> str:
@@ -1610,6 +1661,12 @@ def settings_page(request: Request):
                 "openai": bool(get_openai_api_key()),
                 "anthropic": bool(get_anthropic_api_key()),
             },
+            "telegram_secrets": {
+                "bot_token": bool(get_telegram_bot_token()),
+                "webhook_secret": bool(get_telegram_webhook_secret()),
+            },
+            "telegram_pairing_code": request.query_params.get("telegram_pairing_code", ""),
+            "telegram_webhook_url": str(request.url_for("telegram_webhook")),
         },
     )
 
@@ -1662,6 +1719,52 @@ async def test_runtime_submit(request: Request):
     except Exception as exc:
         return _redirect(next_path, f"{t('api_connection_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect(next_path, t("api_connection_ok"), "success")
+
+
+@router.post("/app/settings/telegram")
+async def update_telegram_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    bot_token = str(form.get("telegram_bot_token", "")).strip()
+    webhook_secret = str(form.get("telegram_webhook_secret", "")).strip()
+    if bot_token:
+        write_state_secret(TELEGRAM_BOT_TOKEN_STATE_SECRET, bot_token)
+    if webhook_secret:
+        write_state_secret(TELEGRAM_WEBHOOK_SECRET_STATE_SECRET, webhook_secret)
+    allowed_raw = str(form.get("telegram_allowed_user_id", "")).strip()
+    try:
+        allowed_user_id = int(allowed_raw) if allowed_raw else None
+    except ValueError:
+        return _redirect("/app/settings", "Telegram user ID must be a number.", "error")
+    request.app.state.ctx.service.update_telegram_settings(
+        settings.telegram.model_copy(
+            update={
+                "enabled": bool(form.get("telegram_enabled")),
+                "bot_token_set": bool(bot_token or get_telegram_bot_token()),
+                "webhook_secret_set": bool(webhook_secret or get_telegram_webhook_secret()),
+                "allowed_user_id": allowed_user_id,
+                "notify_approvals": bool(form.get("telegram_notify_approvals")),
+                "allow_low_risk_approval": bool(form.get("telegram_allow_low_risk_approval")),
+            }
+        )
+    )
+    return _redirect("/app/settings", t("telegram_settings_saved"), "success")
+
+
+@router.post("/app/settings/telegram/pairing-code")
+async def create_telegram_pairing_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    code = request.app.state.ctx.service.create_telegram_pairing_code()
+    return _redirect(f"/app/settings?telegram_pairing_code={quote(code)}", t("telegram_pairing_created"), "success")
 
 
 @router.post("/app/ceo/conversation")
