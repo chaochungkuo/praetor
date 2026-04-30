@@ -203,6 +203,44 @@
     </section>
   </section>
 
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h3>{{ t("memory_promotion") }}</h3>
+        <p>{{ t("memory_promotion_desc") }}</p>
+      </div>
+      <form method="post" action="/app/missions/{{ mission.id }}/memory-promotion">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="secondary">{{ t("create_memory_promotion") }}</button>
+      </form>
+    </div>
+    {% if memory_promotion_reviews %}
+      <div class="list">
+        {% for review in memory_promotion_reviews %}
+          <div class="list-row">
+            <div>
+              <strong>{{ review.summary }}</strong>
+              <div class="muted">{{ t("status") }}: {{ label(review.status) }} · {{ t("promotion_findings") }}: {{ review.findings|length }}</div>
+              {% if review.findings %}
+                <details>
+                  <summary>{{ t("promotion_findings") }}</summary>
+                  <ul class="compact-list">
+                    {% for finding in review.findings %}
+                      <li>{{ label(finding.type) }}: {{ finding.summary }} <span class="muted">{{ finding.disposition }}</span></li>
+                    {% endfor %}
+                  </ul>
+                </details>
+              {% endif %}
+            </div>
+            <span class="status">{{ label(review.status) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_memory_promotion") }}</p>
+    {% endif %}
+  </section>
+
   <section class="grid two">
     <section class="panel">
       <h3>{{ t("task_logs") }}</h3>

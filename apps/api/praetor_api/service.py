@@ -27,6 +27,7 @@ from .models import (
     GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
+    MemoryPromotionReview,
     MatterDecisionRecord,
     MatterRecord,
     LoginRequest,
@@ -45,6 +46,7 @@ from .models import (
     OwnerAuthRecord,
     PlannerAction,
     PraetorBriefing,
+    PromotionFinding,
     ReviewPolicy,
     RunAttempt,
     RoleDefinition,
@@ -1060,6 +1062,124 @@ class PraetorService:
             open_questions=self.storage.list_open_questions(matter_id=matter_id, mission_id=mission_id),
             knowledge_updates=self.storage.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id),
         )
+
+    def mission_memory_promotion_reviews(self, mission_id: str, limit: int = 10) -> list[MemoryPromotionReview]:
+        self.get_mission(mission_id)
+        return self.storage.list_memory_promotion_reviews(mission_id=mission_id, limit=limit)
+
+    def create_memory_promotion_review(self, mission_id: str) -> MemoryPromotionReview:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        mission = self.get_mission(mission_id)
+        existing = self.storage.list_memory_promotion_reviews(mission_id=mission_id, limit=1)
+        if existing and existing[0].status in {"draft", "ready_for_review"}:
+            return existing[0]
+
+        reports = self.storage.read_mission_texts(workspace_root, mission_id)
+        decisions = self.storage.list_matter_decisions(mission_id=mission_id)
+        questions = self.storage.list_open_questions(mission_id=mission_id)
+        documents = self.storage.list_documents(mission_id=mission_id)
+        findings: list[PromotionFinding] = []
+
+        for decision in decisions:
+            findings.append(
+                PromotionFinding(
+                    type="decision",
+                    summary=decision.summary,
+                    disposition="promote_to_decision_record",
+                    target="matter_decisions",
+                    rationale=decision.rationale,
+                    source_ids=[decision.id],
+                )
+            )
+        for question in questions:
+            findings.append(
+                PromotionFinding(
+                    type="open_question",
+                    summary=question.question,
+                    disposition="track_until_answered" if question.status not in {"answered", "closed"} else "closed",
+                    target="open_questions",
+                    rationale=question.blocking,
+                    source_ids=[question.id],
+                )
+            )
+        for document in documents:
+            latest = document.versions[-1] if document.versions else None
+            findings.append(
+                PromotionFinding(
+                    type="document_change",
+                    summary=f"{document.title}: v{document.current_version:03d} is {document.status}.",
+                    disposition="preserve_in_document_registry",
+                    target=latest.path if latest else None,
+                    rationale=latest.reason if latest else None,
+                    source_ids=[document.id],
+                )
+            )
+
+        report_text = reports.get("REPORT.md", "").strip()
+        if report_text:
+            excerpt = report_text.splitlines()[-1][:300]
+            findings.append(
+                PromotionFinding(
+                    type="fact",
+                    summary=f"Final report excerpt: {excerpt}",
+                    disposition="review_for_wiki_promotion",
+                    target="CEO Memory.md",
+                    rationale="Generated from owner-visible mission report, not raw chat.",
+                )
+            )
+        findings.append(
+            PromotionFinding(
+                type="do_not_promote",
+                summary="Raw CEO chat, agent turns, and work-session messages remain evidence only.",
+                disposition="archive_as_audit_trail",
+                target="conversation_logs",
+                rationale="Discussion text may include abandoned ideas or unresolved context.",
+            )
+        )
+
+        proposed_updates = []
+        if mission.matter_id and mission.client_id:
+            update = KnowledgeUpdate(
+                matter_id=mission.matter_id,
+                client_id=mission.client_id,
+                mission_id=mission.id,
+                target_page="CEO Memory.md",
+                summary=f"Mission closeout: {mission.title}",
+                content="\n".join(
+                    [
+                        f"Mission: {mission.title}",
+                        f"Status: {mission.status}",
+                        "Promote only confirmed decisions, document registry facts, and resolved open questions.",
+                    ]
+                ),
+                status="proposed",
+            )
+            self.storage.save_knowledge_update(update)
+            proposed_updates.append(update.id)
+
+        review = MemoryPromotionReview(
+            mission_id=mission.id,
+            matter_id=mission.matter_id,
+            client_id=mission.client_id,
+            summary=(
+                "Raw discussion is preserved as evidence. This review extracts only decisions, "
+                "document facts, open questions, and proposed durable knowledge."
+            ),
+            findings=findings,
+            proposed_knowledge_update_ids=proposed_updates,
+        )
+        self.storage.save_memory_promotion_review(review)
+        self._audit(
+            "memory_promotion_review_created",
+            {
+                "review_id": review.id,
+                "mission_id": mission.id,
+                "findings": len(findings),
+                "proposed_updates": len(proposed_updates),
+            },
+        )
+        return review
 
     def list_meetings(self, mission_id: str | None = None) -> list[MeetingRecord]:
         settings = self._require_settings()

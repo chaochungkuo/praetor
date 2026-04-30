@@ -106,6 +106,8 @@ DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"
 DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
 OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
 KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
+PromotionFindingType = Literal["decision", "fact", "document_change", "open_question", "discarded_idea", "do_not_promote"]
+PromotionReviewStatus = Literal["draft", "ready_for_review", "applied", "rejected"]
 ReviewCadence = Literal["on_open", "daily", "weekly", "manual"]
 NotificationThreshold = Literal["never", "approval_required", "high_only", "digest"]
 InboxSeverity = Literal["low", "medium", "high"]
@@ -619,6 +621,29 @@ class KnowledgeSnapshot(BaseModel):
     decisions: list[MatterDecisionRecord] = Field(default_factory=list)
     open_questions: list[OpenQuestionRecord] = Field(default_factory=list)
     knowledge_updates: list[KnowledgeUpdate] = Field(default_factory=list)
+
+
+class PromotionFinding(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("finding"))
+    type: PromotionFindingType
+    summary: str
+    disposition: str = "review"
+    target: str | None = None
+    source_ids: list[str] = Field(default_factory=list)
+    rationale: str | None = None
+
+
+class MemoryPromotionReview(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("promotion"))
+    mission_id: str
+    matter_id: str | None = None
+    client_id: str | None = None
+    status: PromotionReviewStatus = "ready_for_review"
+    summary: str
+    findings: list[PromotionFinding] = Field(default_factory=list)
+    proposed_knowledge_update_ids: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class WorkflowContract(BaseModel):

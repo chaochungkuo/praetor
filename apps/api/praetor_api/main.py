@@ -461,6 +461,26 @@ def api_mission_knowledge_snapshot(mission_id: str):
         fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
+@app.get("/api/missions/{mission_id}/memory-promotion")
+def api_mission_memory_promotion(mission_id: str):
+    try:
+        return ok({"reviews": get_ctx().service.mission_memory_promotion_reviews(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.post("/api/missions/{mission_id}/memory-promotion")
+def api_create_mission_memory_promotion(mission_id: str):
+    try:
+        return ok(get_ctx().service.create_memory_promotion_review(mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
 @app.get("/api/missions/{mission_id}/workspace-scope")
 def api_mission_workspace_scope(mission_id: str):
     try:

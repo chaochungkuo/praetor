@@ -49,6 +49,14 @@ This workspace contract is versioned with the company workspace. It defines how 
 - A final owner-visible report exists.
 - Durable knowledge updates are proposed, approved, applied, or rejected.
 
+## Memory Promotion Contract
+
+- Chat, agent turns, work-session messages, and raw external text are evidence, not durable memory.
+- Durable memory must come from confirmed decisions, document registry facts, resolved open questions, or approved knowledge updates.
+- Mission closeout should create a memory promotion review before writing new wiki knowledge.
+- Abandoned ideas, unresolved speculation, and do-not-promote notes stay in audit logs or promotion review records, not in the wiki.
+- Proposed knowledge updates must identify their target page and source records.
+
 ## Safety Contract
 
 - Agent writes must stay inside the mission or matter workspace unless explicitly allowed.

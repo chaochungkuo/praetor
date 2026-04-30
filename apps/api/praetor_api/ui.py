@@ -424,6 +424,11 @@ TRANSLATIONS = {
         "matter_decisions": "Matter decisions",
         "open_questions": "Open questions",
         "knowledge_updates": "Knowledge updates",
+        "memory_promotion": "Memory promotion",
+        "memory_promotion_desc": "Raw discussion stays as evidence. Only reviewed conclusions become durable company knowledge.",
+        "create_memory_promotion": "Create promotion review",
+        "promotion_findings": "Findings",
+        "no_memory_promotion": "No memory promotion review yet.",
         "no_documents_registered": "No documents registered yet.",
         "no_matter_decisions": "No matter decisions yet.",
         "no_open_questions": "No open questions.",
@@ -830,6 +835,11 @@ TRANSLATIONS = {
         "matter_decisions": "事項決策",
         "open_questions": "未決問題",
         "knowledge_updates": "知識更新",
+        "memory_promotion": "記憶沉澱",
+        "memory_promotion_desc": "原始討論只作為證據保存；只有經過整理的結論會成為公司長期知識。",
+        "create_memory_promotion": "建立沉澱審查",
+        "promotion_findings": "整理結果",
+        "no_memory_promotion": "目前沒有記憶沉澱審查。",
         "no_documents_registered": "目前沒有文件登錄。",
         "no_matter_decisions": "目前沒有事項決策。",
         "no_open_questions": "目前沒有未決問題。",
@@ -1982,6 +1992,7 @@ def mission_detail_page(request: Request, mission_id: str):
     runs = service.list_mission_runs(mission_id)
     work_sessions = service.mission_work_sessions(mission_id)
     knowledge = service.mission_knowledge_snapshot(mission_id)
+    memory_promotion_reviews = service.mission_memory_promotion_reviews(mission_id)
     run_attempts = service.list_run_attempts(mission_id)
     workspace_scope = service.mission_workspace_scope(mission_id)
     workflow_contract = service.workflow_contract()
@@ -1996,6 +2007,7 @@ def mission_detail_page(request: Request, mission_id: str):
             "runs": runs,
             "work_sessions": work_sessions,
             "knowledge": knowledge,
+            "memory_promotion_reviews": memory_promotion_reviews,
             "run_attempts": run_attempts,
             "workspace_scope": workspace_scope,
             "workflow_contract": workflow_contract,
@@ -2155,6 +2167,17 @@ async def create_meeting_submit(request: Request, mission_id: str):
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect("/app/meetings", f"Meeting created: {meeting.id}", "success")
+
+
+@router.post("/app/missions/{mission_id}/memory-promotion")
+async def create_memory_promotion_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        review = request.app.state.ctx.service.create_memory_promotion_review(mission_id)
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", f"Memory promotion review created: {review.id}", "success")
 
 
 @router.post("/app/missions/{mission_id}/approval")

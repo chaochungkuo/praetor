@@ -453,6 +453,21 @@ Praetor 和 PM 不應該每次都讀完整 workspace。
 3. 再根據 task 類型選 relevant wiki/pages/files
 4. 顯示 retrieval preview 供使用者查看
 
+### 7.5 Memory Promotion
+
+原始對話不是公司記憶。CEO 對話、AI 對 AI 的工作訊息、tool output、外部文件回覆都可以作為 audit evidence 保存，但不能直接寫入 `Wiki/` 或 client knowledge。
+
+任務 closeout 時應建立 `MemoryPromotionReview`：
+
+- `decision`：已確認決策，保留到 decision record
+- `fact`：可重用且已確認的事實，候選寫入 wiki
+- `document_change`：文件版本與修改原因，保留到 document registry
+- `open_question`：尚未回答的問題，繼續追蹤
+- `discarded_idea`：討論過但放棄的想法，只保留在 review/audit
+- `do_not_promote`：明確不可寫入長期記憶的內容
+
+只有經過審查的 `KnowledgeUpdate` 才能進入 durable company memory。
+
 這樣做的好處：
 - 降低 token 消耗
 - 增加可解釋性

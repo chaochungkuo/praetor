@@ -22,6 +22,7 @@ from .models import (
     DocumentRecord,
     EscalationRecord,
     KnowledgeUpdate,
+    MemoryPromotionReview,
     MatterDecisionRecord,
     MatterRecord,
     MeetingRecord,
@@ -163,6 +164,7 @@ class FilesystemStore:
         self.matter_decisions_path = self.state_dir / "matter_decisions.json"
         self.open_questions_path = self.state_dir / "open_questions.json"
         self.knowledge_updates_path = self.state_dir / "knowledge_updates.json"
+        self.memory_promotion_reviews_path = self.state_dir / "memory_promotion_reviews.json"
         self.agent_roles_path = self.state_dir / "agent_roles.json"
         self.agents_path = self.state_dir / "agents.json"
         self.teams_path = self.state_dir / "mission_teams.json"
@@ -685,6 +687,23 @@ class FilesystemStore:
             updates = [item for item in updates if item.status == status]
         return updates
 
+    def save_memory_promotion_review(self, review: MemoryPromotionReview) -> None:
+        reviews = self.list_memory_promotion_reviews(limit=10_000)
+        reviews = [item for item in reviews if item.id != review.id] + [review]
+        reviews.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.memory_promotion_reviews_path, reviews)
+
+    def list_memory_promotion_reviews(
+        self,
+        mission_id: str | None = None,
+        limit: int = 50,
+    ) -> list[MemoryPromotionReview]:
+        reviews = self._read_model_list(self.memory_promotion_reviews_path, MemoryPromotionReview)
+        if mission_id is not None:
+            reviews = [item for item in reviews if item.mission_id == mission_id]
+        reviews.sort(key=lambda item: item.updated_at, reverse=True)
+        return reviews[:limit]
+
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         roles = self.list_agent_roles()
         roles = [item for item in roles if item.id != role.id and item.name != role.name] + [role]
@@ -928,6 +947,16 @@ class AppStorage:
         status: str | None = None,
     ) -> list[KnowledgeUpdate]:
         return self.fs.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id, status=status)
+
+    def save_memory_promotion_review(self, review: MemoryPromotionReview) -> None:
+        self.fs.save_memory_promotion_review(review)
+
+    def list_memory_promotion_reviews(
+        self,
+        mission_id: str | None = None,
+        limit: int = 50,
+    ) -> list[MemoryPromotionReview]:
+        return self.fs.list_memory_promotion_reviews(mission_id=mission_id, limit=limit)
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         self.fs.save_agent_role(role)
