@@ -231,6 +231,7 @@ def main() -> int:
             },
         )
         mission_id = mission["data"]["id"]
+        mission_knowledge = request("GET", f"/api/missions/{mission_id}/knowledge")
         run_result = request("POST", f"/missions/{mission_id}/run")
         work_sessions = request("GET", f"/api/missions/{mission_id}/work-sessions")
         meeting = request("POST", f"/missions/{mission_id}/meeting")
@@ -278,6 +279,18 @@ def main() -> int:
                 ],
             },
         )
+        contract_mission = request(
+            "POST",
+            "/missions",
+            {
+                "title": "Draft contract for Client Acme",
+                "summary": "Prepare a first contract draft and track lawyer feedback.",
+                "domains": ["legal"],
+                "priority": "high",
+                "requested_outputs": [],
+            },
+        )
+        contract_knowledge = request("GET", f"/api/missions/{contract_mission['data']['id']}/knowledge")
         briefing = request("GET", "/praetor/briefing")
         exported = request("POST", "/schemas/export")
         report_path = workspace_root / "Missions" / mission_id / "REPORT.md"
@@ -289,6 +302,9 @@ def main() -> int:
                     "onboarding_ok": complete["ok"],
                     "mission_id": mission_id,
                     "mission_status": mission_detail["data"]["status"],
+                    "knowledge_clients": len(mission_knowledge["data"]["clients"]),
+                    "knowledge_matters": len(mission_knowledge["data"]["matters"]),
+                    "knowledge_open_questions": len(mission_knowledge["data"]["open_questions"]),
                     "task_status": run_result["data"]["task"]["status"],
                     "bridge_status": run_result["data"]["bridge_run"]["normalized_status"],
                     "work_session_status": run_result["data"]["work_session"]["status"],
@@ -298,6 +314,8 @@ def main() -> int:
                     "stopped_status": stopped_result["data"]["status"],
                     "complex_pm_required": complex_mission["data"]["pm_required"],
                     "complex_manager_layer": complex_mission["data"]["manager_layer"],
+                    "contract_client": contract_knowledge["data"]["clients"][0]["name"],
+                    "contract_documents": len(contract_knowledge["data"]["documents"]),
                     "report_exists": report_path.exists(),
                     "pm_report_exists": pm_report_path.exists(),
                     "briefing": briefing["data"],

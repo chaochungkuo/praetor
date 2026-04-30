@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import Any
 
 from .auth import hash_password, validate_password_strength, verify_password
@@ -13,12 +14,19 @@ from .models import (
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    ClientRecord,
     CompletionContract,
     ConversationCreateRequest,
     ConversationMessage,
     ConversationCreateResult,
     DelegationRecord,
+    DocumentRecord,
+    DocumentVersion,
     EscalationRecord,
+    KnowledgeSnapshot,
+    KnowledgeUpdate,
+    MatterDecisionRecord,
+    MatterRecord,
     LoginRequest,
     MeetingRecord,
     MissionContinueRequest,
@@ -31,6 +39,7 @@ from .models import (
     MissionPauseRequest,
     MissionStopRequest,
     OnboardingAnswers,
+    OpenQuestionRecord,
     OwnerAuthRecord,
     PlannerAction,
     PraetorBriefing,
@@ -337,6 +346,8 @@ class PraetorService:
             status="planned",
         )
         self.storage.save_mission(Path(settings.workspace.root), mission)
+        self._ensure_mission_knowledge_workspace(mission)
+        self.storage.save_mission(Path(settings.workspace.root), mission)
         if mission.pm_required:
             self.storage.append_pm_report(
                 Path(settings.workspace.root),
@@ -379,6 +390,191 @@ class PraetorService:
                 )
             )
         return mission
+
+    def _ensure_mission_knowledge_workspace(self, mission: MissionDefinition) -> MatterRecord:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        existing = self.storage.list_matters(mission_id=mission.id)
+        if existing:
+            matter = existing[0]
+            mission.client_id = matter.client_id
+            mission.matter_id = matter.id
+            return matter
+
+        client_name = self._infer_client_name(mission)
+        client = self._ensure_client(workspace_root, client_name)
+        base_slug = self._slugify(mission.title)[:40] or "matter"
+        matter_slug = f"{base_slug}-{mission.id.removeprefix('mission_')[:8]}"
+        matter_folder = f"clients/{client.slug}/matters/{matter_slug}"
+        matter = MatterRecord(
+            client_id=client.id,
+            mission_id=mission.id,
+            title=mission.title,
+            slug=matter_slug,
+            folder=matter_folder,
+            brief_path=f"{matter_folder}/brief.md",
+            decisions_path=f"{matter_folder}/decisions.md",
+            open_questions_path=f"{matter_folder}/open-questions.md",
+        )
+        self.storage.save_matter(workspace_root, matter)
+        mission.client_id = client.id
+        mission.matter_id = matter.id
+        self._seed_matter_registry(workspace_root, mission, client, matter)
+        self._audit(
+            "knowledge_workspace_created",
+            {
+                "mission_id": mission.id,
+                "client_id": client.id,
+                "matter_id": matter.id,
+                "folder": matter.folder,
+            },
+        )
+        return matter
+
+    def _ensure_client(self, workspace_root: Path, name: str) -> ClientRecord:
+        slug = self._slugify(name) or "general"
+        for client in self.storage.list_clients():
+            if client.slug == slug:
+                return client
+        client = ClientRecord(
+            name=name,
+            slug=slug,
+            folder=f"clients/{slug}",
+            summary="Created automatically from a Praetor mission. Confirmed client facts should be promoted here.",
+        )
+        self.storage.save_client(workspace_root, client)
+        return client
+
+    def _seed_matter_registry(
+        self,
+        workspace_root: Path,
+        mission: MissionDefinition,
+        client: ClientRecord,
+        matter: MatterRecord,
+    ) -> None:
+        self.storage.save_matter_decision(
+            workspace_root,
+            MatterDecisionRecord(
+                matter_id=matter.id,
+                client_id=client.id,
+                mission_id=mission.id,
+                summary="Matter workspace opened; no final business decision has been confirmed yet.",
+                rationale="Praetor separates raw conversation from durable memory until decisions are confirmed.",
+            ),
+        )
+        self.storage.save_open_question(
+            workspace_root,
+            OpenQuestionRecord(
+                matter_id=matter.id,
+                client_id=client.id,
+                mission_id=mission.id,
+                question="What final output should be treated as the authoritative version for this matter?",
+                blocking="final archive and knowledge promotion",
+                status="waiting_owner",
+            ),
+        )
+        self.storage.save_knowledge_update(
+            KnowledgeUpdate(
+                matter_id=matter.id,
+                client_id=client.id,
+                mission_id=mission.id,
+                target_page=f"Clients/{client.slug}.md",
+                summary="Client matter opened",
+                content=(
+                    f"Praetor opened matter '{matter.title}' for {client.name}. "
+                    "This is a proposed memory update, not confirmed client knowledge."
+                ),
+                status="proposed",
+            )
+        )
+        for document in self._planned_documents_for_mission(mission, client, matter):
+            self.storage.save_document(document)
+
+    def _planned_documents_for_mission(
+        self,
+        mission: MissionDefinition,
+        client: ClientRecord,
+        matter: MatterRecord,
+    ) -> list[DocumentRecord]:
+        documents: list[DocumentRecord] = []
+        outputs = mission.requested_outputs or []
+        for index, output in enumerate(outputs, start=1):
+            title = Path(output).name or f"Requested output {index}"
+            documents.append(
+                DocumentRecord(
+                    matter_id=matter.id,
+                    client_id=client.id,
+                    mission_id=mission.id,
+                    title=title,
+                    document_type=self._document_type_for_path(title),
+                    status="draft",
+                    versions=[
+                        DocumentVersion(
+                            version=1,
+                            path=output,
+                            label="v001 planned output",
+                            reason="Requested when the mission was created.",
+                        )
+                    ],
+                )
+            )
+        text = " ".join([mission.title, mission.summary or "", " ".join(mission.domains)]).lower()
+        if not documents and any(term in text for term in ["contract", "agreement", "legal", "合約", "合同", "法律", "法務"]):
+            path = f"{matter.folder}/versions/v001-contract-draft.docx"
+            documents.append(
+                DocumentRecord(
+                    matter_id=matter.id,
+                    client_id=client.id,
+                    mission_id=mission.id,
+                    title="Contract draft",
+                    document_type="contract",
+                    status="draft",
+                    versions=[
+                        DocumentVersion(
+                            version=1,
+                            path=path,
+                            label="v001 planned contract draft",
+                            reason="Reserved for the first contract draft; content is not created until execution.",
+                        )
+                    ],
+                )
+            )
+        return documents
+
+    @staticmethod
+    def _document_type_for_path(path: str) -> str:
+        suffix = Path(path).suffix.lower()
+        if suffix == ".docx":
+            return "docx"
+        if suffix == ".pdf":
+            return "pdf"
+        if suffix in {".md", ".txt"}:
+            return "note"
+        return "working_document"
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        value = value.strip().lower()
+        value = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", value).strip("-")
+        return value or "general"
+
+    @staticmethod
+    def _infer_client_name(mission: MissionDefinition) -> str:
+        texts = [mission.title, mission.summary or ""]
+        patterns = [
+            (r"(?:client|customer)\s+([A-Za-z0-9][A-Za-z0-9 _.-]{1,48})", re.IGNORECASE),
+            (r"(?:for|with)\s+([A-Z][A-Za-z0-9 _.-]{1,48})", 0),
+            (r"客[戶户]\s*([A-Za-z0-9\u4e00-\u9fff _.-]{1,32})", 0),
+            (r"([A-Za-z0-9\u4e00-\u9fff _.-]{1,32})\s*客[戶户]", 0),
+        ]
+        for text in texts:
+            for pattern, flags in patterns:
+                match = re.search(pattern, text, flags=flags)
+                if match:
+                    name = match.group(1).strip(" .。,:，：")
+                    if name:
+                        return name
+        return "General"
 
     def _ensure_mission_team(self, mission: MissionDefinition, requested_roles: list[str] | None = None) -> MissionTeam:
         existing = self.storage.list_teams(mission_id=mission.id)
@@ -563,6 +759,34 @@ class PraetorService:
     def list_wiki_pages(self) -> list[dict[str, str]]:
         settings = self._require_settings()
         return self.storage.list_wiki_pages(Path(settings.workspace.root))
+
+    def knowledge_snapshot(self) -> KnowledgeSnapshot:
+        self._require_settings()
+        return KnowledgeSnapshot(
+            clients=self.storage.list_clients(),
+            matters=self.storage.list_matters(),
+            documents=self.storage.list_documents(),
+            decisions=self.storage.list_matter_decisions(),
+            open_questions=self.storage.list_open_questions(),
+            knowledge_updates=self.storage.list_knowledge_updates(),
+        )
+
+    def mission_knowledge_snapshot(self, mission_id: str) -> KnowledgeSnapshot:
+        mission = self.get_mission(mission_id)
+        matter_id = mission.matter_id
+        client_id = mission.client_id
+        matters = self.storage.list_matters(mission_id=mission_id)
+        if matter_id is None and matters:
+            matter_id = matters[0].id
+            client_id = matters[0].client_id
+        return KnowledgeSnapshot(
+            clients=[item for item in self.storage.list_clients() if client_id is None or item.id == client_id],
+            matters=matters,
+            documents=self.storage.list_documents(matter_id=matter_id, mission_id=mission_id),
+            decisions=self.storage.list_matter_decisions(matter_id=matter_id, mission_id=mission_id),
+            open_questions=self.storage.list_open_questions(matter_id=matter_id, mission_id=mission_id),
+            knowledge_updates=self.storage.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id),
+        )
 
     def list_meetings(self, mission_id: str | None = None) -> list[MeetingRecord]:
         settings = self._require_settings()

@@ -402,6 +402,21 @@ TRANSLATIONS = {
         "session_turns": "Turns",
         "current_blocker": "Current blocker",
         "completion_contract": "Completion contract",
+        "knowledge_workspace": "Knowledge workspace",
+        "client_record": "Client record",
+        "matter_record": "Matter record",
+        "document_registry": "Document registry",
+        "document_versions": "Versions",
+        "matter_decisions": "Matter decisions",
+        "open_questions": "Open questions",
+        "knowledge_updates": "Knowledge updates",
+        "no_documents_registered": "No documents registered yet.",
+        "no_matter_decisions": "No matter decisions yet.",
+        "no_open_questions": "No open questions.",
+        "no_knowledge_updates": "No proposed knowledge updates.",
+        "folder": "Folder",
+        "current_version": "Current version",
+        "reason": "Reason",
         "report": "Report",
         "run_budget": "Run budget",
         "max_steps": "Max steps",
@@ -779,6 +794,21 @@ TRANSLATIONS = {
         "session_turns": "回合",
         "current_blocker": "目前阻塞",
         "completion_contract": "完成條件",
+        "knowledge_workspace": "知識工作區",
+        "client_record": "客戶資料",
+        "matter_record": "事項資料",
+        "document_registry": "文件登錄",
+        "document_versions": "版本",
+        "matter_decisions": "事項決策",
+        "open_questions": "未決問題",
+        "knowledge_updates": "知識更新",
+        "no_documents_registered": "目前沒有文件登錄。",
+        "no_matter_decisions": "目前沒有事項決策。",
+        "no_open_questions": "目前沒有未決問題。",
+        "no_knowledge_updates": "目前沒有建議寫入知識庫的更新。",
+        "folder": "資料夾",
+        "current_version": "目前版本",
+        "reason": "原因",
         "report": "報告",
         "run_budget": "執行預算",
         "max_steps": "最多步數",
@@ -1808,6 +1838,7 @@ def memory_page(request: Request):
             **_base_context(request, "memory", "Memory"),
             "wiki_pages": service.list_wiki_pages(),
             "recent_runs": service.list_recent_runs(limit=10),
+            "knowledge": service.knowledge_snapshot(),
         },
     )
 
@@ -1897,6 +1928,7 @@ def mission_detail_page(request: Request, mission_id: str):
     texts = service.read_mission_texts(mission_id)
     runs = service.list_mission_runs(mission_id)
     work_sessions = service.mission_work_sessions(mission_id)
+    knowledge = service.mission_knowledge_snapshot(mission_id)
     return templates.TemplateResponse(
         request=request,
         name="mission_detail.html",
@@ -1907,6 +1939,7 @@ def mission_detail_page(request: Request, mission_id: str):
             "texts": texts,
             "runs": runs,
             "work_sessions": work_sessions,
+            "knowledge": knowledge,
         },
     )
 

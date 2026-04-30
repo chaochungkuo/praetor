@@ -101,6 +101,11 @@ WorkSessionTurnType = Literal[
     "manager_decision",
     "escalation",
 ]
+MatterStatus = Literal["open", "waiting_owner", "waiting_external", "review", "closed", "archived"]
+DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"]
+DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
+OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
+KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
 
 
 class ApiEnvelope(BaseModel):
@@ -319,6 +324,8 @@ class MissionDefinition(BaseModel):
     domains: list[str] = Field(default_factory=list)
     summary: str | None = None
     requested_outputs: list[str] = Field(default_factory=list)
+    client_id: str | None = None
+    matter_id: str | None = None
     run_budget: MissionRunBudget = Field(default_factory=MissionRunBudget)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -452,6 +459,105 @@ class WorkSession(BaseModel):
     turns: list[WorkSessionTurn] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ClientRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("client"))
+    name: str
+    slug: str
+    summary: str | None = None
+    folder: str
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MatterRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("matter"))
+    client_id: str
+    mission_id: str | None = None
+    title: str
+    slug: str
+    status: MatterStatus = "open"
+    folder: str
+    brief_path: str
+    decisions_path: str
+    open_questions_path: str
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentVersion(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("docver"))
+    version: int
+    path: str
+    label: str
+    reason: str
+    source_ids: list[str] = Field(default_factory=list)
+    created_by: str = "praetor"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("doc"))
+    matter_id: str
+    client_id: str
+    mission_id: str | None = None
+    title: str
+    document_type: str = "working_document"
+    status: DocumentStatus = "draft"
+    current_version: int = 1
+    versions: list[DocumentVersion] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MatterDecisionRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("matterdecision"))
+    matter_id: str
+    client_id: str
+    mission_id: str | None = None
+    summary: str
+    rationale: str | None = None
+    source_ids: list[str] = Field(default_factory=list)
+    status: DecisionStatus = "confirmed"
+    created_by: str = "praetor"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class OpenQuestionRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("question"))
+    matter_id: str
+    client_id: str
+    mission_id: str | None = None
+    question: str
+    owner: str = "chairman"
+    blocking: str | None = None
+    status: OpenQuestionStatus = "open"
+    asked_at: datetime = Field(default_factory=utc_now)
+    answered_at: datetime | None = None
+
+
+class KnowledgeUpdate(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("knowledge"))
+    matter_id: str | None = None
+    client_id: str | None = None
+    mission_id: str | None = None
+    target_page: str = "CEO Memory.md"
+    summary: str
+    content: str
+    source_ids: list[str] = Field(default_factory=list)
+    status: KnowledgeUpdateStatus = "proposed"
+    created_at: datetime = Field(default_factory=utc_now)
+    applied_at: datetime | None = None
+
+
+class KnowledgeSnapshot(BaseModel):
+    clients: list[ClientRecord] = Field(default_factory=list)
+    matters: list[MatterRecord] = Field(default_factory=list)
+    documents: list[DocumentRecord] = Field(default_factory=list)
+    decisions: list[MatterDecisionRecord] = Field(default_factory=list)
+    open_questions: list[OpenQuestionRecord] = Field(default_factory=list)
+    knowledge_updates: list[KnowledgeUpdate] = Field(default_factory=list)
 
 
 class MissionTimelineEvent(BaseModel):

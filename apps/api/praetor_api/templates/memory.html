@@ -7,6 +7,45 @@
   </section>
   <section class="grid two">
     <section class="panel">
+      <h3>{{ t("client_record") }}</h3>
+      {% if knowledge.clients %}
+        <div class="list">
+          {% for client in knowledge.clients %}
+            <div class="list-row">
+              <div>
+                <strong>{{ client.name }}</strong>
+                <div class="muted">{{ client.folder }}</div>
+              </div>
+              <span class="status">{{ knowledge.matters|selectattr("client_id", "equalto", client.id)|list|length }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("none") }}</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>{{ t("open_questions") }}</h3>
+      {% set open_items = knowledge.open_questions|rejectattr("status", "equalto", "closed")|list %}
+      {% if open_items %}
+        <div class="list">
+          {% for question in open_items %}
+            <div class="list-row">
+              <div>
+                <strong>{{ question.question }}</strong>
+                <div class="muted">{{ question.blocking or t("none") }}</div>
+              </div>
+              <span class="status">{{ label(question.status) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_open_questions") }}</p>
+      {% endif %}
+    </section>
+  </section>
+  <section class="grid two">
+    <section class="panel">
       <h3>{{ t("wiki_pages") }}</h3>
       {% if wiki_pages %}
         <div class="list">

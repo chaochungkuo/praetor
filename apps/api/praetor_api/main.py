@@ -299,6 +299,24 @@ def get_mission(mission_id: str):
         fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
+@app.get("/knowledge")
+def knowledge_snapshot():
+    try:
+        return ok(get_ctx().service.knowledge_snapshot())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.get("/missions/{mission_id}/knowledge")
+def mission_knowledge_snapshot(mission_id: str):
+    try:
+        return ok(get_ctx().service.mission_knowledge_snapshot(mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
 @app.post("/missions/{mission_id}/pause")
 def pause_mission(mission_id: str, payload: MissionPauseRequest):
     try:
@@ -393,12 +411,30 @@ def organization_snapshot():
         fail(400, "not_initialized", str(exc))
 
 
+@app.get("/api/knowledge")
+def api_knowledge_snapshot():
+    try:
+        return ok(get_ctx().service.knowledge_snapshot())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
 @app.get("/api/missions/{mission_id}/organization")
 def mission_organization_snapshot(mission_id: str):
     try:
         return ok(get_ctx().service.organization_snapshot(mission_id=mission_id))
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
+
+
+@app.get("/api/missions/{mission_id}/knowledge")
+def api_mission_knowledge_snapshot(mission_id: str):
+    try:
+        return ok(get_ctx().service.mission_knowledge_snapshot(mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
 @app.get("/api/missions/{mission_id}/completion-contract")
