@@ -519,10 +519,28 @@ def api_workspace_steward():
         fail(400, "not_initialized", str(exc))
 
 
+@app.post("/api/workspace/reconcile")
+def api_reconcile_workspace():
+    try:
+        return ok(get_ctx().service.reconcile_workspace())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
 @app.get("/api/missions/{mission_id}/workspace-steward")
 def api_mission_workspace_steward(mission_id: str):
     try:
         return ok(get_ctx().service.workspace_steward_snapshot(mission_id=mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.post("/api/missions/{mission_id}/workspace-reconcile")
+def api_reconcile_mission_workspace(mission_id: str):
+    try:
+        return ok(get_ctx().service.reconcile_workspace(mission_id=mission_id))
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
     except KeyError:

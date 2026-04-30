@@ -56,6 +56,8 @@ This workspace contract is versioned with the company workspace. It defines how 
 - Uploaded, downloaded, generated, requested, and executor-created files should enter the same file intake and registry flow.
 - Folder restructuring should create a reviewable plan before moving important client, legal, privacy, or delivery files.
 - Wiki and document registry references should be updated through stable IDs such as praetor://file/<asset_id>, not only raw paths.
+- Manual file edits, Git changes, missing files, and untracked files should be reconciled into reports before Praetor updates durable registry state.
+- Praetor must not overwrite manual workspace changes during reconciliation.
 
 ## Completion Contract
 

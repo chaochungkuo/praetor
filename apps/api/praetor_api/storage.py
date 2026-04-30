@@ -24,6 +24,7 @@ from .models import (
     EscalationRecord,
     FileAssetRecord,
     FileMoveRecord,
+    WorkspaceReconciliationReport,
     KnowledgeUpdate,
     MemoryPromotionReview,
     MatterDecisionRecord,
@@ -167,6 +168,7 @@ class FilesystemStore:
         self.documents_path = self.state_dir / "documents.json"
         self.file_assets_path = self.state_dir / "file_assets.json"
         self.file_moves_path = self.state_dir / "file_moves.json"
+        self.workspace_reconciliation_reports_path = self.state_dir / "workspace_reconciliation_reports.json"
         self.workspace_restructure_plans_path = self.state_dir / "workspace_restructure_plans.json"
         self.matter_decisions_path = self.state_dir / "matter_decisions.json"
         self.open_questions_path = self.state_dir / "open_questions.json"
@@ -670,6 +672,23 @@ class FilesystemStore:
         moves.sort(key=lambda item: item.created_at, reverse=True)
         return moves[:limit]
 
+    def save_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
+        reports = self.list_workspace_reconciliation_reports(limit=100)
+        reports = [item for item in reports if item.id != report.id] + [report]
+        reports.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.workspace_reconciliation_reports_path, reports)
+
+    def list_workspace_reconciliation_reports(
+        self,
+        mission_id: str | None = None,
+        limit: int = 20,
+    ) -> list[WorkspaceReconciliationReport]:
+        reports = self._read_model_list(self.workspace_reconciliation_reports_path, WorkspaceReconciliationReport)
+        if mission_id is not None:
+            reports = [item for item in reports if item.mission_id == mission_id]
+        reports.sort(key=lambda item: item.created_at, reverse=True)
+        return reports[:limit]
+
     def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
         plans = self.list_workspace_restructure_plans(limit=100_000)
         plans = [item for item in plans if item.id != plan.id] + [plan]
@@ -1024,6 +1043,16 @@ class AppStorage:
 
     def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
         return self.fs.list_file_moves(asset_id=asset_id, limit=limit)
+
+    def save_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
+        self.fs.save_workspace_reconciliation_report(report)
+
+    def list_workspace_reconciliation_reports(
+        self,
+        mission_id: str | None = None,
+        limit: int = 20,
+    ) -> list[WorkspaceReconciliationReport]:
+        return self.fs.list_workspace_reconciliation_reports(mission_id=mission_id, limit=limit)
 
     def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
         self.fs.save_workspace_restructure_plan(plan)

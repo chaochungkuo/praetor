@@ -249,6 +249,7 @@ def main() -> int:
         board_briefing = request("POST", f"/api/missions/{mission_id}/board-briefings")
         board_briefing_list = request("GET", f"/api/missions/{mission_id}/board-briefings")
         restructure_plan = request("POST", f"/api/missions/{mission_id}/workspace-restructure-plan")
+        reconciliation = request("POST", f"/api/missions/{mission_id}/workspace-reconcile")
         steward_after = request("GET", f"/api/missions/{mission_id}/workspace-steward")
         promotion = request("POST", f"/api/missions/{mission_id}/memory-promotion")
         promotion_list = request("GET", f"/api/missions/{mission_id}/memory-promotion")
@@ -327,6 +328,8 @@ def main() -> int:
                     "steward_assets_before": len(steward_before["data"]["assets"]),
                     "steward_assets_after": len(steward_after["data"]["assets"]),
                     "restructure_plan_moves": len(restructure_plan["data"]["moves"]),
+                    "reconciliation_scanned": reconciliation["data"]["scanned_files"],
+                    "reconciliation_reports": len(steward_after["data"]["reconciliation_reports"]),
                     "workflow_has_contract": "Completion Contract" in workflow["data"]["body"],
                     "governance_review_ok": governance_review["ok"],
                     "governance_review_items": len(governance_review_run["data"]["items"]),

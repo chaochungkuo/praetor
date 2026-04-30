@@ -416,6 +416,8 @@ TRANSLATIONS = {
         "file_assets": "File assets",
         "restructure_plans": "Restructure plans",
         "create_restructure_plan": "Create restructure plan",
+        "reconcile_workspace": "Reconcile workspace",
+        "reconciliation_reports": "Reconciliation reports",
         "no_file_assets": "No file assets registered yet.",
         "allowed_write": "Allowed write",
         "denied_write": "Denied write",
@@ -841,6 +843,8 @@ TRANSLATIONS = {
         "file_assets": "檔案資產",
         "restructure_plans": "整理計畫",
         "create_restructure_plan": "建立整理計畫",
+        "reconcile_workspace": "核對工作區",
+        "reconciliation_reports": "核對報告",
         "no_file_assets": "目前沒有已登記的檔案資產。",
         "allowed_write": "允許寫入",
         "denied_write": "禁止寫入",
@@ -2221,6 +2225,24 @@ async def create_workspace_restructure_plan_submit(request: Request, mission_id:
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Workspace restructure plan created: {plan.id}", "success")
+
+
+@router.post("/app/missions/{mission_id}/workspace-reconcile")
+async def reconcile_workspace_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        report = request.app.state.ctx.service.reconcile_workspace(mission_id=mission_id)
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    issues = (
+        len(report.missing_assets)
+        + len(report.changed_assets)
+        + len(report.moved_candidates)
+        + len(report.untracked_files)
+        + len(report.git_changes)
+    )
+    return _redirect(f"/app/missions/{mission_id}", f"Workspace reconciliation completed: {issues} issue(s)", "success")
 
 
 @router.post("/app/missions/{mission_id}/board-briefing")

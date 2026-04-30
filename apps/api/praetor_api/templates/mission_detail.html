@@ -213,6 +213,10 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <button type="submit" class="secondary">{{ t("create_restructure_plan") }}</button>
       </form>
+      <form method="post" action="/app/missions/{{ mission.id }}/workspace-reconcile">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="secondary">{{ t("reconcile_workspace") }}</button>
+      </form>
     </div>
     {% if workspace_steward.assets %}
       <div class="list">
@@ -221,7 +225,9 @@
             <div>
               <strong>{{ asset.title or asset.current_path }}</strong>
               <div class="muted">{{ asset.current_path }}</div>
-              <div class="muted">{{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ asset.id }}</div>
+              <div class="muted">
+                {{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ label(asset.sync_status) }} · {{ asset.id }}
+              </div>
             </div>
           </div>
         {% endfor %}
@@ -239,6 +245,24 @@
               <div class="muted">{{ t("status") }}: {{ label(plan.status) }} · {{ plan.moves|length }} moves</div>
             </div>
             <span class="status">{{ label(plan.status) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if workspace_steward.reconciliation_reports %}
+      <h4>{{ t("reconciliation_reports") }}</h4>
+      <div class="list">
+        {% for report in workspace_steward.reconciliation_reports[:3] %}
+          <div class="list-row">
+            <div>
+              <strong>{{ report.scanned_files }} files scanned</strong>
+              <div class="muted">
+                missing {{ report.missing_assets|length }} · changed {{ report.changed_assets|length }} ·
+                moved {{ report.moved_candidates|length }} · untracked {{ report.untracked_files|length }} ·
+                git {{ report.git_changes|length }}
+              </div>
+            </div>
+            <span class="status">{{ label(report.status) }}</span>
           </div>
         {% endfor %}
       </div>
