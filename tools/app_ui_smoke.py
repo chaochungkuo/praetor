@@ -111,11 +111,13 @@ def main() -> int:
                 "requested_outputs": ["/workspace/Projects/UISmoke/PROJECT.md"],
             },
         )
+        created = request_json("GET", "/missions")["data"]["missions"][0]
         anon_text = urllib.request.urlopen(f"{BASE_URL}/app/overview", timeout=30).read().decode("utf-8")
         praetor = get_text("/app/praetor")
         inbox = get_text("/app/inbox")
         overview = get_text("/app/overview")
         tasks = get_text("/app/tasks")
+        mission_detail = get_text(f"/app/missions/{created['id']}")
         agents = get_text("/app/agents")
         activity = get_text("/app/activity")
         memory = get_text("/app/memory")
@@ -137,6 +139,7 @@ def main() -> int:
                     "inbox_has_chairman_inbox": "Chairman Inbox" in inbox,
                     "overview_has_total": "Total missions" in overview,
                     "tasks_has_board": "Mission board" in tasks,
+                    "mission_detail_has_work_sessions": "AI work sessions" in mission_detail,
                     "agents_has_directory": "Agent Directory" in agents,
                     "activity_has_audit": "Audit stream" in activity,
                     "memory_has_wiki": "Company memory" in memory,

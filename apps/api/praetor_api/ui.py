@@ -397,6 +397,11 @@ TRANSLATIONS = {
         "requested_outputs": "Requested outputs",
         "task_logs": "Tasks",
         "no_task_logs": "No task logs yet.",
+        "work_sessions": "AI work sessions",
+        "no_work_sessions": "No AI work sessions yet.",
+        "session_turns": "Turns",
+        "current_blocker": "Current blocker",
+        "completion_contract": "Completion contract",
         "report": "Report",
         "run_budget": "Run budget",
         "max_steps": "Max steps",
@@ -769,6 +774,11 @@ TRANSLATIONS = {
         "requested_outputs": "要求產出",
         "task_logs": "工作紀錄",
         "no_task_logs": "目前沒有工作紀錄。",
+        "work_sessions": "AI 工作會話",
+        "no_work_sessions": "目前沒有 AI 工作會話。",
+        "session_turns": "回合",
+        "current_blocker": "目前阻塞",
+        "completion_contract": "完成條件",
         "report": "報告",
         "run_budget": "執行預算",
         "max_steps": "最多步數",
@@ -1886,6 +1896,7 @@ def mission_detail_page(request: Request, mission_id: str):
     tasks = service.list_mission_tasks(mission_id)
     texts = service.read_mission_texts(mission_id)
     runs = service.list_mission_runs(mission_id)
+    work_sessions = service.mission_work_sessions(mission_id)
     return templates.TemplateResponse(
         request=request,
         name="mission_detail.html",
@@ -1895,6 +1906,7 @@ def mission_detail_page(request: Request, mission_id: str):
             "tasks": tasks,
             "texts": texts,
             "runs": runs,
+            "work_sessions": work_sessions,
         },
     )
 

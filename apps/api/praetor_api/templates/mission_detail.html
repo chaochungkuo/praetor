@@ -71,7 +71,57 @@
     <section class="panel">
       <h3>{{ t("report") }}</h3>
       <pre>{{ texts["REPORT.md"] }}</pre>
-    </section>
+	  </section>
+	</section>
+
+  <section class="panel">
+    <h3>{{ t("work_sessions") }}</h3>
+    {% if work_sessions %}
+      <div class="list">
+        {% for session in work_sessions %}
+          <div class="list-row activity-row">
+            <div>
+              <strong>{{ session.manager_role }} -> {{ session.executor_role }}</strong>
+              <div class="muted">
+                {{ t("status") }}: {{ label(session.status) }} ·
+                {{ t("executor") }}: {{ session.executor or t("not_available") }} ·
+                {{ t("session_turns") }}: {{ session.turns|length }}
+              </div>
+              {% if session.current_blocker %}
+                <div class="muted">{{ t("current_blocker") }}: {{ session.current_blocker }}</div>
+              {% endif %}
+            </div>
+            <span class="status">{{ label(session.status) }}</span>
+            {% if session.completion_contract %}
+              <details>
+                <summary>{{ t("completion_contract") }}</summary>
+                <ul class="compact-list">
+                  {% for item in session.completion_contract %}
+                    <li>{{ item }}</li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+            {% if session.turns %}
+              <details open>
+                <summary>{{ t("session_turns") }}</summary>
+                <div class="list">
+                  {% for turn in session.turns %}
+                    <div class="message {{ 'praetor-message' if turn.from_role in ['project_manager', 'praetor'] else 'founder-message' }}">
+                      <strong>{{ turn.from_role }} -> {{ turn.to_role }} · {{ label(turn.turn_type) }}</strong>
+                      <p>{{ turn.body }}</p>
+                      <span class="muted">{{ format_time(turn.created_at) }} · {{ label(turn.status) if turn.status else t("none") }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              </details>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_work_sessions") }}</p>
+    {% endif %}
   </section>
 
   <section class="panel">

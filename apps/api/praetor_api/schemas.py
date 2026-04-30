@@ -27,6 +27,8 @@ from .models import (
     RoleDefinition,
     StandingOrder,
     TaskDefinition,
+    WorkSession,
+    WorkSessionTurn,
 )
 
 
@@ -54,6 +56,8 @@ SCHEMA_MODELS = {
     "planner_plan": PlannerPlan,
     "praetor_briefing": PraetorBriefing,
     "run_record": RunRecord,
+    "work_session": WorkSession,
+    "work_session_turn": WorkSessionTurn,
 }
 
 

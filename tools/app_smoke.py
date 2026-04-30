@@ -232,6 +232,7 @@ def main() -> int:
         )
         mission_id = mission["data"]["id"]
         run_result = request("POST", f"/missions/{mission_id}/run")
+        work_sessions = request("GET", f"/api/missions/{mission_id}/work-sessions")
         meeting = request("POST", f"/missions/{mission_id}/meeting")
         approval = request(
             "POST",
@@ -290,6 +291,8 @@ def main() -> int:
                     "mission_status": mission_detail["data"]["status"],
                     "task_status": run_result["data"]["task"]["status"],
                     "bridge_status": run_result["data"]["bridge_run"]["normalized_status"],
+                    "work_session_status": run_result["data"]["work_session"]["status"],
+                    "work_session_turns": len(work_sessions["data"]["sessions"][0]["turns"]),
                     "meeting_id": meeting["data"]["id"],
                     "approval_status": approval_resolved["data"]["status"],
                     "stopped_status": stopped_result["data"]["status"],
