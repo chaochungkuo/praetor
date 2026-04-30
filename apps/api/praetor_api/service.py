@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import re
 from typing import Any
@@ -14,6 +14,7 @@ from .models import (
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    ChairmanInboxItem,
     ClientRecord,
     CompletionContract,
     ConversationCreateRequest,
@@ -23,6 +24,7 @@ from .models import (
     DocumentRecord,
     DocumentVersion,
     EscalationRecord,
+    GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
     MatterDecisionRecord,
@@ -43,6 +45,7 @@ from .models import (
     OwnerAuthRecord,
     PlannerAction,
     PraetorBriefing,
+    ReviewPolicy,
     RunAttempt,
     RoleDefinition,
     RuntimeSelection,
@@ -845,6 +848,183 @@ class PraetorService:
             items = [item for item in items if item.status == status]
         return items
 
+    def latest_governance_review(self) -> GovernanceReview:
+        settings = self._require_settings()
+        reviews = self.storage.list_governance_reviews(limit=1)
+        if reviews:
+            latest = reviews[0]
+            if settings.review_policy.cadence == "manual":
+                return latest
+            if settings.review_policy.cadence == "on_open" and utc_now() - latest.created_at < timedelta(hours=6):
+                return latest
+            if settings.review_policy.cadence == "daily" and utc_now() - latest.created_at < timedelta(hours=24):
+                return latest
+            if settings.review_policy.cadence == "weekly" and utc_now() - latest.created_at < timedelta(days=7):
+                return latest
+        return self.run_governance_review(persist=True)
+
+    def run_governance_review(self, *, persist: bool = True) -> GovernanceReview:
+        settings = self._require_settings()
+        policy = settings.review_policy
+        workspace_root = Path(settings.workspace.root)
+        missions = self.storage.list_missions(workspace_root)
+        now = utc_now()
+        items: list[ChairmanInboxItem] = []
+
+        for approval in self.storage.list_approvals():
+            if approval.status != "pending":
+                continue
+            severity = "high" if approval.category in {"external_communication", "spending_money", "delete_files"} else "medium"
+            items.append(
+                ChairmanInboxItem(
+                    title=f"Approval required: {approval.category}",
+                    body=approval.reason,
+                    severity=severity,
+                    kind="pending_decision",
+                    href=f"/app/missions/{approval.mission_id}",
+                    mission_id=approval.mission_id,
+                    created_at=approval.created_at,
+                    metadata={"approval_id": approval.id, "category": approval.category},
+                )
+            )
+
+        for mission in missions:
+            if mission.status in {"failed", "paused", "waiting_approval"}:
+                severity = "high" if set(mission.domains) & set(policy.always_escalate_domains) else "medium"
+                items.append(
+                    ChairmanInboxItem(
+                        title=f"Mission needs attention: {mission.title}",
+                        body=mission.summary or f"Mission status is {mission.status}.",
+                        severity=severity,
+                        kind="blocked_work",
+                        href=f"/app/missions/{mission.id}",
+                        mission_id=mission.id,
+                        matter_id=mission.matter_id,
+                        created_at=mission.updated_at,
+                        metadata={"status": mission.status},
+                    )
+                )
+            if mission.status in {"planned", "active", "review", "reviewing", "ready_for_ceo"}:
+                age = now - mission.updated_at
+                if age >= timedelta(hours=policy.stale_mission_hours):
+                    items.append(
+                        ChairmanInboxItem(
+                            title=f"Stale mission: {mission.title}",
+                            body=f"No mission update for at least {policy.stale_mission_hours} hours.",
+                            severity="medium",
+                            kind="stale_mission",
+                            href=f"/app/missions/{mission.id}",
+                            mission_id=mission.id,
+                            matter_id=mission.matter_id,
+                            created_at=mission.updated_at,
+                        )
+                    )
+            if mission.status == "completed":
+                contract = self.mission_completion_contract(mission.id)
+                if not contract.can_close:
+                    items.append(
+                        ChairmanInboxItem(
+                            title=f"Completed mission needs closeout: {mission.title}",
+                            body="Completion contract still has blockers: " + "; ".join(contract.blockers[:3]),
+                            severity="medium",
+                            kind="closeout_review",
+                            href=f"/app/missions/{mission.id}",
+                            mission_id=mission.id,
+                            matter_id=mission.matter_id,
+                            created_at=mission.updated_at,
+                            metadata={"blockers": contract.blockers},
+                        )
+                    )
+
+        for question in self.storage.list_open_questions():
+            if question.status in {"answered", "closed"}:
+                continue
+            items.append(
+                ChairmanInboxItem(
+                    title="Open question requires a decision",
+                    body=question.question,
+                    severity="high" if question.status == "waiting_owner" else "medium",
+                    kind="open_question",
+                    href=f"/app/missions/{question.mission_id}" if question.mission_id else "/app/memory",
+                    mission_id=question.mission_id,
+                    matter_id=question.matter_id,
+                    created_at=question.asked_at,
+                    metadata={"owner": question.owner, "blocking": question.blocking},
+                )
+            )
+
+        stalled_cutoff = now - timedelta(minutes=policy.stalled_run_minutes)
+        for attempt in self.storage.list_run_attempts(limit=100):
+            if attempt.status in {"failed", "timed_out", "stalled"} or (
+                attempt.status not in {"succeeded", "canceled"} and attempt.updated_at <= stalled_cutoff
+            ):
+                items.append(
+                    ChairmanInboxItem(
+                        title=f"Run attempt needs review: {attempt.executor or 'executor'}",
+                        body=attempt.error or attempt.last_message or f"Run attempt status is {attempt.status}.",
+                        severity="medium",
+                        kind="run_attempt",
+                        href=f"/app/missions/{attempt.mission_id}",
+                        mission_id=attempt.mission_id,
+                        created_at=attempt.updated_at,
+                        metadata={"attempt_id": attempt.id, "status": attempt.status},
+                    )
+                )
+
+        for update in self.storage.list_knowledge_updates(status="proposed"):
+            items.append(
+                ChairmanInboxItem(
+                    title=f"Knowledge update awaits review: {update.summary}",
+                    body=update.content,
+                    severity="low",
+                    kind="knowledge_update",
+                    href=f"/app/missions/{update.mission_id}" if update.mission_id else "/app/memory",
+                    mission_id=update.mission_id,
+                    matter_id=update.matter_id,
+                    created_at=update.created_at,
+                    metadata={"target_page": update.target_page},
+                )
+            )
+
+        severity_order = {"high": 0, "medium": 1, "low": 2}
+        items.sort(key=lambda item: (severity_order.get(item.severity, 9), item.created_at), reverse=False)
+        items = items[: policy.max_items]
+        high_count = len([item for item in items if item.severity == "high"])
+        medium_count = len([item for item in items if item.severity == "medium"])
+        if not items:
+            summary = "Governance review found no formal issues requiring owner attention."
+        else:
+            summary = f"Governance review found {len(items)} item(s): {high_count} high, {medium_count} medium."
+        review = GovernanceReview(
+            policy=policy,
+            summary=summary,
+            items=items,
+            next_review_hint=self._next_review_hint(policy),
+        )
+        if persist:
+            self.storage.save_governance_review(review)
+            self._audit(
+                "governance_review_completed",
+                {
+                    "review_id": review.id,
+                    "items": len(items),
+                    "high": high_count,
+                    "medium": medium_count,
+                    "notification_threshold": policy.notification_threshold,
+                },
+            )
+        return review
+
+    @staticmethod
+    def _next_review_hint(policy: ReviewPolicy) -> str:
+        if policy.cadence == "daily":
+            return "Review again during the next daily governance cycle."
+        if policy.cadence == "weekly":
+            return "Review again during the next weekly company review."
+        if policy.cadence == "manual":
+            return "Review again only when the chairman requests it."
+        return "Review again when the chairman opens Praetor."
+
     def list_recent_runs(self, limit: int = 25) -> list[dict]:
         settings = self._require_settings()
         return self.storage.list_recent_runs(Path(settings.workspace.root), limit=limit)
@@ -1276,6 +1456,7 @@ class PraetorService:
             recent_planner_actions=self._recent_planner_actions(audit_events, limit=8),
             runtime_health=self.runtime_health(),
             organization=self.organization_snapshot(),
+            governance_review=self.latest_governance_review(),
         )
 
     def create_ceo_message(self, request: ConversationCreateRequest) -> ConversationCreateResult:

@@ -239,6 +239,8 @@ def main() -> int:
         mission_knowledge = request("GET", f"/api/missions/{mission_id}/knowledge")
         mission_scope = request("GET", f"/api/missions/{mission_id}/workspace-scope")
         workflow = request("GET", "/api/workflow")
+        governance_review = request("GET", "/api/governance/review")
+        governance_review_run = request("POST", "/api/governance/review")
         run_result = request("POST", f"/missions/{mission_id}/run")
         run_attempts = request("GET", f"/api/missions/{mission_id}/run-attempts")
         work_sessions = request("GET", f"/api/missions/{mission_id}/work-sessions")
@@ -316,6 +318,8 @@ def main() -> int:
                     "knowledge_open_questions": len(mission_knowledge["data"]["open_questions"]),
                     "workspace_scope_root": mission_scope["data"]["root"],
                     "workflow_has_contract": "Completion Contract" in workflow["data"]["body"],
+                    "governance_review_ok": governance_review["ok"],
+                    "governance_review_items": len(governance_review_run["data"]["items"]),
                     "run_attempt_status": run_attempts["data"]["attempts"][0]["status"],
                     "completion_has_workspace_scope": completion["data"]["workspace_scope_defined"],
                     "task_status": run_result["data"]["task"]["status"],

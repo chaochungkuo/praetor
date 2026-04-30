@@ -9,6 +9,7 @@ from .models import (
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    ChairmanInboxItem,
     ClientRecord,
     CompanyDNA,
     CompletionContract,
@@ -17,6 +18,7 @@ from .models import (
     DocumentRecord,
     DocumentVersion,
     EscalationRecord,
+    GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
     MatterDecisionRecord,
@@ -31,6 +33,7 @@ from .models import (
     PlannerAction,
     PlannerPlan,
     PraetorBriefing,
+    ReviewPolicy,
     RunAttempt,
     RunRecord,
     RoleDefinition,
@@ -60,6 +63,7 @@ SCHEMA_MODELS = {
     "decision_record": DecisionRecord,
     "approval_request": ApprovalRequest,
     "approval_create_request": ApprovalCreateRequest,
+    "chairman_inbox_item": ChairmanInboxItem,
     "meeting_record": MeetingRecord,
     "onboarding_answers": OnboardingAnswers,
     "onboarding_preview": OnboardingPreview,
@@ -80,6 +84,8 @@ SCHEMA_MODELS = {
     "open_question_record": OpenQuestionRecord,
     "knowledge_update": KnowledgeUpdate,
     "knowledge_snapshot": KnowledgeSnapshot,
+    "governance_review": GovernanceReview,
+    "review_policy": ReviewPolicy,
 }
 
 

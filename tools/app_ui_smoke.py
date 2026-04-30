@@ -137,6 +137,7 @@ def main() -> int:
                     "praetor_has_ceo_hint": "mission draft, approval request, memory update" in praetor,
                     "praetor_has_starters": "Suggested first tasks" in praetor,
                     "inbox_has_chairman_inbox": "Chairman Inbox" in inbox,
+                    "inbox_has_governance_review": "Governance review" in inbox,
                     "overview_has_total": "Total missions" in overview,
                     "tasks_has_board": "Mission board" in tasks,
                     "mission_detail_has_work_sessions": "AI work sessions" in mission_detail,

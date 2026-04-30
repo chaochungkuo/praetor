@@ -403,6 +403,22 @@ def office_snapshot():
         fail(400, "not_initialized", str(exc))
 
 
+@app.get("/api/governance/review")
+def governance_review():
+    try:
+        return ok(get_ctx().service.latest_governance_review())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.post("/api/governance/review")
+def run_governance_review():
+    try:
+        return ok(get_ctx().service.run_governance_review())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
 @app.get("/api/organization")
 def organization_snapshot():
     try:

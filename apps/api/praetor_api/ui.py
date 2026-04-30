@@ -282,6 +282,12 @@ TRANSLATIONS = {
         "recent_audit_events": "Recent audit events",
         "chairman_inbox": "Chairman Inbox",
         "chairman_inbox_desc": "Everything that needs owner attention: approvals, blocked work, runtime risk, and completed missions waiting for review.",
+        "governance_review": "Governance review",
+        "governance_review_desc": "A quiet company review that only raises formal issues requiring attention.",
+        "run_governance_review": "Run review",
+        "review_summary": "Review summary",
+        "next_review": "Next review",
+        "formal_items": "Formal items",
         "needs_attention": "Needs attention",
         "pending_decisions": "Pending decisions",
         "blocked_work": "Blocked work",
@@ -682,6 +688,12 @@ TRANSLATIONS = {
         "recent_audit_events": "近期系統紀錄",
         "chairman_inbox": "董事長收件匣",
         "chairman_inbox_desc": "集中處理需要你注意的事項：批准、卡住的工作、執行環境風險，以及已完成待驗收的任務。",
+        "governance_review": "治理檢查",
+        "governance_review_desc": "低噪音的公司檢查，只提出正式需要注意的事項。",
+        "run_governance_review": "執行檢查",
+        "review_summary": "檢查摘要",
+        "next_review": "下次檢查",
+        "formal_items": "正式事項",
         "needs_attention": "需要注意",
         "pending_decisions": "待裁示",
         "blocked_work": "卡住的工作",
@@ -1408,6 +1420,7 @@ def _build_inbox_items(service, t, label, phrase_label, event_label, event_summa
     recent_runs = service.list_recent_runs(limit=20)
     audit_events = service.list_audit_events(limit=20)
     runtime_health = service.runtime_health()
+    governance_review = service.latest_governance_review()
 
     pending_decisions = []
     for approval in approvals:
@@ -1489,6 +1502,18 @@ def _build_inbox_items(service, t, label, phrase_label, event_label, event_summa
     ]
 
     return {
+        "governance_review": governance_review,
+        "formal_items": [
+            {
+                "title": item.title,
+                "body": item.body,
+                "status": label(item.severity),
+                "href": item.href,
+                "kind": label(item.kind),
+                "created_at": item.created_at,
+            }
+            for item in governance_review.items
+        ][:8],
         "pending_decisions": pending_decisions[:8],
         "blocked_work": blocked_work[:8],
         "risk_signals": risk_signals[:8],
@@ -1627,6 +1652,18 @@ def inbox_page(request: Request):
             ),
         },
     )
+
+
+@router.post("/app/inbox/governance-review")
+async def run_governance_review_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    request.app.state.ctx.service.run_governance_review()
+    return _redirect("/app/inbox", t("governance_review"), "success")
 
 
 @router.get("/app/agents", response_class=HTMLResponse)

@@ -35,11 +35,33 @@
         <h2>{{ t("chairman_inbox") }}</h2>
         <p>{{ t("chairman_inbox_desc") }}</p>
       </div>
-      <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
+      <div class="hero-actions">
+        <form method="post" action="/app/inbox/governance-review">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">{{ t("run_governance_review") }}</button>
+        </form>
+        <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
+      </div>
     </div>
   </section>
 
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h3>{{ t("governance_review") }}</h3>
+        <p>{{ t("governance_review_desc") }}</p>
+      </div>
+      <span class="status">{{ inbox_items.governance_review.items|length }} {{ t("formal_items") }}</span>
+    </div>
+    <p><strong>{{ t("review_summary") }}:</strong> {{ inbox_items.governance_review.summary }}</p>
+    <p class="muted">{{ t("next_review") }}: {{ inbox_items.governance_review.next_review_hint }}</p>
+  </section>
+
   <section class="grid cards command-metrics">
+    <section class="panel stat-card">
+      <span>{{ t("formal_items") }}</span>
+      <strong>{{ inbox_items.formal_items|length }}</strong>
+    </section>
     <section class="panel stat-card">
       <span>{{ t("pending_decisions") }}</span>
       <strong>{{ inbox_items.pending_decisions|length }}</strong>
@@ -59,6 +81,7 @@
   </section>
 
   <section class="grid two">
+    {{ inbox_section(t("formal_items"), inbox_items.formal_items) }}
     {{ inbox_section(t("pending_decisions"), inbox_items.pending_decisions) }}
     {{ inbox_section(t("blocked_work"), inbox_items.blocked_work) }}
     {{ inbox_section(t("risk_signals"), inbox_items.risk_signals) }}

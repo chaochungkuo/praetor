@@ -106,6 +106,10 @@ DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"
 DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
 OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
 KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
+ReviewCadence = Literal["on_open", "daily", "weekly", "manual"]
+NotificationThreshold = Literal["never", "approval_required", "high_only", "digest"]
+InboxSeverity = Literal["low", "medium", "high"]
+InboxStatus = Literal["open", "acknowledged", "resolved", "dismissed"]
 RunAttemptStatus = Literal[
     "preparing_workspace",
     "building_prompt",
@@ -186,6 +190,16 @@ class GovernancePolicy(BaseModel):
     auto_execute: list[str] = Field(default_factory=list)
     never_allow: list[str] = Field(default_factory=list)
     run_budget: RunBudgetPolicy = Field(default_factory=RunBudgetPolicy)
+
+
+class ReviewPolicy(BaseModel):
+    cadence: ReviewCadence = "on_open"
+    notification_threshold: NotificationThreshold = "approval_required"
+    quiet_mode: bool = True
+    stale_mission_hours: int = 48
+    stalled_run_minutes: int = 30
+    max_items: int = 12
+    always_escalate_domains: list[str] = Field(default_factory=lambda: ["legal", "security", "privacy", "finance"])
 
 
 class CompanyDNA(BaseModel):
@@ -618,6 +632,31 @@ class WorkflowContract(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class ChairmanInboxItem(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("inbox"))
+    title: str
+    body: str
+    severity: InboxSeverity = "medium"
+    status: InboxStatus = "open"
+    kind: str = "governance"
+    href: str = "/app/inbox"
+    source: str = "governance_review"
+    mission_id: str | None = None
+    matter_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GovernanceReview(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("review"))
+    status: str = "completed"
+    policy: ReviewPolicy = Field(default_factory=ReviewPolicy)
+    summary: str = "No formal issues require owner attention."
+    items: list[ChairmanInboxItem] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    next_review_hint: str = "Review again when the chairman opens Praetor."
+
+
 class MissionTimelineEvent(BaseModel):
     id: str
     mission_id: str | None = None
@@ -641,6 +680,7 @@ class OfficeSnapshot(BaseModel):
     recent_planner_actions: list[PlannerAction] = Field(default_factory=list)
     runtime_health: dict[str, Any] = Field(default_factory=dict)
     organization: OrganizationSnapshot = Field(default_factory=OrganizationSnapshot)
+    governance_review: GovernanceReview | None = None
 
 
 class TelegramIntegrationSettings(BaseModel):
@@ -663,6 +703,7 @@ class AppSettings(BaseModel):
     runtime: RuntimeSelection
     workspace: WorkspaceConfig
     governance: GovernancePolicy
+    review_policy: ReviewPolicy = Field(default_factory=ReviewPolicy)
     company_dna: CompanyDNA
     roles: list[RoleDefinition] = Field(default_factory=list)
     telegram: TelegramIntegrationSettings = Field(default_factory=TelegramIntegrationSettings)

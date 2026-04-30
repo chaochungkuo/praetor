@@ -15,6 +15,7 @@ from .models import (
     AgentRoleSpec,
     AppSettings,
     ApprovalRequest,
+    GovernanceReview,
     ClientRecord,
     ConversationMessage,
     DelegationRecord,
@@ -151,6 +152,7 @@ class FilesystemStore:
         self.auth_path = self.state_dir / "auth.json"
         self.audit_path = self.state_dir / "audit.jsonl"
         self.approvals_path = self.state_dir / "approvals.json"
+        self.governance_reviews_path = self.state_dir / "governance_reviews.json"
         self.conversation_path = self.state_dir / "office_conversation.json"
         self.agent_messages_path = self.state_dir / "agent_messages.json"
         self.work_sessions_path = self.state_dir / "work_sessions.json"
@@ -383,6 +385,17 @@ class FilesystemStore:
             return []
         payload = json.loads(self.approvals_path.read_text(encoding="utf-8"))
         return [ApprovalRequest.model_validate(item) for item in payload]
+
+    def save_governance_review(self, review: GovernanceReview) -> None:
+        reviews = self.list_governance_reviews(limit=100)
+        reviews = [item for item in reviews if item.id != review.id] + [review]
+        reviews.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.governance_reviews_path, reviews)
+
+    def list_governance_reviews(self, limit: int = 20) -> list[GovernanceReview]:
+        reviews = self._read_model_list(self.governance_reviews_path, GovernanceReview)
+        reviews.sort(key=lambda item: item.created_at, reverse=True)
+        return reviews[:limit]
 
     def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
         meetings_dir = self.meeting_dir(workspace_root, meeting.mission_id)
@@ -957,6 +970,12 @@ class AppStorage:
 
     def list_approvals(self) -> list[ApprovalRequest]:
         return self.fs.list_approvals()
+
+    def save_governance_review(self, review: GovernanceReview) -> None:
+        self.fs.save_governance_review(review)
+
+    def list_governance_reviews(self, limit: int = 20) -> list[GovernanceReview]:
+        return self.fs.list_governance_reviews(limit=limit)
 
     def append_audit_event(self, payload: dict) -> None:
         self.fs.append_audit_event(payload)
