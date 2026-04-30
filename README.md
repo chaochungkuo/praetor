@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./branding/praetor-logo-dark.png" alt="Praetor logo" width="720" />
+  <img src="./branding/praetor-logo-dark.png" alt="Praetor logo" width="360" />
 </p>
 
 # Praetor
