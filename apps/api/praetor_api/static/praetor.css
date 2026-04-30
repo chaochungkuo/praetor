@@ -592,6 +592,141 @@ pre {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.org-hero {
+  overflow: hidden;
+}
+.org-signal-panel {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 18rem;
+}
+.org-signal-panel div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.055);
+}
+.org-signal-panel span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.org-signal-panel strong {
+  font-size: 1.45rem;
+}
+.org-board {
+  position: relative;
+}
+.agent-work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.agent-work-card {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.agent-work-topline,
+.team-card,
+.role-detail > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.agent-work-topline h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1.25rem;
+  line-height: 1.15;
+}
+.agent-current-work,
+.agent-blocker {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(213,179,106,0.20);
+  background: rgba(213,179,106,0.06);
+}
+.agent-current-work span,
+.agent-blocker span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.agent-current-work strong,
+.agent-blocker strong {
+  line-height: 1.35;
+}
+.agent-work-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+.agent-work-meta.compact {
+  grid-template-columns: 1fr;
+  min-width: 18rem;
+}
+.agent-work-meta div {
+  display: grid;
+  gap: 0.2rem;
+}
+.agent-work-meta dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.agent-work-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.agent-blocker {
+  border-color: rgba(185,78,72,0.25);
+  background: rgba(185,78,72,0.065);
+}
+.status-blocked {
+  border-color: rgba(185,78,72,0.24);
+  color: #ffb1aa;
+}
+.status-working {
+  border-color: rgba(52,119,203,0.24);
+  color: #b8d6ff;
+}
+.status-idle {
+  color: var(--muted);
+}
+.team-card {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.022);
+  color: inherit;
+  text-decoration: none;
+}
+.team-card-main {
+  min-width: 0;
+}
+.team-card-main strong {
+  display: block;
+  margin: 0.25rem 0 0.35rem;
+}
+.role-detail {
+  padding: 0;
+}
+.role-detail > summary {
+  padding: 1rem;
+  color: var(--text);
+  list-style: none;
+}
+.role-detail > summary::-webkit-details-marker {
+  display: none;
+}
+.role-detail > p,
+.role-detail > .agent-meta {
+  padding: 0 1rem 1rem;
+}
 
 .form-grid {
   display: grid;
@@ -1282,7 +1417,12 @@ button.secondary:hover {
 .action-menu > summary,
 .action-menu-list,
 .health-metrics div,
-.soft-row {
+.soft-row,
+.org-signal-panel div,
+.agent-current-work,
+.agent-blocker,
+.team-card,
+.role-detail > summary {
   border-color: rgba(226,219,207,0.76);
   background: rgba(255,253,248,0.72);
   border-radius: 16px;
@@ -1308,9 +1448,36 @@ button.secondary:hover {
   padding-top: 0.4rem;
 }
 
+.agent-work-card {
+  border-color: rgba(255,255,255,0.58);
+}
+
+.agent-work-topline h3,
+.agent-current-work strong,
+.team-card-main strong {
+  color: #181511;
+}
+
+.status-blocked {
+  border-color: rgba(177,68,57,0.24);
+  background: rgba(177,68,57,0.08);
+  color: #8b2d26;
+}
+
+.status-working {
+  border-color: rgba(37,99,173,0.20);
+  background: rgba(37,99,173,0.08);
+  color: #245c9f;
+}
+
+.status-idle {
+  color: #766b5f;
+}
+
 @media (max-width: 1200px) {
   .executive-grid,
-  .briefing-columns {
+  .briefing-columns,
+  .agent-work-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1336,6 +1503,23 @@ button.secondary:hover {
 
   .health-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .org-signal-panel {
+    min-width: 0;
+  }
+
+  .agent-work-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .team-card,
+  .agent-work-topline {
+    flex-direction: column;
+  }
+
+  .agent-work-meta.compact {
+    min-width: 0;
   }
 
   .executive-details > summary {

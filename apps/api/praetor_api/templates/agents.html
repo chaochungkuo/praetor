@@ -1,94 +1,126 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="panel hero">
-    <div class="hero-row">
-      <div>
-        <h2>{{ t("agent_directory") }}</h2>
-        <p>{{ t("agent_directory_desc") }}</p>
+  <section class="executive-hero glass-panel org-hero">
+    <div class="executive-hero-main">
+      <span class="eyebrow">{{ t("ai_command_center") }}</span>
+      <h2>{{ t("agent_directory") }}</h2>
+      <p>{{ t("agent_directory_desc") }}</p>
+      <div class="executive-meta">
+        <span class="status">{{ agent_overview.agents_created }} {{ t("agents_created") }}</span>
+        <span class="status">{{ agent_overview.active_teams }} {{ t("active_teams") }}</span>
+        <span class="status">{{ agent_overview.open_work_sessions }} {{ t("open_work_sessions") }}</span>
+        <span class="status">{{ agent_overview.blocked_agents }} {{ t("blocked_agents") }}</span>
       </div>
-      <span class="status">{{ organization.agent_roles|length }} {{ t("role_charter") }}</span>
     </div>
+    <div class="org-signal-panel">
+      <div>
+        <span>{{ t("active_agents") }}</span>
+        <strong>{{ organization.agents|length }}</strong>
+      </div>
+      <div>
+        <span>{{ t("role_charter") }}</span>
+        <strong>{{ organization.agent_roles|length }}</strong>
+      </div>
+      <div>
+        <span>{{ t("recent_agent_activity") }}</span>
+        <strong>{{ recent_activity|length }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel command-panel org-board">
+    <div class="section-heading">
+      <div>
+        <h3>{{ t("active_agents") }}</h3>
+        <p>{{ t("ai_command_center_desc") }}</p>
+      </div>
+    </div>
+    {% if agent_cards %}
+      <div class="agent-work-grid">
+        {% for card in agent_cards %}
+          <a class="agent-work-card glass-panel" href="{{ card.href }}">
+            <div class="agent-work-topline">
+              <div>
+                <span class="eyebrow">{{ role_label(card.agent.role_name) }}</span>
+                <h3>{{ card.agent.display_name|replace(card.agent.role_name, role_label(card.agent.role_name)) }}</h3>
+              </div>
+              <span class="status status-{{ card.status }}">{{ label(card.status) }}</span>
+            </div>
+            <div class="agent-current-work">
+              <span>{{ t("current_assignment") }}</span>
+              <strong>{{ card.mission.title if card.mission else t("waiting_for_assignment") }}</strong>
+            </div>
+            <dl class="agent-work-meta">
+              <div>
+                <dt>{{ t("current_work") }}</dt>
+                <dd>{{ phrase_label(card.current_work) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("next_step") }}</dt>
+                <dd>{{ phrase_label(t(card.next_step) if card.next_step in ["waiting_for_owner", "continue_work_session", "review_recent_activity", "ready_for_next_assignment"] else card.next_step) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("reports_to") }}</dt>
+                <dd>{{ role_label(card.reports_to) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("last_activity") }}</dt>
+                <dd>{{ format_time(card.last_activity) }}</dd>
+              </div>
+            </dl>
+            {% if card.session and card.session.current_blocker %}
+              <div class="agent-blocker">
+                <span>{{ t("blocked_by") }}</span>
+                <strong>{{ card.session.current_blocker }}</strong>
+              </div>
+            {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_active_agents") }}</p>
+    {% endif %}
   </section>
 
   <section class="grid two">
     <section class="panel command-panel">
       <div class="section-heading">
         <div>
-          <h3>{{ t("team_operating_model") }}</h3>
-          <p>{{ t("active_agents") }}: {{ organization.agents|length }}</p>
+          <h3>{{ t("mission_teams") }}</h3>
+          <p>{{ t("mission_teams_desc") }}</p>
         </div>
-        <span class="status">{{ t("supervisor") }} / {{ t("authority") }}</span>
+        <span class="status">{{ team_cards|length }} {{ t("team") }}</span>
       </div>
-      <div class="agent-role-grid">
-        {% for role in organization.agent_roles %}
-          <article class="agent-card">
-            <div class="agent-card-header">
-              <div>
-                <div class="eyebrow">{{ t("role_charter") }}</div>
-                <h3>{{ role_label(role.name) }}</h3>
-              </div>
-              <span class="status">{{ agents_by_role.get(role.name, [])|length }} {{ t("instances") }}</span>
-            </div>
-            <p>{{ phrase_label(role.purpose) }}</p>
-            <dl class="agent-meta">
-              <div>
-                <dt>{{ t("supervisor") }}</dt>
-                <dd>{{ phrase_label(role.default_supervisor_role) }}</dd>
-              </div>
-              <div>
-                <dt>{{ t("skills") }}</dt>
-                <dd>
-                  {% for skill in role.skills %}
-                    {{ phrase_label(skill) }}{{ ", " if not loop.last else "" }}
-                  {% else %}
-                    {{ t("not_available") }}
-                  {% endfor %}
-                </dd>
-              </div>
-              <div>
-                <dt>{{ t("authority") }}</dt>
-                <dd>
-                  {% for item in role.decision_authority %}
-                    {{ phrase_label(item) }}{{ ", " if not loop.last else "" }}
-                  {% else %}
-                    {{ t("not_available") }}
-                  {% endfor %}
-                </dd>
-              </div>
-              <div>
-                <dt>{{ t("escalates_on") }}</dt>
-                <dd>
-                  {% for trigger in role.escalation_triggers %}
-                    {{ phrase_label(trigger) }}{{ ", " if not loop.last else "" }}
-                  {% else %}
-                    {{ t("not_available") }}
-                  {% endfor %}
-                </dd>
-              </div>
-            </dl>
-          </article>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="panel command-panel">
-      <div class="section-heading">
-        <div>
-          <h3>{{ t("active_agents") }}</h3>
-          <p>{{ t("agent_directory_desc") }}</p>
-        </div>
-      </div>
-      {% if organization.agents %}
+      {% if team_cards %}
         <div class="command-list">
-          {% for agent in organization.agents %}
-            <a class="command-card" href="{{ '/app/missions/' ~ agent.mission_id if agent.mission_id else '/app/agents' }}">
-              <div>
-                <div class="eyebrow">{{ role_label(agent.role_name) }}</div>
-                <strong>{{ agent.display_name|replace(agent.role_name, role_label(agent.role_name)) }}</strong>
-                <p>{{ phrase_label(agent.charter) }}</p>
+          {% for card in team_cards %}
+            <a class="team-card" href="{{ card.href }}">
+              <div class="team-card-main">
+                <span class="eyebrow">{{ t("team") }}</span>
+                <strong>{{ card.team.name }}</strong>
+                <p>{{ card.mission.title if card.mission else card.team.mission_id }}</p>
               </div>
-              <span class="status">{{ label(agent.status) }}</span>
+              <dl class="agent-work-meta compact">
+                <div>
+                  <dt>{{ t("team_lead") }}</dt>
+                  <dd>{{ card.lead.display_name if card.lead else t("not_available") }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("team_members") }}</dt>
+                  <dd>
+                    {% for member in card.members %}
+                      {{ role_label(member.role_name) }}{{ ", " if not loop.last else "" }}
+                    {% else %}
+                      {{ t("no_team_members") }}
+                    {% endfor %}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ t("status") }}</dt>
+                  <dd>{{ label(card.team.status) }}</dd>
+                </div>
+              </dl>
             </a>
           {% endfor %}
         </div>
@@ -96,31 +128,91 @@
         <p class="muted">{{ t("no_active_agents") }}</p>
       {% endif %}
     </section>
+
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("recent_agent_activity") }}</h3>
+          <p>{{ t("no_agent_activity") if not recent_activity else recent_activity|length }}</p>
+        </div>
+        <a class="small-button" href="/app/activity">{{ t("audit_stream") }}</a>
+      </div>
+      {% if recent_activity %}
+        <div class="command-list">
+          {% for event in recent_activity[:8] %}
+            <a class="command-card" href="{{ '/app/missions/' ~ event.mission_id if event.mission_id else '/app/activity' }}">
+              <div>
+                <div class="eyebrow">{{ event.actor }}</div>
+                <strong>{{ phrase_label(event.title) }}</strong>
+                <p>{{ phrase_label(event.body) if event.body else t("event_recorded") }}</p>
+              </div>
+              <span class="status">{{ format_time(event.created_at) }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_agent_activity") }}</p>
+      {% endif %}
+    </section>
   </section>
 
   <section class="panel command-panel">
     <div class="section-heading">
       <div>
-        <h3>{{ t("recent_agent_activity") }}</h3>
-        <p>{{ t("no_agent_activity") if not recent_activity else recent_activity|length }}</p>
+        <h3>{{ t("role_library") }}</h3>
+        <p>{{ t("role_library_desc") }}</p>
       </div>
-      <a class="small-button" href="/app/activity">{{ t("audit_stream") }}</a>
+      <span class="status">{{ organization.agent_roles|length }} {{ t("role_charter") }}</span>
     </div>
-    {% if recent_activity %}
-      <div class="command-list three">
-        {% for event in recent_activity[:12] %}
-          <a class="command-card" href="{{ '/app/missions/' ~ event.mission_id if event.mission_id else '/app/activity' }}">
+    <div class="agent-role-grid">
+      {% for role in organization.agent_roles %}
+        <details class="agent-card role-detail">
+          <summary>
+            <span>
+              <span class="eyebrow">{{ t("role_charter") }}</span>
+              <strong>{{ role_label(role.name) }}</strong>
+            </span>
+            <span class="status">{{ agents_by_role.get(role.name, [])|length }} {{ t("instances") }}</span>
+          </summary>
+          <p>{{ phrase_label(role.purpose) }}</p>
+          <dl class="agent-meta">
             <div>
-              <div class="eyebrow">{{ event.actor }}</div>
-              <strong>{{ phrase_label(event.title) }}</strong>
-              <p>{{ phrase_label(event.body) if event.body else t("event_recorded") }}</p>
+              <dt>{{ t("supervisor") }}</dt>
+              <dd>{{ phrase_label(role.default_supervisor_role) }}</dd>
             </div>
-            <span class="status">{{ format_time(event.created_at) }}</span>
-          </a>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_agent_activity") }}</p>
-    {% endif %}
+            <div>
+              <dt>{{ t("skills") }}</dt>
+              <dd>
+                {% for skill in role.skills %}
+                  {{ phrase_label(skill) }}{{ ", " if not loop.last else "" }}
+                {% else %}
+                  {{ t("not_available") }}
+                {% endfor %}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t("authority") }}</dt>
+              <dd>
+                {% for item in role.decision_authority %}
+                  {{ phrase_label(item) }}{{ ", " if not loop.last else "" }}
+                {% else %}
+                  {{ t("not_available") }}
+                {% endfor %}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t("escalates_on") }}</dt>
+              <dd>
+                {% for trigger in role.escalation_triggers %}
+                  {{ phrase_label(trigger) }}{{ ", " if not loop.last else "" }}
+                {% else %}
+                  {{ t("not_available") }}
+                {% endfor %}
+              </dd>
+            </div>
+          </dl>
+        </details>
+      {% endfor %}
+    </div>
   </section>
 {% endblock %}

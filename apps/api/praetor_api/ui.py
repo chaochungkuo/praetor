@@ -298,7 +298,35 @@ TRANSLATIONS = {
         "open_mission": "Open mission",
         "review_item": "Review item",
         "agent_directory": "Agent Directory",
-        "agent_directory_desc": "The AI organization: roles, active workers, skills, authority, supervisors, and recent internal activity.",
+        "agent_directory_desc": "The AI organization: who exists, what each agent is working on, who manages whom, and what needs attention.",
+        "ai_command_center": "AI command center",
+        "ai_command_center_desc": "A chairman-readable view of the AI company at work.",
+        "agents_created": "Agents created",
+        "active_teams": "Active teams",
+        "open_work_sessions": "Open work sessions",
+        "blocked_agents": "Blocked agents",
+        "current_assignment": "Current assignment",
+        "current_work": "Current work",
+        "next_step": "Next step",
+        "reports_to": "Reports to",
+        "last_activity": "Last activity",
+        "team": "Team",
+        "team_lead": "Team lead",
+        "team_members": "Team members",
+        "no_team_members": "No team members yet.",
+        "mission_teams": "Mission teams",
+        "mission_teams_desc": "How Praetor groups agents around active work.",
+        "role_library": "Role library",
+        "role_library_desc": "Available role charters. These are capability definitions, not necessarily active staff.",
+        "open_agent_mission": "Open mission",
+        "working_on_mission": "Working on mission",
+        "waiting_for_assignment": "Waiting for assignment",
+        "monitoring_company": "Monitoring company operations",
+        "ready_for_next_assignment": "Ready for next assignment",
+        "waiting_for_owner": "Waiting for owner decision",
+        "blocked_by": "Blocked by",
+        "continue_work_session": "Continue current work session",
+        "review_recent_activity": "Review recent activity",
         "role_charter": "Role charter",
         "active_agents": "Active agents",
         "recent_agent_activity": "Recent agent activity",
@@ -741,7 +769,35 @@ TRANSLATIONS = {
         "open_mission": "打開任務",
         "review_item": "查看項目",
         "agent_directory": "AI 組織名錄",
-        "agent_directory_desc": "公司的 AI 組織：角色、工作中的 agent、技能、權限、主管與近期內部活動。",
+        "agent_directory_desc": "公司的 AI 組織：目前有誰、各自在做什麼、誰管理誰，以及哪裡需要注意。",
+        "ai_command_center": "AI 組織作戰室",
+        "ai_command_center_desc": "用董事長看得懂的方式呈現 AI 公司正在如何運作。",
+        "agents_created": "已建立 Agent",
+        "active_teams": "工作團隊",
+        "open_work_sessions": "進行中會話",
+        "blocked_agents": "受阻 Agent",
+        "current_assignment": "目前任務",
+        "current_work": "正在處理",
+        "next_step": "下一步",
+        "reports_to": "回報對象",
+        "last_activity": "最後活動",
+        "team": "團隊",
+        "team_lead": "團隊負責人",
+        "team_members": "團隊成員",
+        "no_team_members": "尚未有團隊成員。",
+        "mission_teams": "任務編組",
+        "mission_teams_desc": "Praetor 如何圍繞任務組成 AI 團隊。",
+        "role_library": "角色能力庫",
+        "role_library_desc": "可用的角色章程。這是能力定義，不一定代表目前有 agent 正在工作。",
+        "open_agent_mission": "打開任務",
+        "working_on_mission": "正在處理任務",
+        "waiting_for_assignment": "等待指派",
+        "monitoring_company": "監控公司運作",
+        "ready_for_next_assignment": "可接受下一個指派",
+        "waiting_for_owner": "等待董事長裁示",
+        "blocked_by": "受阻原因",
+        "continue_work_session": "繼續目前工作會話",
+        "review_recent_activity": "查看近期活動",
         "role_charter": "角色職責",
         "active_agents": "工作中的 Agent",
         "recent_agent_activity": "近期 AI 內部活動",
@@ -947,6 +1003,10 @@ VALUE_LABELS = {
         "paused": "paused",
         "completed": "completed",
         "failed": "failed",
+        "idle": "idle",
+        "blocked": "blocked",
+        "waiting_owner": "waiting owner",
+        "working": "working",
         "pending": "pending",
         "approved": "approved",
         "rejected": "rejected",
@@ -996,6 +1056,10 @@ VALUE_LABELS = {
         "paused": "已暫停",
         "completed": "已完成",
         "failed": "失敗",
+        "idle": "待命",
+        "blocked": "受阻",
+        "waiting_owner": "等待董事長",
+        "working": "工作中",
         "pending": "待處理",
         "approved": "已批准",
         "rejected": "已拒絕",
@@ -1598,17 +1662,118 @@ def _build_inbox_items(service, t, label, phrase_label, event_label, event_summa
 def _build_agent_directory(service) -> dict[str, Any]:
     organization = service.organization_snapshot()
     activity = service.office_snapshot().agent_activity
+    missions = service.list_missions()
+    missions_by_id = _mission_by_id(missions)
+    agents_by_id = {agent.id: agent for agent in organization.agents}
     agents_by_role: dict[str, list[Any]] = {}
     for agent in organization.agents:
         agents_by_role.setdefault(agent.role_name, []).append(agent)
     activity_by_role: dict[str, list[Any]] = {}
     for event in activity:
         activity_by_role.setdefault(event.actor.replace("_", " ").title(), []).append(event)
+    work_sessions_by_mission: dict[str, list[Any]] = {}
+    for mission in missions:
+        try:
+            sessions = service.mission_work_sessions(mission.id)
+        except KeyError:
+            sessions = []
+        work_sessions_by_mission[mission.id] = sessions
+    delegations_by_agent: dict[str, list[Any]] = {}
+    delegations_by_role: dict[str, list[Any]] = {}
+    for delegation in organization.delegations:
+        if delegation.status in {"done", "cancelled"}:
+            continue
+        if delegation.to_agent_id:
+            delegations_by_agent.setdefault(delegation.to_agent_id, []).append(delegation)
+        delegations_by_role.setdefault(delegation.to_role, []).append(delegation)
+
+    def current_session_for(agent: Any) -> Any | None:
+        if not agent.mission_id:
+            return None
+        sessions = work_sessions_by_mission.get(agent.mission_id, [])
+        role_names = {agent.role_name, agent.role_name.lower().replace(" ", "_")}
+        for session in sessions:
+            if session.status in {"completed", "cancelled"}:
+                continue
+            if session.manager_role in role_names or session.executor_role in role_names:
+                return session
+        return sessions[0] if sessions else None
+
+    agent_cards = []
+    blocked_count = 0
+    open_work_session_count = 0
+    for sessions in work_sessions_by_mission.values():
+        open_work_session_count += len([session for session in sessions if session.status not in {"completed", "cancelled"}])
+    for agent in organization.agents:
+        mission = missions_by_id.get(agent.mission_id) if agent.mission_id else None
+        session = current_session_for(agent)
+        assigned = delegations_by_agent.get(agent.id, []) or delegations_by_role.get(agent.role_name, [])
+        blocker = session.current_blocker if session and session.current_blocker else None
+        if blocker:
+            state = "blocked"
+            current_work = blocker
+            next_step = "waiting_for_owner" if "owner" in blocker.lower() else "review_recent_activity"
+            blocked_count += 1
+        elif session:
+            state = "working"
+            current_work = f"{session.manager_role} -> {session.executor_role}"
+            next_step = "continue_work_session"
+        elif assigned:
+            state = "working"
+            current_work = assigned[0].title
+            next_step = assigned[0].success_criteria[0] if assigned[0].success_criteria else "review_recent_activity"
+        elif mission:
+            state = "active"
+            current_work = mission.summary or "working_on_mission"
+            next_step = "review_recent_activity"
+        else:
+            state = "idle"
+            current_work = "monitoring_company" if agent.role_name == "CEO" else "waiting_for_assignment"
+            next_step = "ready_for_next_assignment"
+        last_activity = agent.updated_at
+        if session and session.updated_at > last_activity:
+            last_activity = session.updated_at
+        agent_cards.append(
+            {
+                "agent": agent,
+                "mission": mission,
+                "session": session,
+                "status": state,
+                "current_work": current_work,
+                "next_step": next_step,
+                "reports_to": agent.supervisor_role or "ceo",
+                "last_activity": last_activity,
+                "href": f"/app/missions/{agent.mission_id}" if agent.mission_id else "/app/agents",
+            }
+        )
+
+    team_cards = []
+    for team in organization.teams:
+        mission = missions_by_id.get(team.mission_id)
+        lead = agents_by_id.get(team.lead_agent_id) if team.lead_agent_id else None
+        members = [agents_by_id[agent_id] for agent_id in team.member_agent_ids if agent_id in agents_by_id]
+        team_cards.append(
+            {
+                "team": team,
+                "mission": mission,
+                "lead": lead,
+                "members": members,
+                "href": f"/app/missions/{team.mission_id}",
+            }
+        )
     return {
         "organization": organization,
         "agents_by_role": agents_by_role,
         "activity_by_role": activity_by_role,
         "recent_activity": activity,
+        "agent_cards": agent_cards,
+        "team_cards": team_cards,
+        "agent_overview": {
+            "agents_created": len(organization.agents),
+            "active_teams": len(organization.teams),
+            "open_work_sessions": open_work_session_count,
+            "blocked_agents": blocked_count,
+        },
     }
 
 
