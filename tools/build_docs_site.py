@@ -23,6 +23,7 @@ PAGES = [
     ("docs/PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md", "Privacy Boundaries"),
     ("docs/PRAETOR_MEMORY_PROMOTION.md", "Memory Promotion"),
     ("docs/PRAETOR_TEAM_PLANNING.md", "Team Planning"),
+    ("docs/PRAETOR_WORKSPACE_STEWARD.md", "Workspace Steward"),
     ("docs/INSTALL_CHECKLIST.md", "Install Checklist"),
     ("docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md", "Deployment Security"),
     ("docs/PRAETOR_LOCAL_DEPLOY.md", "Local Deploy"),

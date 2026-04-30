@@ -22,6 +22,8 @@ from .models import (
     DelegationRecord,
     DocumentRecord,
     EscalationRecord,
+    FileAssetRecord,
+    FileMoveRecord,
     KnowledgeUpdate,
     MemoryPromotionReview,
     MatterDecisionRecord,
@@ -35,6 +37,7 @@ from .models import (
     StandingOrder,
     TaskDefinition,
     WorkflowContract,
+    WorkspaceRestructurePlan,
     WorkspaceScope,
     WorkSession,
 )
@@ -162,6 +165,9 @@ class FilesystemStore:
         self.clients_path = self.state_dir / "clients.json"
         self.matters_path = self.state_dir / "matters.json"
         self.documents_path = self.state_dir / "documents.json"
+        self.file_assets_path = self.state_dir / "file_assets.json"
+        self.file_moves_path = self.state_dir / "file_moves.json"
+        self.workspace_restructure_plans_path = self.state_dir / "workspace_restructure_plans.json"
         self.matter_decisions_path = self.state_dir / "matter_decisions.json"
         self.open_questions_path = self.state_dir / "open_questions.json"
         self.knowledge_updates_path = self.state_dir / "knowledge_updates.json"
@@ -619,6 +625,76 @@ class FilesystemStore:
             documents = [item for item in documents if item.mission_id == mission_id]
         return documents
 
+    def save_file_asset(self, asset: FileAssetRecord) -> None:
+        assets = self.list_file_assets(limit=100_000)
+        assets = [
+            item
+            for item in assets
+            if item.id != asset.id
+            and item.current_path != asset.current_path
+            and not (
+                asset.document_version_id is not None
+                and item.document_version_id == asset.document_version_id
+            )
+        ] + [asset]
+        assets.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.file_assets_path, assets)
+
+    def list_file_assets(
+        self,
+        mission_id: str | None = None,
+        matter_id: str | None = None,
+        document_id: str | None = None,
+        limit: int = 50,
+    ) -> list[FileAssetRecord]:
+        assets = self._read_model_list(self.file_assets_path, FileAssetRecord)
+        if mission_id is not None:
+            assets = [item for item in assets if item.mission_id == mission_id]
+        if matter_id is not None:
+            assets = [item for item in assets if item.matter_id == matter_id]
+        if document_id is not None:
+            assets = [item for item in assets if item.document_id == document_id]
+        assets.sort(key=lambda item: item.updated_at, reverse=True)
+        return assets[:limit]
+
+    def save_file_move(self, move: FileMoveRecord) -> None:
+        moves = self.list_file_moves(limit=100_000)
+        moves = [item for item in moves if item.id != move.id] + [move]
+        moves.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.file_moves_path, moves)
+
+    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
+        moves = self._read_model_list(self.file_moves_path, FileMoveRecord)
+        if asset_id is not None:
+            moves = [item for item in moves if item.asset_id == asset_id]
+        moves.sort(key=lambda item: item.created_at, reverse=True)
+        return moves[:limit]
+
+    def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
+        plans = self.list_workspace_restructure_plans(limit=100_000)
+        plans = [item for item in plans if item.id != plan.id] + [plan]
+        plans.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.workspace_restructure_plans_path, plans)
+
+    def list_workspace_restructure_plans(
+        self,
+        mission_id: str | None = None,
+        limit: int = 20,
+    ) -> list[WorkspaceRestructurePlan]:
+        plans = self._read_model_list(self.workspace_restructure_plans_path, WorkspaceRestructurePlan)
+        if mission_id is not None:
+            plans = [item for item in plans if item.mission_id == mission_id]
+        plans.sort(key=lambda item: item.updated_at, reverse=True)
+        return plans[:limit]
+
+    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
+        path = workspace_root / ".praetor" / "file_manifest.json"
+        _write_workspace_text(
+            path,
+            json.dumps([item.model_dump(mode="json") for item in assets], indent=2, ensure_ascii=True),
+        )
+        return path
+
     def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
         decisions = self.list_matter_decisions()
         decisions = [item for item in decisions if item.id != decision.id] + [decision]
@@ -930,6 +1006,37 @@ class AppStorage:
 
     def list_documents(self, matter_id: str | None = None, mission_id: str | None = None) -> list[DocumentRecord]:
         return self.fs.list_documents(matter_id=matter_id, mission_id=mission_id)
+
+    def save_file_asset(self, asset: FileAssetRecord) -> None:
+        self.fs.save_file_asset(asset)
+
+    def list_file_assets(
+        self,
+        mission_id: str | None = None,
+        matter_id: str | None = None,
+        document_id: str | None = None,
+        limit: int = 50,
+    ) -> list[FileAssetRecord]:
+        return self.fs.list_file_assets(mission_id=mission_id, matter_id=matter_id, document_id=document_id, limit=limit)
+
+    def save_file_move(self, move: FileMoveRecord) -> None:
+        self.fs.save_file_move(move)
+
+    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
+        return self.fs.list_file_moves(asset_id=asset_id, limit=limit)
+
+    def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
+        self.fs.save_workspace_restructure_plan(plan)
+
+    def list_workspace_restructure_plans(
+        self,
+        mission_id: str | None = None,
+        limit: int = 20,
+    ) -> list[WorkspaceRestructurePlan]:
+        return self.fs.list_workspace_restructure_plans(mission_id=mission_id, limit=limit)
+
+    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
+        return self.fs.write_workspace_manifest(workspace_root, assets)
 
     def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
         self.fs.save_matter_decision(workspace_root, decision)

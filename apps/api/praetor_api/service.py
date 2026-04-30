@@ -25,6 +25,8 @@ from .models import (
     DocumentRecord,
     DocumentVersion,
     EscalationRecord,
+    FileAssetRecord,
+    FileMoveRecord,
     GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
@@ -57,7 +59,9 @@ from .models import (
     TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
+    WorkspaceRestructurePlan,
     WorkspaceScope,
+    WorkspaceStewardSnapshot,
     WorkSession,
     WorkSessionTurn,
     utc_now,
@@ -426,6 +430,7 @@ class PraetorService:
             )
         )
         self._ensure_mission_team(mission)
+        self._register_requested_output_assets(mission)
         if mission.pm_required:
             self.storage.append_agent_message(
                 AgentMessage(
@@ -569,6 +574,7 @@ class PraetorService:
         )
         for document in self._planned_documents_for_mission(mission, client, matter):
             self.storage.save_document(document)
+            self._register_document_assets(document)
 
     def _planned_documents_for_mission(
         self,
@@ -822,6 +828,186 @@ class PraetorService:
             except OSError:
                 pass
         return self.storage.load_workflow_contract(workspace_root)
+
+    def workspace_steward_snapshot(self, mission_id: str | None = None, limit: int = 100) -> WorkspaceStewardSnapshot:
+        settings = self._require_settings()
+        assets = self.storage.list_file_assets(mission_id=mission_id, limit=limit)
+        plans = self.storage.list_workspace_restructure_plans(mission_id=mission_id, limit=20)
+        moves = self.storage.list_file_moves(limit=50)
+        self.storage.write_workspace_manifest(Path(settings.workspace.root), self.storage.list_file_assets(limit=100_000))
+        return WorkspaceStewardSnapshot(assets=assets, restructure_plans=plans, recent_moves=moves)
+
+    def create_workspace_restructure_plan(self, mission_id: str | None = None) -> WorkspaceRestructurePlan:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        mission = self.get_mission(mission_id) if mission_id else None
+        matter = next(iter(self.storage.list_matters(mission_id=mission_id)), None) if mission_id else None
+        assets = self.storage.list_file_assets(mission_id=mission_id, limit=100_000)
+        moves: list[FileMoveRecord] = []
+        for asset in assets:
+            target = self._canonical_asset_path(asset, matter)
+            if not target or target == asset.current_path:
+                continue
+            moves.append(
+                FileMoveRecord(
+                    asset_id=asset.id,
+                    from_path=asset.current_path,
+                    to_path=target,
+                    reason="Workspace Steward recommends canonical matter/project organization.",
+                    requires_approval=asset.sensitivity in {"confidential", "restricted"},
+                )
+            )
+        requires_approval = bool(moves) and (len(moves) > 10 or any(move.requires_approval for move in moves))
+        plan = WorkspaceRestructurePlan(
+            mission_id=mission.id if mission else None,
+            matter_id=matter.id if matter else None,
+            client_id=matter.client_id if matter else None,
+            summary=f"Workspace Steward reviewed {len(assets)} file asset(s) and proposed {len(moves)} move(s).",
+            rationale=(
+                "Praetor keeps stable file asset IDs and treats filesystem paths as changeable locations. "
+                "This plan can be reviewed before files are moved or Wiki links are updated."
+            ),
+            moves=moves,
+            wiki_updates=[
+                "Update wiki links to stable praetor://file/<asset_id> references after move execution."
+            ] if moves else [],
+            registry_updates=[
+                "Update document registry paths and previous_paths after move execution."
+            ] if moves else [],
+            risks=[
+                "Do not execute moves that affect client, legal, privacy, or delivery files without approval.",
+                "External links or manually written Markdown paths may need review after restructuring.",
+            ] if moves else [],
+            requires_approval=requires_approval,
+        )
+        self.storage.save_workspace_restructure_plan(plan)
+        for move in moves:
+            self.storage.save_file_move(move)
+        self.storage.write_workspace_manifest(workspace_root, self.storage.list_file_assets(limit=100_000))
+        self._audit(
+            "workspace_restructure_plan_created",
+            {
+                "plan_id": plan.id,
+                "mission_id": mission_id,
+                "moves": len(moves),
+                "requires_approval": requires_approval,
+            },
+        )
+        return plan
+
+    def _register_requested_output_assets(self, mission: MissionDefinition) -> None:
+        for output in mission.requested_outputs:
+            self._save_file_asset(
+                FileAssetRecord(
+                    current_path=self._workspace_relative_path(output),
+                    source="requested_output",
+                    sensitivity=self._infer_file_sensitivity(output),
+                    title=Path(output).name,
+                    purpose="Requested mission output.",
+                    client_id=mission.client_id,
+                    matter_id=mission.matter_id,
+                    mission_id=mission.id,
+                    steward_notes="Registered from mission requested_outputs.",
+                )
+            )
+
+    def _register_document_assets(self, document: DocumentRecord) -> None:
+        for version in document.versions:
+            self._save_file_asset(
+                FileAssetRecord(
+                    current_path=self._workspace_relative_path(version.path),
+                    source="document_version",
+                    sensitivity=self._infer_file_sensitivity(version.path),
+                    title=document.title,
+                    purpose=version.reason,
+                    client_id=document.client_id,
+                    matter_id=document.matter_id,
+                    mission_id=document.mission_id,
+                    document_id=document.id,
+                    document_version_id=version.id,
+                    steward_notes=f"Registered from document registry version v{version.version:03d}.",
+                )
+            )
+
+    def _register_runtime_output_assets(self, mission: MissionDefinition, changed_files: list[str]) -> None:
+        for path in changed_files:
+            self._save_file_asset(
+                FileAssetRecord(
+                    current_path=self._workspace_relative_path(path),
+                    source="runtime_output",
+                    sensitivity=self._infer_file_sensitivity(path),
+                    title=Path(path).name,
+                    purpose="Executor changed or generated this file.",
+                    client_id=mission.client_id,
+                    matter_id=mission.matter_id,
+                    mission_id=mission.id,
+                    steward_notes="Registered from runtime changed_files.",
+                )
+            )
+
+    def _save_file_asset(self, asset: FileAssetRecord) -> None:
+        settings = self._require_settings()
+        existing = next(
+            (
+                item
+                for item in self.storage.list_file_assets(limit=100_000)
+                if item.current_path == asset.current_path
+                or (
+                    asset.document_version_id is not None
+                    and item.document_version_id == asset.document_version_id
+                )
+            ),
+            None,
+        )
+        if existing is not None:
+            asset = existing.model_copy(
+                update={
+                    "source": asset.source,
+                    "sensitivity": asset.sensitivity,
+                    "title": asset.title or existing.title,
+                    "purpose": asset.purpose or existing.purpose,
+                    "client_id": asset.client_id or existing.client_id,
+                    "matter_id": asset.matter_id or existing.matter_id,
+                    "mission_id": asset.mission_id or existing.mission_id,
+                    "document_id": asset.document_id or existing.document_id,
+                    "document_version_id": asset.document_version_id or existing.document_version_id,
+                    "steward_notes": asset.steward_notes or existing.steward_notes,
+                    "updated_at": utc_now(),
+                }
+            )
+        self.storage.save_file_asset(asset)
+        self.storage.write_workspace_manifest(Path(settings.workspace.root), self.storage.list_file_assets(limit=100_000))
+
+    def _canonical_asset_path(self, asset: FileAssetRecord, matter: MatterRecord | None = None) -> str | None:
+        if matter is None:
+            return None
+        filename = Path(asset.current_path).name
+        if not filename:
+            return None
+        if asset.document_id or asset.source == "document_version":
+            return f"{matter.folder}/versions/{filename}"
+        if asset.source == "runtime_output":
+            return f"{matter.folder}/outputs/{filename}"
+        if asset.source == "requested_output":
+            return f"{matter.folder}/requested/{filename}"
+        return f"{matter.folder}/files/{filename}"
+
+    @staticmethod
+    def _workspace_relative_path(path: str) -> str:
+        path = path.strip()
+        for prefix in ["/app/workspace/", "/workspace/"]:
+            if path.startswith(prefix):
+                return path[len(prefix) :].lstrip("/")
+        return path.lstrip("/")
+
+    @staticmethod
+    def _infer_file_sensitivity(path: str) -> str:
+        lowered = path.lower()
+        if any(term in lowered for term in ["secret", "token", "key", "credential", "private"]):
+            return "restricted"
+        if any(term in lowered for term in ["contract", "legal", "合約", "合同", "client", "customer"]):
+            return "confidential"
+        return "internal"
 
     def organization_snapshot(self, mission_id: str | None = None) -> OrganizationSnapshot:
         self._require_settings()
@@ -1780,6 +1966,7 @@ class PraetorService:
                 ]
             ),
         )
+        self._register_runtime_output_assets(mission, final_result.run_record.changed_files)
         if mission.pm_required:
             self.storage.append_pm_report(
                 workspace_root,

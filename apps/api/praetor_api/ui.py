@@ -411,6 +411,12 @@ TRANSLATIONS = {
         "run_attempts": "Run attempts",
         "workspace_scope": "Workspace scope",
         "workflow_contract": "Workflow contract",
+        "workspace_steward": "Workspace Steward",
+        "workspace_steward_desc": "Praetor registers files by stable IDs so folders can be reorganized without losing document references.",
+        "file_assets": "File assets",
+        "restructure_plans": "Restructure plans",
+        "create_restructure_plan": "Create restructure plan",
+        "no_file_assets": "No file assets registered yet.",
         "allowed_write": "Allowed write",
         "denied_write": "Denied write",
         "last_event": "Last event",
@@ -830,6 +836,12 @@ TRANSLATIONS = {
         "run_attempts": "執行嘗試",
         "workspace_scope": "工作區範圍",
         "workflow_contract": "工作流程規範",
+        "workspace_steward": "Workspace Steward",
+        "workspace_steward_desc": "Praetor 會用穩定 ID 登記檔案，讓資料夾可以整理而不失去文件引用。",
+        "file_assets": "檔案資產",
+        "restructure_plans": "整理計畫",
+        "create_restructure_plan": "建立整理計畫",
+        "no_file_assets": "目前沒有已登記的檔案資產。",
         "allowed_write": "允許寫入",
         "denied_write": "禁止寫入",
         "last_event": "最後事件",
@@ -2010,6 +2022,7 @@ def mission_detail_page(request: Request, mission_id: str):
     knowledge = service.mission_knowledge_snapshot(mission_id)
     memory_promotion_reviews = service.mission_memory_promotion_reviews(mission_id)
     board_briefings = service.list_board_briefings(mission_id)
+    workspace_steward = service.workspace_steward_snapshot(mission_id=mission_id)
     run_attempts = service.list_run_attempts(mission_id)
     workspace_scope = service.mission_workspace_scope(mission_id)
     workflow_contract = service.workflow_contract()
@@ -2026,6 +2039,7 @@ def mission_detail_page(request: Request, mission_id: str):
             "knowledge": knowledge,
             "memory_promotion_reviews": memory_promotion_reviews,
             "board_briefings": board_briefings,
+            "workspace_steward": workspace_steward,
             "run_attempts": run_attempts,
             "workspace_scope": workspace_scope,
             "workflow_contract": workflow_contract,
@@ -2196,6 +2210,17 @@ async def create_memory_promotion_submit(request: Request, mission_id: str):
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Memory promotion review created: {review.id}", "success")
+
+
+@router.post("/app/missions/{mission_id}/workspace-restructure-plan")
+async def create_workspace_restructure_plan_submit(request: Request, mission_id: str):
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    try:
+        plan = request.app.state.ctx.service.create_workspace_restructure_plan(mission_id=mission_id)
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
+    return _redirect(f"/app/missions/{mission_id}", f"Workspace restructure plan created: {plan.id}", "success")
 
 
 @router.post("/app/missions/{mission_id}/board-briefing")

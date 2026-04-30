@@ -49,6 +49,14 @@ This workspace contract is versioned with the company workspace. It defines how 
 - Low-risk sequencing can be decided by the PM inside mission scope.
 - Security, privacy, legal, spending, external communication, destructive file actions, and material strategy changes must be escalated.
 
+## Workspace Steward Contract
+
+- The owner should not need to manually create folders or classify files.
+- Files must be registered as stable file assets; filesystem paths are current locations, not durable identity.
+- Uploaded, downloaded, generated, requested, and executor-created files should enter the same file intake and registry flow.
+- Folder restructuring should create a reviewable plan before moving important client, legal, privacy, or delivery files.
+- Wiki and document registry references should be updated through stable IDs such as praetor://file/<asset_id>, not only raw paths.
+
 ## Completion Contract
 
 - Requested outputs are present or explicitly waived.

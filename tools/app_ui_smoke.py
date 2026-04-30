@@ -143,6 +143,7 @@ def main() -> int:
                     "mission_detail_has_work_sessions": "AI work sessions" in mission_detail,
                     "mission_detail_has_knowledge_workspace": "Knowledge workspace" in mission_detail,
                     "mission_detail_has_workspace_scope": "Workspace scope" in mission_detail,
+                    "mission_detail_has_workspace_steward": "Workspace Steward" in mission_detail,
                     "mission_detail_has_run_attempts": "Run attempts" in mission_detail,
                     "mission_detail_has_board_briefing": "Board briefing" in mission_detail,
                     "mission_detail_has_memory_promotion": "Memory promotion" in mission_detail,

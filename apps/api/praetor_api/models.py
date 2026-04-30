@@ -105,6 +105,10 @@ WorkSessionTurnType = Literal[
 ]
 MatterStatus = Literal["open", "waiting_owner", "waiting_external", "review", "closed", "archived"]
 DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"]
+FileAssetSource = Literal["requested_output", "document_version", "runtime_output", "upload", "download", "manual"]
+FileAssetSensitivity = Literal["low", "internal", "confidential", "restricted"]
+FileMoveStatus = Literal["proposed", "applied", "skipped", "failed"]
+WorkspaceRestructureStatus = Literal["draft", "ready_for_review", "applied", "rejected"]
 DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
 OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
 KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
@@ -590,6 +594,62 @@ class DocumentRecord(BaseModel):
     versions: list[DocumentVersion] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class FileAssetRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("fileasset"))
+    current_path: str
+    previous_paths: list[str] = Field(default_factory=list)
+    source: FileAssetSource = "manual"
+    sensitivity: FileAssetSensitivity = "internal"
+    title: str | None = None
+    purpose: str | None = None
+    client_id: str | None = None
+    matter_id: str | None = None
+    mission_id: str | None = None
+    document_id: str | None = None
+    document_version_id: str | None = None
+    related_decision_ids: list[str] = Field(default_factory=list)
+    related_question_ids: list[str] = Field(default_factory=list)
+    created_by: str = "workspace_steward"
+    steward_notes: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class FileMoveRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("filemove"))
+    asset_id: str
+    from_path: str
+    to_path: str
+    reason: str
+    status: FileMoveStatus = "proposed"
+    requires_approval: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    applied_at: datetime | None = None
+
+
+class WorkspaceRestructurePlan(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("restructure"))
+    status: WorkspaceRestructureStatus = "ready_for_review"
+    mission_id: str | None = None
+    matter_id: str | None = None
+    client_id: str | None = None
+    summary: str
+    rationale: str
+    moves: list[FileMoveRecord] = Field(default_factory=list)
+    wiki_updates: list[str] = Field(default_factory=list)
+    registry_updates: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    requires_approval: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class WorkspaceStewardSnapshot(BaseModel):
+    assets: list[FileAssetRecord] = Field(default_factory=list)
+    restructure_plans: list[WorkspaceRestructurePlan] = Field(default_factory=list)
+    recent_moves: list[FileMoveRecord] = Field(default_factory=list)
 
 
 class MatterDecisionRecord(BaseModel):

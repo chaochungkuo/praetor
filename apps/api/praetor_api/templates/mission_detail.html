@@ -206,6 +206,48 @@
   <section class="panel">
     <div class="section-heading">
       <div>
+        <h3>{{ t("workspace_steward") }}</h3>
+        <p>{{ t("workspace_steward_desc") }}</p>
+      </div>
+      <form method="post" action="/app/missions/{{ mission.id }}/workspace-restructure-plan">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="secondary">{{ t("create_restructure_plan") }}</button>
+      </form>
+    </div>
+    {% if workspace_steward.assets %}
+      <div class="list">
+        {% for asset in workspace_steward.assets[:8] %}
+          <div class="list-row">
+            <div>
+              <strong>{{ asset.title or asset.current_path }}</strong>
+              <div class="muted">{{ asset.current_path }}</div>
+              <div class="muted">{{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ asset.id }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_file_assets") }}</p>
+    {% endif %}
+    {% if workspace_steward.restructure_plans %}
+      <h4>{{ t("restructure_plans") }}</h4>
+      <div class="list">
+        {% for plan in workspace_steward.restructure_plans[:3] %}
+          <div class="list-row">
+            <div>
+              <strong>{{ plan.summary }}</strong>
+              <div class="muted">{{ t("status") }}: {{ label(plan.status) }} · {{ plan.moves|length }} moves</div>
+            </div>
+            <span class="status">{{ label(plan.status) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
         <h3>{{ t("board_briefing") }}</h3>
         <p>{{ t("board_briefing_desc") }}</p>
       </div>
