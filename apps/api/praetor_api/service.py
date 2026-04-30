@@ -41,6 +41,8 @@ from .models import (
     TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
+    WorkSession,
+    WorkSessionTurn,
     utc_now,
 )
 from .planner import CEOPlanner, CEOPlannerContext, default_ceo_planner
@@ -719,6 +721,20 @@ class PraetorService:
         mission.updated_at = utc_now()
         workspace_root = Path(settings.workspace.root)
         self.storage.save_mission(workspace_root, mission)
+        work_session = self._open_work_session(mission)
+        self._append_work_session_turn(
+            work_session,
+            WorkSessionTurn(
+                turn_type="manager_instruction",
+                from_role=work_session.manager_role,
+                to_role=work_session.executor_role,
+                body=(
+                    f"Run mission '{mission.title}'. Produce requested outputs, report blockers, "
+                    "and escalate safety, privacy, destructive-write, shell, or strategy risks."
+                ),
+                status="assigned",
+            ),
+        )
 
         primary_result = runtime_engine.run_mission(
             workspace_root=workspace_root,
@@ -729,6 +745,8 @@ class PraetorService:
         )
         self.storage.save_task(workspace_root, primary_result.task)
         self.storage.save_bridge_run(workspace_root, mission.id, primary_result.run_record.model_dump(mode="json"))
+        work_session.executor = primary_result.task.current_executor
+        self._record_executor_turn(work_session, primary_result.task.id, primary_result.run_record)
         self.storage.append_agent_message(
             AgentMessage(
                 mission_id=mission.id,
@@ -747,6 +765,21 @@ class PraetorService:
         if self._should_fallback(primary_result.run_record.normalized_status) and fallback_runtime is not None:
             fallback_health = runtime_engine.probe(fallback_runtime)
             if fallback_health.get("healthy"):
+                self._append_work_session_turn(
+                    work_session,
+                    WorkSessionTurn(
+                        turn_type="manager_decision",
+                        from_role=work_session.manager_role,
+                        to_role=work_session.executor_role,
+                        body=(
+                            f"Primary executor returned {primary_result.run_record.normalized_status}; "
+                            f"PM is switching to fallback runtime {fallback_runtime.mode}."
+                        ),
+                        status="fallback_started",
+                        task_id=primary_result.task.id,
+                        run_id=primary_result.run_record.run_id,
+                    ),
+                )
                 self._audit(
                     "mission_run_fallback_started",
                     {
@@ -769,6 +802,8 @@ class PraetorService:
                     mission.id,
                     fallback_result.run_record.model_dump(mode="json"),
                 )
+                work_session.executor = fallback_result.task.current_executor
+                self._record_executor_turn(work_session, fallback_result.task.id, fallback_result.run_record)
                 self.storage.append_agent_message(
                     AgentMessage(
                         mission_id=mission.id,
@@ -787,6 +822,7 @@ class PraetorService:
         mission.status = self._mission_status_from_bridge(final_status)
         mission.updated_at = utc_now()
         self.storage.save_mission(workspace_root, mission)
+        self._record_manager_decision(work_session, mission.status, final_result.task.id, final_result.run_record)
         self.storage.append_report(
             workspace_root,
             mission.id,
@@ -851,6 +887,7 @@ class PraetorService:
             "mission": mission,
             "task": final_result.task,
             "bridge_run": final_result.run_record,
+            "work_session": work_session,
         }
 
     def _notify_telegram_approval(self, approval: ApprovalRequest) -> None:
@@ -1086,6 +1123,20 @@ class PraetorService:
                     metadata={"category": escalation.category, "options": escalation.options},
                 )
             )
+        for session in self.storage.list_work_sessions(mission_id=mission_id, limit=20):
+            events.append(
+                MissionTimelineEvent(
+                    id=session.id,
+                    mission_id=mission_id,
+                    type="audit",
+                    title=f"Work session: {session.status}",
+                    body=session.current_blocker or f"{session.manager_role} managing {session.executor_role}",
+                    actor=session.manager_role,
+                    status=session.status,
+                    created_at=session.updated_at,
+                    metadata={"turns": len(session.turns), "executor": session.executor},
+                )
+            )
         events.sort(key=lambda item: item.created_at)
         return events
 
@@ -1094,6 +1145,108 @@ class PraetorService:
         if self.storage.load_mission(Path(settings.workspace.root), mission_id) is None:
             raise KeyError(mission_id)
         return self.storage.list_agent_messages(mission_id=mission_id, limit=limit)
+
+    def mission_work_sessions(self, mission_id: str, limit: int = 20) -> list[WorkSession]:
+        settings = self._require_settings()
+        if self.storage.load_mission(Path(settings.workspace.root), mission_id) is None:
+            raise KeyError(mission_id)
+        return self.storage.list_work_sessions(mission_id=mission_id, limit=limit)
+
+    def _open_work_session(self, mission: MissionDefinition) -> WorkSession:
+        session = WorkSession(
+            mission_id=mission.id,
+            manager_role="project_manager" if mission.pm_required else "praetor",
+            executor_role="developer",
+            status="running",
+            completion_contract=[
+                "requested outputs are present or explicitly waived",
+                "executor result is reviewed by the manager",
+                "blockers and escalation needs are recorded",
+                "owner-visible report is updated",
+            ],
+        )
+        self.storage.save_work_session(session)
+        self._audit("work_session_opened", {"session_id": session.id, "mission_id": mission.id, "manager_role": session.manager_role})
+        return session
+
+    def _append_work_session_turn(self, session: WorkSession, turn: WorkSessionTurn) -> None:
+        session.turns.append(turn)
+        session.updated_at = utc_now()
+        self.storage.save_work_session(session)
+
+    def _record_executor_turn(self, session: WorkSession, task_id: str, run_record) -> None:
+        normalized = run_record.normalized_status or run_record.status
+        turn_type = "executor_result"
+        body = (
+            f"Executor returned {normalized}. "
+            f"Changed files: {', '.join(run_record.changed_files) or 'none'}."
+        )
+        if normalized in {"paused_budget", "paused_decision", "paused_risk", "interactive_approval_required", "auth_required"}:
+            turn_type = "executor_question"
+            body = run_record.pause_reason or f"Executor needs manager or owner action: {normalized}."
+            session.status = "waiting_manager"
+            session.current_blocker = body
+        self._append_work_session_turn(
+            session,
+            WorkSessionTurn(
+                turn_type=turn_type,
+                from_role=session.executor_role,
+                to_role=session.manager_role,
+                body=body,
+                status=normalized,
+                task_id=task_id,
+                run_id=run_record.run_id,
+                metadata={
+                    "executor": run_record.executor,
+                    "changed_files": run_record.changed_files,
+                    "pause_reason": run_record.pause_reason,
+                },
+            ),
+        )
+
+    def _record_manager_decision(self, session: WorkSession, mission_status: str, task_id: str, run_record) -> None:
+        normalized = run_record.normalized_status or run_record.status
+        if mission_status == "completed":
+            session.status = "completed"
+            session.current_blocker = None
+            body = "PM reviewed the executor result and marked the session completed."
+            turn_status = "completed"
+        elif mission_status == "waiting_approval":
+            session.status = "waiting_approval"
+            session.current_blocker = run_record.pause_reason or f"Approval required after executor status {normalized}."
+            body = f"PM escalated this blocker into Praetor approval flow: {session.current_blocker}"
+            turn_status = "escalated"
+        elif mission_status == "paused":
+            session.status = "blocked"
+            session.current_blocker = run_record.pause_reason or f"Mission paused after executor status {normalized}."
+            body = f"PM blocked the session until the executor issue is resolved: {session.current_blocker}"
+            turn_status = "blocked"
+        else:
+            session.status = "failed"
+            session.current_blocker = run_record.stderr_tail or run_record.stdout_tail or f"Executor status {normalized}."
+            body = f"PM marked the session failed and preserved the executor output for review: {session.current_blocker}"
+            turn_status = "failed"
+        self._append_work_session_turn(
+            session,
+            WorkSessionTurn(
+                turn_type="manager_decision",
+                from_role=session.manager_role,
+                to_role="ceo" if session.status in {"waiting_approval", "blocked", "failed"} else session.executor_role,
+                body=body,
+                status=turn_status,
+                task_id=task_id,
+                run_id=run_record.run_id,
+            ),
+        )
+        self._audit(
+            "work_session_updated",
+            {
+                "session_id": session.id,
+                "mission_id": session.mission_id,
+                "status": session.status,
+                "current_blocker": session.current_blocker,
+            },
+        )
 
     def _apply_planner_action(
         self,

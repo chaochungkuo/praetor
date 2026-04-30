@@ -24,6 +24,7 @@ from .models import (
     OwnerAuthRecord,
     StandingOrder,
     TaskDefinition,
+    WorkSession,
 )
 
 
@@ -143,6 +144,7 @@ class FilesystemStore:
         self.approvals_path = self.state_dir / "approvals.json"
         self.conversation_path = self.state_dir / "office_conversation.json"
         self.agent_messages_path = self.state_dir / "agent_messages.json"
+        self.work_sessions_path = self.state_dir / "work_sessions.json"
         self.agent_roles_path = self.state_dir / "agent_roles.json"
         self.agents_path = self.state_dir / "agents.json"
         self.teams_path = self.state_dir / "mission_teams.json"
@@ -444,6 +446,25 @@ class FilesystemStore:
         messages.sort(key=lambda item: item.created_at)
         return messages[-limit:]
 
+    def save_work_session(self, session: WorkSession) -> None:
+        sessions = self.list_work_sessions(limit=10_000)
+        sessions = [item for item in sessions if item.id != session.id] + [session]
+        sessions.sort(key=lambda item: item.updated_at, reverse=True)
+        _write_private_text(
+            self.work_sessions_path,
+            json.dumps([item.model_dump(mode="json") for item in sessions], indent=2, ensure_ascii=True),
+        )
+
+    def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
+        if not self.work_sessions_path.exists():
+            return []
+        payload = json.loads(self.work_sessions_path.read_text(encoding="utf-8"))
+        sessions = [WorkSession.model_validate(item) for item in payload]
+        if mission_id is not None:
+            sessions = [item for item in sessions if item.mission_id == mission_id]
+        sessions.sort(key=lambda item: item.updated_at, reverse=True)
+        return sessions[:limit]
+
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         roles = self.list_agent_roles()
         roles = [item for item in roles if item.id != role.id and item.name != role.name] + [role]
@@ -616,6 +637,12 @@ class AppStorage:
 
     def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
         return self.fs.list_agent_messages(mission_id=mission_id, limit=limit)
+
+    def save_work_session(self, session: WorkSession) -> None:
+        self.fs.save_work_session(session)
+
+    def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
+        return self.fs.list_work_sessions(mission_id=mission_id, limit=limit)
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         self.fs.save_agent_role(role)

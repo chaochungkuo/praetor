@@ -93,6 +93,14 @@ EscalationLevel = Literal["project_manager", "ceo", "chairman"]
 EscalationStatus = Literal["pending", "resolved", "dismissed"]
 DelegationStatus = Literal["assigned", "running", "blocked", "review", "done", "cancelled"]
 StandingOrderScope = Literal["global", "mission", "security", "privacy", "legal", "finance", "product", "engineering"]
+WorkSessionStatus = Literal["open", "running", "waiting_manager", "waiting_approval", "completed", "failed", "blocked"]
+WorkSessionTurnType = Literal[
+    "manager_instruction",
+    "executor_result",
+    "executor_question",
+    "manager_decision",
+    "escalation",
+]
 
 
 class ApiEnvelope(BaseModel):
@@ -417,6 +425,33 @@ class AgentMessage(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     task_id: str | None = None
     run_id: str | None = None
+
+
+class WorkSessionTurn(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("turn"))
+    turn_type: WorkSessionTurnType
+    from_role: str
+    to_role: str
+    body: str
+    status: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    task_id: str | None = None
+    run_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkSession(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("worksession"))
+    mission_id: str
+    manager_role: str = "project_manager"
+    executor_role: str = "developer"
+    executor: str | None = None
+    status: WorkSessionStatus = "open"
+    current_blocker: str | None = None
+    completion_contract: list[str] = Field(default_factory=list)
+    turns: list[WorkSessionTurn] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class MissionTimelineEvent(BaseModel):

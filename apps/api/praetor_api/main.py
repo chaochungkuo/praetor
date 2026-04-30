@@ -466,6 +466,16 @@ def mission_agent_messages(mission_id: str):
         fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
+@app.get("/api/missions/{mission_id}/work-sessions")
+def mission_work_sessions(mission_id: str):
+    try:
+        return ok({"sessions": get_ctx().service.mission_work_sessions(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
 @app.get("/debug/state")
 def debug_state():
     from .config import get_debug_routes_enabled
