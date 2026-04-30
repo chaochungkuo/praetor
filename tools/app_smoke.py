@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import http.cookiejar
+import urllib.error
 import urllib.request
 
 
@@ -40,8 +41,12 @@ def request(method: str, path: str, payload: dict | None = None, *, setup: bool 
         headers["X-Praetor-Setup-Token"] = SETUP_TOKEN
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
-    with OPENER.open(req, timeout=30) as resp:
-        return json.load(resp)
+    try:
+        with OPENER.open(req, timeout=30) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"{method} {path} failed with HTTP {exc.code}: {body}") from exc
 
 
 def wait_for_server() -> None:
@@ -232,8 +237,12 @@ def main() -> int:
         )
         mission_id = mission["data"]["id"]
         mission_knowledge = request("GET", f"/api/missions/{mission_id}/knowledge")
+        mission_scope = request("GET", f"/api/missions/{mission_id}/workspace-scope")
+        workflow = request("GET", "/api/workflow")
         run_result = request("POST", f"/missions/{mission_id}/run")
+        run_attempts = request("GET", f"/api/missions/{mission_id}/run-attempts")
         work_sessions = request("GET", f"/api/missions/{mission_id}/work-sessions")
+        completion = request("GET", f"/api/missions/{mission_id}/completion-contract")
         meeting = request("POST", f"/missions/{mission_id}/meeting")
         approval = request(
             "POST",
@@ -305,6 +314,10 @@ def main() -> int:
                     "knowledge_clients": len(mission_knowledge["data"]["clients"]),
                     "knowledge_matters": len(mission_knowledge["data"]["matters"]),
                     "knowledge_open_questions": len(mission_knowledge["data"]["open_questions"]),
+                    "workspace_scope_root": mission_scope["data"]["root"],
+                    "workflow_has_contract": "Completion Contract" in workflow["data"]["body"],
+                    "run_attempt_status": run_attempts["data"]["attempts"][0]["status"],
+                    "completion_has_workspace_scope": completion["data"]["workspace_scope_defined"],
                     "task_status": run_result["data"]["task"]["status"],
                     "bridge_status": run_result["data"]["bridge_run"]["normalized_status"],
                     "work_session_status": run_result["data"]["work_session"]["status"],

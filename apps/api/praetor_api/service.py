@@ -43,6 +43,7 @@ from .models import (
     OwnerAuthRecord,
     PlannerAction,
     PraetorBriefing,
+    RunAttempt,
     RoleDefinition,
     RuntimeSelection,
     StandingOrder,
@@ -50,6 +51,7 @@ from .models import (
     TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
+    WorkspaceScope,
     WorkSession,
     WorkSessionTurn,
     utc_now,
@@ -61,7 +63,7 @@ from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
 from .storage import AppStorage
 from .telegram import generate_pairing_code, new_pairing_settings, process_update, send_approval_notification
-from .workspace import bootstrap_workspace
+from .workspace import DEFAULT_WORKFLOW_CONTRACT, bootstrap_workspace
 
 
 def parse_datetime(value: str | None) -> datetime:
@@ -419,6 +421,7 @@ class PraetorService:
         self.storage.save_matter(workspace_root, matter)
         mission.client_id = client.id
         mission.matter_id = matter.id
+        self._ensure_workspace_scope(mission, matter)
         self._seed_matter_registry(workspace_root, mission, client, matter)
         self._audit(
             "knowledge_workspace_created",
@@ -430,6 +433,37 @@ class PraetorService:
             },
         )
         return matter
+
+    def _ensure_workspace_scope(self, mission: MissionDefinition, matter: MatterRecord | None = None) -> WorkspaceScope:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        existing = self.storage.load_workspace_scope(workspace_root, mission.id)
+        if existing is not None:
+            return existing
+        matter = matter or next(iter(self.storage.list_matters(mission_id=mission.id)), None)
+        root = matter.folder if matter is not None else f"Missions/{mission.id}"
+        scope = WorkspaceScope(
+            mission_id=mission.id,
+            matter_id=matter.id if matter is not None else None,
+            root=root,
+            allowed_read=[
+                root,
+                f"Missions/{mission.id}",
+                "Wiki",
+                "PRAETOR_WORKFLOW.md",
+            ],
+            allowed_write=[
+                root,
+                f"Missions/{mission.id}",
+            ],
+            denied_write=[
+                "Archive",
+                ".praetor",
+            ],
+            workflow_path="PRAETOR_WORKFLOW.md",
+        )
+        self.storage.save_workspace_scope(workspace_root, scope)
+        return scope
 
     def _ensure_client(self, workspace_root: Path, name: str) -> ClientRecord:
         slug = self._slugify(name) or "general"
@@ -688,6 +722,33 @@ class PraetorService:
         settings = self._require_settings()
         return self.storage.list_bridge_runs(Path(settings.workspace.root), mission_id)
 
+    def list_run_attempts(self, mission_id: str, limit: int = 20) -> list[RunAttempt]:
+        settings = self._require_settings()
+        if self.storage.load_mission(Path(settings.workspace.root), mission_id) is None:
+            raise KeyError(mission_id)
+        return self.storage.list_run_attempts(mission_id=mission_id, limit=limit)
+
+    def mission_workspace_scope(self, mission_id: str) -> WorkspaceScope:
+        settings = self._require_settings()
+        mission = self.get_mission(mission_id)
+        scope = self.storage.load_workspace_scope(Path(settings.workspace.root), mission_id)
+        if scope is not None:
+            return scope
+        matter = next(iter(self.storage.list_matters(mission_id=mission.id)), None)
+        return self._ensure_workspace_scope(mission, matter)
+
+    def workflow_contract(self):
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        workflow_path = workspace_root / "PRAETOR_WORKFLOW.md"
+        if not workflow_path.exists():
+            workflow_path.write_text(DEFAULT_WORKFLOW_CONTRACT, encoding="utf-8")
+            try:
+                workflow_path.chmod(0o600)
+            except OSError:
+                pass
+        return self.storage.load_workflow_contract(workspace_root)
+
     def organization_snapshot(self, mission_id: str | None = None) -> OrganizationSnapshot:
         self._require_settings()
         self._ensure_default_agent_roles()
@@ -707,6 +768,14 @@ class PraetorService:
         mission = self.get_mission(mission_id)
         delegations = self.storage.list_delegations(mission_id=mission_id)
         pending_escalations = self.storage.list_escalations(mission_id=mission_id, status="pending")
+        open_questions = [
+            item
+            for item in self.storage.list_open_questions(mission_id=mission_id)
+            if item.status not in {"answered", "closed"}
+        ]
+        documents = self.storage.list_documents(mission_id=mission_id)
+        knowledge_updates = self.storage.list_knowledge_updates(mission_id=mission_id)
+        workspace_scope = self.storage.load_workspace_scope(workspace_root, mission_id)
         reports = self.storage.read_mission_texts(workspace_root, mission_id)
         missing_outputs = [
             output
@@ -730,7 +799,27 @@ class PraetorService:
             blockers.append("Pending escalations require resolution.")
         if not review_passed:
             blockers.append("Reviewer has not passed the mission.")
-        can_close = required_outputs_present and delegations_done and not pending_escalations and final_report_ready
+        if open_questions:
+            blockers.append(f"Open questions remain: {len(open_questions)}")
+        if not workspace_scope:
+            blockers.append("Workspace scope has not been defined.")
+        knowledge_updates_reviewed = not knowledge_updates or all(
+            item.status in {"applied", "rejected"} for item in knowledge_updates
+        )
+        if not knowledge_updates_reviewed:
+            blockers.append("Knowledge updates are still proposed or awaiting approval.")
+        documents_registered = bool(documents) or not mission.requested_outputs
+        if mission.requested_outputs and not documents_registered:
+            blockers.append("Requested documents are not registered.")
+        can_close = (
+            required_outputs_present
+            and delegations_done
+            and not pending_escalations
+            and final_report_ready
+            and not open_questions
+            and workspace_scope is not None
+            and knowledge_updates_reviewed
+        )
         return CompletionContract(
             mission_id=mission_id,
             required_outputs_present=required_outputs_present,
@@ -739,6 +828,10 @@ class PraetorService:
             no_pending_escalations=not pending_escalations,
             final_report_ready=final_report_ready,
             memory_updated=memory_updated,
+            no_open_questions=not open_questions,
+            documents_registered=documents_registered,
+            knowledge_updates_reviewed=knowledge_updates_reviewed,
+            workspace_scope_defined=workspace_scope is not None,
             can_close=can_close,
             blockers=blockers,
         )
@@ -933,6 +1026,9 @@ class PraetorService:
         settings = self._require_settings()
         self._ensure_default_standing_orders()
         mission = self.get_mission(mission_id)
+        scope = self.mission_workspace_scope(mission_id)
+        workflow = self.workflow_contract()
+        target_workdir = (Path(settings.workspace.root) / scope.root).resolve()
         runtime_engine = MissionRuntime()
         safety_policy = build_prompt_safety_policy(
             settings=settings,
@@ -940,6 +1036,20 @@ class PraetorService:
             mission=mission,
             role_name="Project Execution",
         ).text
+        safety_policy = append_safety_policy(
+            safety_policy,
+            "\n".join(
+                [
+                    "Praetor workflow contract:",
+                    workflow.body[:4000],
+                    "",
+                    "Workspace scope:",
+                    f"- root: {scope.root}",
+                    f"- allowed_write: {', '.join(scope.allowed_write)}",
+                    f"- denied_write: {', '.join(scope.denied_write)}",
+                ]
+            ),
+        )
 
         mission.status = "active"
         mission.updated_at = utc_now()
@@ -960,13 +1070,23 @@ class PraetorService:
             ),
         )
 
+        primary_attempt = self._open_run_attempt(
+            mission=mission,
+            executor=settings.runtime.executor or settings.runtime.provider or settings.runtime.mode,
+            workspace_path=str(target_workdir),
+            attempt_number=1,
+        )
+        self._update_run_attempt(primary_attempt, "building_prompt", "Built mission prompt with workflow contract.")
+        self._update_run_attempt(primary_attempt, "launching_agent", "Launching primary executor.")
         primary_result = runtime_engine.run_mission(
             workspace_root=workspace_root,
             mission=mission,
             runtime=settings.runtime,
             permissions=settings.workspace.permissions,
             safety_policy=safety_policy,
+            target_workdir=target_workdir,
         )
+        self._finish_run_attempt(primary_attempt, primary_result.task.id, primary_result.run_record)
         self.storage.save_task(workspace_root, primary_result.task)
         self.storage.save_bridge_run(workspace_root, mission.id, primary_result.run_record.model_dump(mode="json"))
         work_session.executor = primary_result.task.current_executor
@@ -1013,13 +1133,22 @@ class PraetorService:
                         "from_executor": primary_result.run_record.executor,
                     },
                 )
+                fallback_attempt = self._open_run_attempt(
+                    mission=mission,
+                    executor=fallback_runtime.executor or fallback_runtime.provider or fallback_runtime.mode,
+                    workspace_path=str(target_workdir),
+                    attempt_number=2,
+                )
+                self._update_run_attempt(fallback_attempt, "launching_agent", "Launching fallback executor.")
                 fallback_result = runtime_engine.run_mission(
                     workspace_root=workspace_root,
                     mission=mission,
                     runtime=fallback_runtime,
                     permissions=settings.workspace.permissions,
                     safety_policy=safety_policy,
+                    target_workdir=target_workdir,
                 )
+                self._finish_run_attempt(fallback_attempt, fallback_result.task.id, fallback_result.run_record)
                 self.storage.save_task(workspace_root, fallback_result.task)
                 self.storage.save_bridge_run(
                     workspace_root,
@@ -1375,6 +1504,79 @@ class PraetorService:
         if self.storage.load_mission(Path(settings.workspace.root), mission_id) is None:
             raise KeyError(mission_id)
         return self.storage.list_work_sessions(mission_id=mission_id, limit=limit)
+
+    def _open_run_attempt(
+        self,
+        *,
+        mission: MissionDefinition,
+        executor: str,
+        workspace_path: str,
+        attempt_number: int,
+    ) -> RunAttempt:
+        attempt = RunAttempt(
+            mission_id=mission.id,
+            attempt=attempt_number,
+            status="preparing_workspace",
+            executor=executor,
+            workspace_path=workspace_path,
+            last_event="preparing_workspace",
+            last_message="Preparing isolated mission workspace.",
+        )
+        self.storage.save_run_attempt(attempt)
+        self._audit(
+            "run_attempt_started",
+            {
+                "attempt_id": attempt.id,
+                "mission_id": mission.id,
+                "executor": executor,
+                "workspace_path": workspace_path,
+            },
+        )
+        return attempt
+
+    def _update_run_attempt(
+        self,
+        attempt: RunAttempt,
+        status: str,
+        message: str,
+        *,
+        error: str | None = None,
+    ) -> RunAttempt:
+        attempt.status = status
+        attempt.last_event = status
+        attempt.last_message = message
+        attempt.error = error
+        attempt.updated_at = utc_now()
+        self.storage.save_run_attempt(attempt)
+        return attempt
+
+    def _finish_run_attempt(self, attempt: RunAttempt, task_id: str, run_record) -> RunAttempt:
+        normalized = run_record.normalized_status or run_record.status
+        attempt.task_id = task_id
+        attempt.run_id = run_record.run_id
+        attempt.executor = run_record.executor
+        attempt.status = "succeeded" if normalized == "completed" else "failed"
+        attempt.last_event = normalized
+        attempt.last_message = run_record.pause_reason or run_record.stdout_tail or f"Executor finished with {normalized}."
+        attempt.error = run_record.stderr_tail if attempt.status == "failed" else None
+        attempt.input_tokens = run_record.usage.input_tokens or 0
+        attempt.output_tokens = run_record.usage.output_tokens or 0
+        attempt.total_tokens = attempt.input_tokens + attempt.output_tokens
+        attempt.turn_count += 1
+        attempt.finished_at = run_record.finished_at or utc_now()
+        attempt.updated_at = utc_now()
+        self.storage.save_run_attempt(attempt)
+        self._audit(
+            "run_attempt_finished",
+            {
+                "attempt_id": attempt.id,
+                "mission_id": attempt.mission_id,
+                "run_id": attempt.run_id,
+                "status": attempt.status,
+                "normalized_status": normalized,
+            },
+        )
+        return attempt
 
     def _open_work_session(self, mission: MissionDefinition) -> WorkSession:
         session = WorkSession(

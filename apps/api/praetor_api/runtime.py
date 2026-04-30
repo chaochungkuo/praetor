@@ -99,6 +99,7 @@ class MissionRuntime:
         runtime: RuntimeSelection,
         permissions: WorkspacePermissions,
         safety_policy: str | None = None,
+        target_workdir: Path | None = None,
     ) -> MissionRuntimeResult:
         if runtime.mode == "subscription_executor":
             return self._run_subscription_executor(
@@ -106,6 +107,7 @@ class MissionRuntime:
                 mission=mission,
                 executor=runtime.executor or "codex",
                 safety_policy=safety_policy,
+                target_workdir=target_workdir,
             )
         if runtime.mode == "api":
             return self._run_api_mode(
@@ -114,6 +116,7 @@ class MissionRuntime:
                 runtime=runtime,
                 permissions=permissions,
                 safety_policy=safety_policy,
+                target_workdir=target_workdir,
             )
         raise RuntimeError(f"Unsupported runtime mode: {runtime.mode}")
 
@@ -124,6 +127,7 @@ class MissionRuntime:
         mission: MissionDefinition,
         executor: str,
         safety_policy: str | None = None,
+        target_workdir: Path | None = None,
     ) -> MissionRuntimeResult:
         if not (self.base_url and self.token):
             raise RuntimeError("Bridge runtime is not configured.")
@@ -138,7 +142,7 @@ class MissionRuntime:
             outputs=mission.requested_outputs,
         )
         client = BridgeClient(base_url=self.base_url or "", token=self.token or "")
-        target_workdir = self._target_workdir(mission, workspace_root)
+        target_workdir = target_workdir or self._target_workdir(mission, workspace_root)
         target_workdir.mkdir(parents=True, exist_ok=True)
         payload = {
             "request_id": generate_id("req"),
@@ -183,6 +187,7 @@ class MissionRuntime:
         runtime: RuntimeSelection,
         permissions: WorkspacePermissions,
         safety_policy: str | None = None,
+        target_workdir: Path | None = None,
     ) -> MissionRuntimeResult:
         provider = runtime.provider or "openai"
         model = runtime.model or ("gpt-4.1-mini" if provider == "openai" else "claude-3-5-sonnet-latest")
@@ -198,7 +203,7 @@ class MissionRuntime:
         try:
             payload, result = run_api_mission(
                 mission=mission,
-                workspace_root=workspace_root,
+                workspace_root=target_workdir or workspace_root,
                 provider=provider,
                 model=model,
                 base_url=runtime.base_url,
@@ -255,7 +260,7 @@ class MissionRuntime:
 
     @staticmethod
     def _container_target_workdir(host_workdir: Path, workspace_root: Path) -> str:
-        rel = host_workdir.relative_to(workspace_root)
+        rel = host_workdir.resolve().relative_to(workspace_root.resolve())
         return f"/app/workspace/{rel.as_posix()}"
 
     @staticmethod

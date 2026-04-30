@@ -49,6 +49,26 @@
     </ul>
   </section>
 
+  <section class="grid two">
+    <section class="panel">
+      <h3>{{ t("workspace_scope") }}</h3>
+      <ul class="compact-list">
+        <li>{{ t("folder") }}: {{ workspace_scope.root }}</li>
+        <li>{{ t("workflow_contract") }}: {{ workspace_scope.workflow_path or t("none") }}</li>
+        <li>{{ t("allowed_write") }}: {{ workspace_scope.allowed_write|join(', ') or t("none") }}</li>
+        <li>{{ t("denied_write") }}: {{ workspace_scope.denied_write|join(', ') or t("none") }}</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h3>{{ t("completion_contract") }}</h3>
+      <ul class="compact-list">
+        {% for item in workflow_contract.default_completion_contract %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </section>
+
   <section class="panel">
     <h3>{{ t("knowledge_workspace") }}</h3>
     <div class="grid two">
@@ -255,6 +275,34 @@
       </div>
     {% else %}
       <p class="muted">{{ t("no_work_sessions") }}</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3>{{ t("run_attempts") }}</h3>
+    {% if run_attempts %}
+      <div class="list">
+        {% for attempt in run_attempts %}
+          <div class="list-row">
+            <div>
+              <strong>{{ attempt.executor or t("not_available") }}</strong>
+              <div class="muted">
+                {{ t("status") }}: {{ label(attempt.status) }} ·
+                {{ t("last_event") }}: {{ label(attempt.last_event) if attempt.last_event else t("none") }}
+              </div>
+              <div class="muted">
+                {{ t("folder") }}: {{ attempt.workspace_path }} ·
+                {{ t("tokens") }}: {{ attempt.total_tokens }}
+              </div>
+              {% if attempt.last_message %}<div class="muted">{{ attempt.last_message }}</div>{% endif %}
+              {% if attempt.error %}<div class="muted">{{ attempt.error }}</div>{% endif %}
+            </div>
+            <span class="status">{{ label(attempt.status) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_run_attempts") }}</p>
     {% endif %}
   </section>
 

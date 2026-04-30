@@ -28,8 +28,11 @@ from .models import (
     MissionTeam,
     OpenQuestionRecord,
     OwnerAuthRecord,
+    RunAttempt,
     StandingOrder,
     TaskDefinition,
+    WorkflowContract,
+    WorkspaceScope,
     WorkSession,
 )
 
@@ -151,6 +154,7 @@ class FilesystemStore:
         self.conversation_path = self.state_dir / "office_conversation.json"
         self.agent_messages_path = self.state_dir / "agent_messages.json"
         self.work_sessions_path = self.state_dir / "work_sessions.json"
+        self.run_attempts_path = self.state_dir / "run_attempts.json"
         self.clients_path = self.state_dir / "clients.json"
         self.matters_path = self.state_dir / "matters.json"
         self.documents_path = self.state_dir / "documents.json"
@@ -477,6 +481,19 @@ class FilesystemStore:
         sessions.sort(key=lambda item: item.updated_at, reverse=True)
         return sessions[:limit]
 
+    def save_run_attempt(self, attempt: RunAttempt) -> None:
+        attempts = self.list_run_attempts(limit=10_000)
+        attempts = [item for item in attempts if item.id != attempt.id] + [attempt]
+        attempts.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.run_attempts_path, attempts)
+
+    def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
+        attempts = self._read_model_list(self.run_attempts_path, RunAttempt)
+        if mission_id is not None:
+            attempts = [item for item in attempts if item.mission_id == mission_id]
+        attempts.sort(key=lambda item: item.updated_at, reverse=True)
+        return attempts[:limit]
+
     def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
         clients = self.list_clients()
         clients = [item for item in clients if item.id != client.id and item.slug != client.slug] + [client]
@@ -526,6 +543,41 @@ class FilesystemStore:
         _write_workspace_text(
             matter_dir / "registry.json",
             json.dumps(registry, indent=2, ensure_ascii=True),
+        )
+
+    def save_workspace_scope(self, workspace_root: Path, scope: WorkspaceScope) -> Path:
+        path = self.mission_dir(workspace_root, scope.mission_id) / "workspace_scope.json"
+        _write_workspace_text(path, scope.model_dump_json(indent=2))
+        return path
+
+    def load_workspace_scope(self, workspace_root: Path, mission_id: str) -> WorkspaceScope | None:
+        path = self.mission_dir(workspace_root, mission_id) / "workspace_scope.json"
+        if not path.exists():
+            return None
+        return WorkspaceScope.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def load_workflow_contract(self, workspace_root: Path) -> WorkflowContract:
+        path = workspace_root / "PRAETOR_WORKFLOW.md"
+        body = path.read_text(encoding="utf-8") if path.exists() else ""
+        return WorkflowContract(
+            path=str(path.relative_to(workspace_root)) if path.exists() else "PRAETOR_WORKFLOW.md",
+            body=body,
+            default_completion_contract=[
+                "requested outputs are present or explicitly waived",
+                "documents are registered with version reasons",
+                "open questions are resolved or marked non-blocking",
+                "required approvals and reviews are complete",
+                "final report and knowledge promotion state are recorded",
+            ],
+            approval_policy={
+                "destructive_write": "escalate",
+                "external_communication": "escalate",
+                "privacy_sensitive_memory": "escalate",
+            },
+            workspace_policy={
+                "default_write_scope": "mission_or_matter_workspace",
+                "workflow_file": "PRAETOR_WORKFLOW.md",
+            },
         )
 
     def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
@@ -799,6 +851,12 @@ class AppStorage:
     def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
         return self.fs.list_work_sessions(mission_id=mission_id, limit=limit)
 
+    def save_run_attempt(self, attempt: RunAttempt) -> None:
+        self.fs.save_run_attempt(attempt)
+
+    def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
+        return self.fs.list_run_attempts(mission_id=mission_id, limit=limit)
+
     def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
         self.fs.save_client(workspace_root, client)
 
@@ -810,6 +868,15 @@ class AppStorage:
 
     def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
         return self.fs.list_matters(client_id=client_id, mission_id=mission_id)
+
+    def save_workspace_scope(self, workspace_root: Path, scope: WorkspaceScope) -> Path:
+        return self.fs.save_workspace_scope(workspace_root, scope)
+
+    def load_workspace_scope(self, workspace_root: Path, mission_id: str) -> WorkspaceScope | None:
+        return self.fs.load_workspace_scope(workspace_root, mission_id)
+
+    def load_workflow_contract(self, workspace_root: Path) -> WorkflowContract:
+        return self.fs.load_workflow_contract(workspace_root)
 
     def save_document(self, document: DocumentRecord) -> None:
         self.fs.save_document(document)

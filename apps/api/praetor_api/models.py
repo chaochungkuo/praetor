@@ -106,6 +106,18 @@ DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"
 DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
 OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
 KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
+RunAttemptStatus = Literal[
+    "preparing_workspace",
+    "building_prompt",
+    "launching_agent",
+    "streaming_turn",
+    "succeeded",
+    "failed",
+    "timed_out",
+    "stalled",
+    "canceled",
+    "retry_queued",
+]
 
 
 class ApiEnvelope(BaseModel):
@@ -149,6 +161,16 @@ class WorkspacePermissions(BaseModel):
 class WorkspaceConfig(BaseModel):
     root: str
     permissions: WorkspacePermissions
+
+
+class WorkspaceScope(BaseModel):
+    mission_id: str
+    matter_id: str | None = None
+    root: str
+    allowed_read: list[str] = Field(default_factory=list)
+    allowed_write: list[str] = Field(default_factory=list)
+    denied_write: list[str] = Field(default_factory=list)
+    workflow_path: str | None = None
 
 
 class RunBudgetPolicy(BaseModel):
@@ -276,6 +298,10 @@ class CompletionContract(BaseModel):
     no_pending_escalations: bool = False
     final_report_ready: bool = False
     memory_updated: bool = False
+    no_open_questions: bool = False
+    documents_registered: bool = False
+    knowledge_updates_reviewed: bool = False
+    workspace_scope_defined: bool = False
     can_close: bool = False
     blockers: list[str] = Field(default_factory=list)
 
@@ -293,6 +319,27 @@ class TaskDefinition(BaseModel):
     status: TaskStatus = "planned"
     checkpoint_policy: TaskCheckpointPolicy = Field(default_factory=TaskCheckpointPolicy)
     outputs: list[str] = Field(default_factory=list)
+
+
+class RunAttempt(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("attempt"))
+    mission_id: str
+    task_id: str | None = None
+    run_id: str | None = None
+    attempt: int = 1
+    status: RunAttemptStatus = "preparing_workspace"
+    executor: str | None = None
+    workspace_path: str
+    last_event: str | None = None
+    last_message: str | None = None
+    error: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    turn_count: int = 0
+    started_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    finished_at: datetime | None = None
 
 
 class UsageSummary(BaseModel):
@@ -558,6 +605,17 @@ class KnowledgeSnapshot(BaseModel):
     decisions: list[MatterDecisionRecord] = Field(default_factory=list)
     open_questions: list[OpenQuestionRecord] = Field(default_factory=list)
     knowledge_updates: list[KnowledgeUpdate] = Field(default_factory=list)
+
+
+class WorkflowContract(BaseModel):
+    path: str = "PRAETOR_WORKFLOW.md"
+    version: str = "1"
+    title: str = "Praetor workflow"
+    body: str
+    default_completion_contract: list[str] = Field(default_factory=list)
+    approval_policy: dict[str, Any] = Field(default_factory=dict)
+    workspace_policy: dict[str, Any] = Field(default_factory=dict)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class MissionTimelineEvent(BaseModel):

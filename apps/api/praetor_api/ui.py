@@ -402,6 +402,14 @@ TRANSLATIONS = {
         "session_turns": "Turns",
         "current_blocker": "Current blocker",
         "completion_contract": "Completion contract",
+        "run_attempts": "Run attempts",
+        "workspace_scope": "Workspace scope",
+        "workflow_contract": "Workflow contract",
+        "allowed_write": "Allowed write",
+        "denied_write": "Denied write",
+        "last_event": "Last event",
+        "tokens": "Tokens",
+        "no_run_attempts": "No run attempts yet.",
         "knowledge_workspace": "Knowledge workspace",
         "client_record": "Client record",
         "matter_record": "Matter record",
@@ -794,6 +802,14 @@ TRANSLATIONS = {
         "session_turns": "回合",
         "current_blocker": "目前阻塞",
         "completion_contract": "完成條件",
+        "run_attempts": "執行嘗試",
+        "workspace_scope": "工作區範圍",
+        "workflow_contract": "工作流程規範",
+        "allowed_write": "允許寫入",
+        "denied_write": "禁止寫入",
+        "last_event": "最後事件",
+        "tokens": "Token",
+        "no_run_attempts": "目前沒有執行嘗試。",
         "knowledge_workspace": "知識工作區",
         "client_record": "客戶資料",
         "matter_record": "事項資料",
@@ -1929,6 +1945,9 @@ def mission_detail_page(request: Request, mission_id: str):
     runs = service.list_mission_runs(mission_id)
     work_sessions = service.mission_work_sessions(mission_id)
     knowledge = service.mission_knowledge_snapshot(mission_id)
+    run_attempts = service.list_run_attempts(mission_id)
+    workspace_scope = service.mission_workspace_scope(mission_id)
+    workflow_contract = service.workflow_contract()
     return templates.TemplateResponse(
         request=request,
         name="mission_detail.html",
@@ -1940,6 +1959,9 @@ def mission_detail_page(request: Request, mission_id: str):
             "runs": runs,
             "work_sessions": work_sessions,
             "knowledge": knowledge,
+            "run_attempts": run_attempts,
+            "workspace_scope": workspace_scope,
+            "workflow_contract": workflow_contract,
         },
     )
 

@@ -419,6 +419,14 @@ def api_knowledge_snapshot():
         fail(400, "not_initialized", str(exc))
 
 
+@app.get("/api/workflow")
+def api_workflow_contract():
+    try:
+        return ok(get_ctx().service.workflow_contract())
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
 @app.get("/api/missions/{mission_id}/organization")
 def mission_organization_snapshot(mission_id: str):
     try:
@@ -431,6 +439,16 @@ def mission_organization_snapshot(mission_id: str):
 def api_mission_knowledge_snapshot(mission_id: str):
     try:
         return ok(get_ctx().service.mission_knowledge_snapshot(mission_id))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/missions/{mission_id}/workspace-scope")
+def api_mission_workspace_scope(mission_id: str):
+    try:
+        return ok(get_ctx().service.mission_workspace_scope(mission_id))
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
     except KeyError:
@@ -506,6 +524,16 @@ def mission_agent_messages(mission_id: str):
 def mission_work_sessions(mission_id: str):
     try:
         return ok({"sessions": get_ctx().service.mission_work_sessions(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/missions/{mission_id}/run-attempts")
+def mission_run_attempts(mission_id: str):
+    try:
+        return ok({"attempts": get_ctx().service.list_run_attempts(mission_id)})
     except RuntimeError as exc:
         fail(400, "not_initialized", str(exc))
     except KeyError:
