@@ -208,6 +208,171 @@ pre {
 .hero {
   background: linear-gradient(180deg, rgba(213,179,106,0.08), rgba(255,255,255,0.02));
 }
+.glass-panel {
+  position: relative;
+  padding: 1.3rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(255,255,255,0.14);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.105), rgba(255,255,255,0.035)),
+    rgba(18,19,23,0.58);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.10);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+.executive-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  align-items: start;
+  min-height: 13rem;
+}
+.executive-hero-main {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 58rem;
+}
+.executive-hero h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+.executive-hero p {
+  max-width: 52rem;
+  font-size: 1.04rem;
+}
+.executive-meta,
+.executive-actions,
+.mini-actions,
+.health-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+.executive-actions {
+  justify-content: flex-end;
+  max-width: 26rem;
+}
+.action-menu {
+  position: relative;
+}
+.action-menu > summary {
+  min-height: 2.95rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.04);
+  color: var(--accent-2);
+  list-style: none;
+}
+.action-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.action-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.45rem;
+  min-width: 12rem;
+  margin-top: 0.55rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(18,19,23,0.92);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.executive-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+  gap: 1rem;
+}
+.decision-card,
+.health-card {
+  min-height: 12rem;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+.decision-card h3,
+.health-card h3 {
+  font-size: 1.55rem;
+  line-height: 1.15;
+}
+.health-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.health-metrics div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.035);
+}
+.health-metrics strong {
+  font-size: 1.55rem;
+  color: var(--accent-2);
+}
+.health-metrics span,
+.health-strip span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.briefing-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.briefing-columns > div {
+  padding-top: 0.4rem;
+}
+.accordion-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+.executive-details {
+  margin-bottom: 0;
+}
+.executive-details > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+}
+.executive-details > summary::-webkit-details-marker {
+  display: none;
+}
+.executive-details > summary span {
+  font-size: 1.22rem;
+}
+.executive-details > summary small {
+  color: var(--muted);
+  text-align: right;
+}
+.detail-body {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1.2rem;
+}
+.soft-row {
+  background: rgba(255,255,255,0.025);
+  border-color: rgba(255,255,255,0.08);
+}
+.quiet-details {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+.nested-heading {
+  margin-top: 1rem;
+}
 .hero-row {
   display: flex;
   justify-content: space-between;
@@ -1089,5 +1254,96 @@ button.secondary:hover {
   .agent-card,
   .list-row {
     border-radius: 14px;
+  }
+}
+
+/* Mission detail executive view */
+.glass-panel {
+  border-color: rgba(255,255,255,0.58);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.38)),
+    rgba(255,253,248,0.68);
+  border-radius: 24px;
+  box-shadow: 0 22px 60px rgba(42, 34, 22, 0.10), inset 0 1px 0 rgba(255,255,255,0.78);
+}
+
+.executive-hero {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.78), rgba(246,239,224,0.58)),
+    rgba(255,253,248,0.62);
+}
+
+.executive-hero h2,
+.decision-card h3,
+.health-card h3 {
+  color: #181511;
+}
+
+.action-menu > summary,
+.action-menu-list,
+.health-metrics div,
+.soft-row {
+  border-color: rgba(226,219,207,0.76);
+  background: rgba(255,253,248,0.72);
+  border-radius: 16px;
+}
+
+.action-menu-list {
+  background: rgba(255,253,248,0.94);
+}
+
+.executive-details > summary {
+  color: #201d19;
+}
+
+.executive-details > summary small {
+  color: #7a7165;
+}
+
+.quiet-details {
+  border-top-color: rgba(226,219,207,0.78);
+}
+
+.health-strip {
+  padding-top: 0.4rem;
+}
+
+@media (max-width: 1200px) {
+  .executive-grid,
+  .briefing-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 840px) {
+  .executive-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-actions,
+  .mini-actions {
+    justify-content: stretch;
+  }
+
+  .executive-actions > *,
+  .mini-actions > * {
+    width: 100%;
+  }
+
+  .action-menu-list {
+    position: static;
+  }
+
+  .health-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-details > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .executive-details > summary small {
+    text-align: left;
   }
 }

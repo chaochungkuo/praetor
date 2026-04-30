@@ -1,555 +1,438 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="panel hero">
-    <div class="hero-row">
-      <div>
-        <h2>{{ mission.title }}</h2>
-        <p>{{ mission.summary or t("no_summary") }}</p>
-      </div>
-      <div class="hero-actions">
-        <form method="post" action="/app/missions/{{ mission.id }}/run">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit">{{ t("run_mission") }}</button>
-        </form>
-        <form method="post" action="/app/missions/{{ mission.id }}/pause">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("pause_mission") }}</button>
-        </form>
-        <form method="post" action="/app/missions/{{ mission.id }}/continue">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("continue_mission") }}</button>
-        </form>
-        <form method="post" action="/app/missions/{{ mission.id }}/stop">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("stop_mission") }}</button>
-        </form>
-        <form method="post" action="/app/missions/{{ mission.id }}/meeting">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("create_review") }}</button>
-        </form>
+  {% set latest_briefing = board_briefings[0] if board_briefings else none %}
+  {% set latest_reconciliation = workspace_steward.reconciliation_reports[0] if workspace_steward.reconciliation_reports else none %}
+  {% set file_health = namespace(issues=0) %}
+  {% for asset in workspace_steward.assets %}
+    {% if asset.sync_status != "tracked" %}
+      {% set file_health.issues = file_health.issues + 1 %}
+    {% endif %}
+  {% endfor %}
+  {% if latest_reconciliation %}
+    {% set file_health.issues = file_health.issues + latest_reconciliation.missing_assets|length + latest_reconciliation.changed_assets|length + latest_reconciliation.moved_candidates|length + latest_reconciliation.untracked_files|length + latest_reconciliation.git_changes|length %}
+  {% endif %}
+
+  <section class="executive-hero glass-panel">
+    <div class="executive-hero-main">
+      <span class="eyebrow">{{ t("chairman_view") }}</span>
+      <h2>{{ mission.title }}</h2>
+      <p>{{ mission.summary or t("no_summary") }}</p>
+      <div class="executive-meta">
+        <span class="status">{{ label(mission.status) }}</span>
+        <span class="status">{{ label(mission.priority) }}</span>
+        <span class="status">{{ label(mission.manager_layer) }}</span>
       </div>
     </div>
-    <ul class="compact-list">
-      <li>{{ t("status") }}: {{ label(mission.status) }}</li>
-      <li>{{ t("priority") }}: {{ label(mission.priority) }}</li>
-      <li>
-        {{ t("domains") }}:
-        {% if mission.domains %}
-          {% for domain in mission.domains %}{{ label(domain) }}{{ ", " if not loop.last else "" }}{% endfor %}
-        {% else %}
-          {{ t("none") }}
-        {% endif %}
-      </li>
-      <li>{{ t("manager_layer") }}: {{ label(mission.manager_layer) }}</li>
-      <li>{{ t("complexity_score") }}: {{ mission.complexity_score }}</li>
-      <li>{{ t("pm_required") }}: {{ label(mission.pm_required) }}</li>
-      <li>{{ t("escalation_reason") }}: {{ mission.escalation_reason or t("none") }}</li>
-      <li>{{ t("requested_outputs") }}: {{ mission.requested_outputs|join(', ') or t("none") }}</li>
-    </ul>
-  </section>
-
-  <section class="grid two">
-    <section class="panel">
-      <h3>{{ t("workspace_scope") }}</h3>
-      <ul class="compact-list">
-        <li>{{ t("folder") }}: {{ workspace_scope.root }}</li>
-        <li>{{ t("workflow_contract") }}: {{ workspace_scope.workflow_path or t("none") }}</li>
-        <li>{{ t("allowed_write") }}: {{ workspace_scope.allowed_write|join(', ') or t("none") }}</li>
-        <li>{{ t("denied_write") }}: {{ workspace_scope.denied_write|join(', ') or t("none") }}</li>
-      </ul>
-    </section>
-    <section class="panel">
-      <h3>{{ t("completion_contract") }}</h3>
-      <ul class="compact-list">
-        {% for item in workflow_contract.default_completion_contract %}
-          <li>{{ item }}</li>
-        {% endfor %}
-      </ul>
-    </section>
-  </section>
-
-  <section class="panel">
-    <h3>{{ t("knowledge_workspace") }}</h3>
-    <div class="grid two">
-      <div>
-        <h4>{{ t("client_record") }}</h4>
-        {% if knowledge.clients %}
-          {% for client in knowledge.clients %}
-            <div class="list-row">
-              <div>
-                <strong>{{ client.name }}</strong>
-                <div class="muted">{{ t("folder") }}: {{ client.folder }}</div>
-                {% if client.summary %}<div class="muted">{{ client.summary }}</div>{% endif %}
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="muted">{{ t("none") }}</p>
-        {% endif %}
-      </div>
-      <div>
-        <h4>{{ t("matter_record") }}</h4>
-        {% if knowledge.matters %}
-          {% for matter in knowledge.matters %}
-            <div class="list-row">
-              <div>
-                <strong>{{ matter.title }}</strong>
-                <div class="muted">{{ t("status") }}: {{ label(matter.status) }}</div>
-                <div class="muted">{{ t("folder") }}: {{ matter.folder }}</div>
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="muted">{{ t("none") }}</p>
-        {% endif %}
-      </div>
-    </div>
-  </section>
-
-  <section class="grid two">
-    <section class="panel">
-      <h3>{{ t("document_registry") }}</h3>
-      {% if knowledge.documents %}
-        <div class="list">
-          {% for document in knowledge.documents %}
-            <div class="list-row">
-              <div>
-                <strong>{{ document.title }}</strong>
-                <div class="muted">
-                  {{ t("status") }}: {{ label(document.status) }} ·
-                  {{ t("current_version") }}: v{{ "%03d"|format(document.current_version) }}
-                </div>
-                {% if document.versions %}
-                  <details>
-                    <summary>{{ t("document_versions") }}</summary>
-                    <ul class="compact-list">
-                      {% for version in document.versions %}
-                        <li>
-                          v{{ "%03d"|format(version.version) }} · {{ version.path }}
-                          <span class="muted">{{ t("reason") }}: {{ version.reason }}</span>
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </details>
-                {% endif %}
-              </div>
-              <span class="status">{{ label(document.document_type) }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="muted">{{ t("no_documents_registered") }}</p>
-      {% endif %}
-    </section>
-
-    <section class="panel">
-      <h3>{{ t("open_questions") }}</h3>
-      {% if knowledge.open_questions %}
-        <div class="list">
-          {% for question in knowledge.open_questions %}
-            <div class="list-row">
-              <div>
-                <strong>{{ question.question }}</strong>
-                <div class="muted">{{ t("status") }}: {{ label(question.status) }} · {{ t("owner") }}: {{ question.owner }}</div>
-                {% if question.blocking %}<div class="muted">{{ t("current_blocker") }}: {{ question.blocking }}</div>{% endif %}
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="muted">{{ t("no_open_questions") }}</p>
-      {% endif %}
-    </section>
-  </section>
-
-  <section class="grid two">
-    <section class="panel">
-      <h3>{{ t("matter_decisions") }}</h3>
-      {% if knowledge.decisions %}
-        <div class="list">
-          {% for decision in knowledge.decisions %}
-            <div class="list-row">
-              <div>
-                <strong>{{ decision.summary }}</strong>
-                {% if decision.rationale %}<div class="muted">{{ decision.rationale }}</div>{% endif %}
-              </div>
-              <span class="status">{{ label(decision.status) }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="muted">{{ t("no_matter_decisions") }}</p>
-      {% endif %}
-    </section>
-    <section class="panel">
-      <h3>{{ t("knowledge_updates") }}</h3>
-      {% if knowledge.knowledge_updates %}
-        <div class="list">
-          {% for update in knowledge.knowledge_updates %}
-            <div class="list-row">
-              <div>
-                <strong>{{ update.summary }}</strong>
-                <div class="muted">{{ update.target_page }}</div>
-                <div class="muted">{{ update.content }}</div>
-              </div>
-              <span class="status">{{ label(update.status) }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="muted">{{ t("no_knowledge_updates") }}</p>
-      {% endif %}
-    </section>
-  </section>
-
-  <section class="panel">
-    <div class="section-heading">
-      <div>
-        <h3>{{ t("workspace_steward") }}</h3>
-        <p>{{ t("workspace_steward_desc") }}</p>
-      </div>
-      <form method="post" action="/app/missions/{{ mission.id }}/workspace-restructure-plan">
+    <div class="executive-actions">
+      <form method="post" action="/app/missions/{{ mission.id }}/run">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <button type="submit" class="secondary">{{ t("create_restructure_plan") }}</button>
+        <button type="submit">{{ t("run_mission") }}</button>
       </form>
-      <form method="post" action="/app/missions/{{ mission.id }}/workspace-reconcile">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <button type="submit" class="secondary">{{ t("reconcile_workspace") }}</button>
-      </form>
-    </div>
-    {% if workspace_steward.assets %}
-      <div class="list">
-        {% for asset in workspace_steward.assets[:8] %}
-          <div class="list-row">
-            <div>
-              <strong>{{ asset.title or asset.current_path }}</strong>
-              <div class="muted">{{ asset.current_path }}</div>
-              <div class="muted">
-                {{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ label(asset.sync_status) }} · {{ asset.id }}
-              </div>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_file_assets") }}</p>
-    {% endif %}
-    {% if workspace_steward.restructure_plans %}
-      <h4>{{ t("restructure_plans") }}</h4>
-      <div class="list">
-        {% for plan in workspace_steward.restructure_plans[:3] %}
-          <div class="list-row">
-            <div>
-              <strong>{{ plan.summary }}</strong>
-              <div class="muted">{{ t("status") }}: {{ label(plan.status) }} · {{ plan.moves|length }} moves</div>
-            </div>
-            <span class="status">{{ label(plan.status) }}</span>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-    {% if workspace_steward.reconciliation_reports %}
-      <h4>{{ t("reconciliation_reports") }}</h4>
-      <div class="list">
-        {% for report in workspace_steward.reconciliation_reports[:3] %}
-          <div class="list-row">
-            <div>
-              <strong>{{ report.scanned_files }} files scanned</strong>
-              <div class="muted">
-                missing {{ report.missing_assets|length }} · changed {{ report.changed_assets|length }} ·
-                moved {{ report.moved_candidates|length }} · untracked {{ report.untracked_files|length }} ·
-                git {{ report.git_changes|length }}
-              </div>
-            </div>
-            <span class="status">{{ label(report.status) }}</span>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </section>
-
-  <section class="panel">
-    <div class="section-heading">
-      <div>
-        <h3>{{ t("board_briefing") }}</h3>
-        <p>{{ t("board_briefing_desc") }}</p>
-      </div>
       <form method="post" action="/app/missions/{{ mission.id }}/board-briefing">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <button type="submit" class="secondary">{{ t("create_board_briefing") }}</button>
       </form>
-    </div>
-    {% if board_briefings %}
-      <div class="list">
-        {% for briefing in board_briefings %}
-          <div class="list-row">
-            <div>
-              <strong>{{ briefing.title }}</strong>
-              <div class="muted">
-                {{ t("status") }}: {{ label(briefing.status) }} ·
-                {{ t("role") }}: {{ briefing.participants|join(', ') }}
-              </div>
-              <p>{{ briefing.executive_summary }}</p>
-              <div class="grid two">
-                <div>
-                  <h4>{{ t("recommendations") }}</h4>
-                  <ul class="compact-list">
-                    {% for item in briefing.recommendations %}<li>{{ item }}</li>{% endfor %}
-                  </ul>
-                </div>
-                <div>
-                  <h4>{{ t("decisions_needed") }}</h4>
-                  <ul class="compact-list">
-                    {% for item in briefing.decisions_needed %}<li>{{ item }}</li>{% endfor %}
-                  </ul>
-                </div>
-                <div>
-                  <h4>{{ t("assumptions") }}</h4>
-                  <ul class="compact-list">
-                    {% for item in briefing.assumptions %}<li>{{ item }}</li>{% endfor %}
-                  </ul>
-                </div>
-                <div>
-                  <h4>{{ t("risks") }}</h4>
-                  <ul class="compact-list">
-                    {% for item in briefing.risks %}<li>{{ item }}</li>{% endfor %}
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <span class="status">{{ label(briefing.status) }}</span>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_board_briefing") }}</p>
-    {% endif %}
-  </section>
-
-  <section class="panel">
-    <div class="section-heading">
-      <div>
-        <h3>{{ t("memory_promotion") }}</h3>
-        <p>{{ t("memory_promotion_desc") }}</p>
-      </div>
-      <form method="post" action="/app/missions/{{ mission.id }}/memory-promotion">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <button type="submit" class="secondary">{{ t("create_memory_promotion") }}</button>
-      </form>
-    </div>
-    {% if memory_promotion_reviews %}
-      <div class="list">
-        {% for review in memory_promotion_reviews %}
-          <div class="list-row">
-            <div>
-              <strong>{{ review.summary }}</strong>
-              <div class="muted">{{ t("status") }}: {{ label(review.status) }} · {{ t("promotion_findings") }}: {{ review.findings|length }}</div>
-              {% if review.findings %}
-                <details>
-                  <summary>{{ t("promotion_findings") }}</summary>
-                  <ul class="compact-list">
-                    {% for finding in review.findings %}
-                      <li>{{ label(finding.type) }}: {{ finding.summary }} <span class="muted">{{ finding.disposition }}</span></li>
-                    {% endfor %}
-                  </ul>
-                </details>
-              {% endif %}
-            </div>
-            <span class="status">{{ label(review.status) }}</span>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_memory_promotion") }}</p>
-    {% endif %}
-  </section>
-
-  <section class="grid two">
-    <section class="panel">
-      <h3>{{ t("task_logs") }}</h3>
-      {% if tasks %}
-        <div class="list">
-          {% for task in tasks %}
-            <div class="list-row">
-              <div>
-                <strong>{{ task.title }}</strong>
-                <div class="muted">{{ t("executor") }}: {{ task.current_executor or t("not_available") }}</div>
-              </div>
-              <span class="status">{{ label(task.status) }}</span>
-            </div>
-          {% endfor %}
+      <details class="action-menu">
+        <summary>{{ t("more_actions") }}</summary>
+        <div class="action-menu-list">
+          <form method="post" action="/app/missions/{{ mission.id }}/pause">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="secondary">{{ t("pause_mission") }}</button>
+          </form>
+          <form method="post" action="/app/missions/{{ mission.id }}/continue">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="secondary">{{ t("continue_mission") }}</button>
+          </form>
+          <form method="post" action="/app/missions/{{ mission.id }}/meeting">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="secondary">{{ t("create_review") }}</button>
+          </form>
+          <form method="post" action="/app/missions/{{ mission.id }}/stop">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="secondary">{{ t("stop_mission") }}</button>
+          </form>
         </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="executive-grid">
+    <section class="glass-panel decision-card">
+      <span class="eyebrow">{{ t("next_decision") }}</span>
+      {% if knowledge.open_questions %}
+        <h3>{{ knowledge.open_questions[0].question }}</h3>
+        <p>{{ knowledge.open_questions[0].blocking or t("owner_decision_needed_desc") }}</p>
+        <span class="status">{{ label(knowledge.open_questions[0].status) }}</span>
+      {% elif latest_briefing and latest_briefing.decisions_needed %}
+        <h3>{{ latest_briefing.decisions_needed[0] }}</h3>
+        <p>{{ latest_briefing.executive_summary }}</p>
+        <span class="status">{{ label(latest_briefing.status) }}</span>
       {% else %}
-        <p class="muted">{{ t("no_task_logs") }}</p>
+        <h3>{{ t("no_owner_decision_needed") }}</h3>
+        <p>{{ t("no_owner_decision_needed_desc") }}</p>
       {% endif %}
     </section>
-    <section class="panel">
-      <h3>{{ t("report") }}</h3>
-      <pre>{{ texts["REPORT.md"] }}</pre>
-	  </section>
-	</section>
 
-  <section class="panel">
-    <h3>{{ t("work_sessions") }}</h3>
-    {% if work_sessions %}
-      <div class="list">
-        {% for session in work_sessions %}
-          <div class="list-row activity-row">
-            <div>
-              <strong>{{ session.manager_role }} -> {{ session.executor_role }}</strong>
-              <div class="muted">
-                {{ t("status") }}: {{ label(session.status) }} ·
-                {{ t("executor") }}: {{ session.executor or t("not_available") }} ·
-                {{ t("session_turns") }}: {{ session.turns|length }}
-              </div>
-              {% if session.current_blocker %}
-                <div class="muted">{{ t("current_blocker") }}: {{ session.current_blocker }}</div>
-              {% endif %}
-            </div>
-            <span class="status">{{ label(session.status) }}</span>
-            {% if session.completion_contract %}
-              <details>
-                <summary>{{ t("completion_contract") }}</summary>
-                <ul class="compact-list">
-                  {% for item in session.completion_contract %}
-                    <li>{{ item }}</li>
-                  {% endfor %}
-                </ul>
-              </details>
-            {% endif %}
-            {% if session.turns %}
-              <details open>
-                <summary>{{ t("session_turns") }}</summary>
-                <div class="list">
-                  {% for turn in session.turns %}
-                    <div class="message {{ 'praetor-message' if turn.from_role in ['project_manager', 'praetor'] else 'founder-message' }}">
-                      <strong>{{ turn.from_role }} -> {{ turn.to_role }} · {{ label(turn.turn_type) }}</strong>
-                      <p>{{ turn.body }}</p>
-                      <span class="muted">{{ format_time(turn.created_at) }} · {{ label(turn.status) if turn.status else t("none") }}</span>
-                    </div>
-                  {% endfor %}
+    <section class="glass-panel health-card">
+      <span class="eyebrow">{{ t("workspace_health") }}</span>
+      <h3>{{ t("needs_review") if file_health.issues else t("healthy") }}</h3>
+      <div class="health-metrics">
+        <div><strong>{{ workspace_steward.assets|length }}</strong><span>{{ t("file_assets") }}</span></div>
+        <div><strong>{{ file_health.issues }}</strong><span>{{ t("review_items") }}</span></div>
+        <div><strong>{{ latest_reconciliation.scanned_files if latest_reconciliation else 0 }}</strong><span>{{ t("files_scanned") }}</span></div>
+      </div>
+      <div class="mini-actions">
+        <form method="post" action="/app/missions/{{ mission.id }}/workspace-reconcile">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">{{ t("reconcile_workspace") }}</button>
+        </form>
+        <form method="post" action="/app/missions/{{ mission.id }}/workspace-restructure-plan">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="secondary">{{ t("create_restructure_plan") }}</button>
+        </form>
+      </div>
+    </section>
+  </section>
+
+  <section class="glass-panel">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">{{ t("board_briefing") }}</span>
+        <h3>{{ latest_briefing.title if latest_briefing else t("no_board_briefing") }}</h3>
+        <p>{{ latest_briefing.executive_summary if latest_briefing else t("board_briefing_desc") }}</p>
+      </div>
+      {% if latest_briefing %}<span class="status">{{ label(latest_briefing.status) }}</span>{% endif %}
+    </div>
+    {% if latest_briefing %}
+      <div class="briefing-columns">
+        <div>
+          <h4>{{ t("recommendations") }}</h4>
+          <ul class="compact-list">
+            {% for item in latest_briefing.recommendations %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </div>
+        <div>
+          <h4>{{ t("decisions_needed") }}</h4>
+          <ul class="compact-list">
+            {% for item in latest_briefing.decisions_needed %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </div>
+        <div>
+          <h4>{{ t("risks") }}</h4>
+          <ul class="compact-list">
+            {% for item in latest_briefing.risks %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+      <details class="quiet-details">
+        <summary>{{ t("assumptions") }}</summary>
+        <ul class="compact-list">
+          {% for item in latest_briefing.assumptions %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </section>
+
+  <section class="accordion-stack">
+    <details class="glass-panel executive-details" open>
+      <summary>
+        <span>{{ t("company_context") }}</span>
+        <small>{{ knowledge.clients|length }} {{ t("client_record") }} · {{ knowledge.documents|length }} {{ t("document_registry") }} · {{ knowledge.open_questions|length }} {{ t("open_questions") }}</small>
+      </summary>
+      <div class="detail-body">
+        <div class="grid two">
+          <section>
+            <h4>{{ t("knowledge_workspace") }}</h4>
+            <div class="list">
+              {% for client in knowledge.clients %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ client.name }}</strong>
+                    {% if client.summary %}<div class="muted">{{ client.summary }}</div>{% endif %}
+                  </div>
                 </div>
-              </details>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_work_sessions") }}</p>
-    {% endif %}
-  </section>
-
-  <section class="panel">
-    <h3>{{ t("run_attempts") }}</h3>
-    {% if run_attempts %}
-      <div class="list">
-        {% for attempt in run_attempts %}
-          <div class="list-row">
-            <div>
-              <strong>{{ attempt.executor or t("not_available") }}</strong>
-              <div class="muted">
-                {{ t("status") }}: {{ label(attempt.status) }} ·
-                {{ t("last_event") }}: {{ label(attempt.last_event) if attempt.last_event else t("none") }}
-              </div>
-              <div class="muted">
-                {{ t("folder") }}: {{ attempt.workspace_path }} ·
-                {{ t("tokens") }}: {{ attempt.total_tokens }}
-              </div>
-              {% if attempt.last_message %}<div class="muted">{{ attempt.last_message }}</div>{% endif %}
-              {% if attempt.error %}<div class="muted">{{ attempt.error }}</div>{% endif %}
+              {% else %}
+                <p class="muted">{{ t("none") }}</p>
+              {% endfor %}
+              {% for matter in knowledge.matters %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ matter.title }}</strong>
+                    <div class="muted">{{ t("status") }}: {{ label(matter.status) }}</div>
+                  </div>
+                </div>
+              {% endfor %}
             </div>
-            <span class="status">{{ label(attempt.status) }}</span>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">{{ t("no_run_attempts") }}</p>
-    {% endif %}
-  </section>
-
-  <section class="panel">
-    <h3>{{ t("run_budget") }}</h3>
-    <ul class="compact-list">
-      <li>{{ t("max_steps") }}: {{ mission.run_budget.max_steps }}</li>
-      <li>{{ t("max_tokens") }}: {{ mission.run_budget.max_tokens }}</li>
-      <li>{{ t("max_time_minutes") }}: {{ mission.run_budget.max_time_minutes }}</li>
-      <li>{{ t("max_cost_eur") }}: {{ mission.run_budget.max_cost_eur }}</li>
-    </ul>
-    {% if runs %}
-      <p class="muted">
-        {{ t("latest_run_usage") }}:
-        {{ t("input") }}={{ runs[0].usage.input_tokens if runs[0].usage else t("not_available") }},
-        {{ t("output") }}={{ runs[0].usage.output_tokens if runs[0].usage else t("not_available") }},
-        duration_ms={{ runs[0].usage.duration_ms if runs[0].usage else 'n/a' }},
-        {{ t("stop_reason") }}={{ runs[0].pause_reason or t("none") }}.
-      </p>
-    {% endif %}
-  </section>
-
-  <section class="panel">
-    <h3>{{ t("execution_runs") }}</h3>
-    {% if runs %}
-      <div class="list">
-        {% for run in runs %}
-          <div class="list-row">
-            <div>
-              <strong>{{ run.run_id }}</strong>
-              <div class="muted">
-                {{ t("executor") }}: {{ run.executor }} · {{ t("changed_files") }}: {{ run.changed_files|join(', ') or t("none") }}
-              </div>
-              <div class="muted">
-                {{ t("input_tokens") }}: {{ run.usage.input_tokens if run.usage else t("not_available") }} ·
-                {{ t("output_tokens") }}: {{ run.usage.output_tokens if run.usage else t("not_available") }}
-              </div>
-              <div class="muted">
-                {{ t("stop_reason") }}: {{ run.pause_reason or t("none") }}
-              </div>
+          </section>
+          <section>
+            <h4>{{ t("open_questions") }}</h4>
+            <div class="list">
+              {% for question in knowledge.open_questions %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ question.question }}</strong>
+                    {% if question.blocking %}<div class="muted">{{ question.blocking }}</div>{% endif %}
+                  </div>
+                  <span class="status">{{ label(question.status) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("no_open_questions") }}</p>
+              {% endfor %}
             </div>
-            <span class="status">{{ label(run.normalized_status) }}</span>
+          </section>
+        </div>
+      </div>
+    </details>
+
+    <details class="glass-panel executive-details">
+      <summary>
+        <span>{{ t("workspace_steward") }}</span>
+        <small>{{ workspace_steward.assets|length }} {{ t("file_assets") }} · {{ workspace_steward.reconciliation_reports|length }} {{ t("reconciliation_reports") }}</small>
+      </summary>
+      <div class="detail-body">
+        <p>{{ t("workspace_steward_desc") }}</p>
+        <div class="list">
+          {% for asset in workspace_steward.assets[:8] %}
+            <div class="list-row soft-row">
+              <div>
+                <strong>{{ asset.title or asset.current_path }}</strong>
+                <div class="muted">{{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ label(asset.sync_status) }}</div>
+              </div>
+              <span class="status">{{ label(asset.sync_status) }}</span>
+            </div>
+          {% else %}
+            <p class="muted">{{ t("no_file_assets") }}</p>
+          {% endfor %}
+        </div>
+        {% if latest_reconciliation %}
+          <div class="health-strip">
+            <span>{{ latest_reconciliation.scanned_files }} {{ t("files_scanned") }}</span>
+            <span>{{ latest_reconciliation.missing_assets|length }} missing</span>
+            <span>{{ latest_reconciliation.changed_assets|length }} changed</span>
+            <span>{{ latest_reconciliation.untracked_files|length }} untracked</span>
+            <span>{{ latest_reconciliation.git_changes|length }} git</span>
           </div>
-        {% endfor %}
+        {% endif %}
       </div>
-    {% else %}
-      <p class="muted">{{ t("no_runs_recorded") }}</p>
-    {% endif %}
-  </section>
+    </details>
 
-  <section class="panel">
-    <h3>{{ t("request_approval_checkpoint") }}</h3>
-    <form class="form-grid" method="post" action="/app/missions/{{ mission.id }}/approval">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-      <label>
-        <span>{{ t("category") }}</span>
-        <select name="category">
-          <option value="change_strategy">{{ label("change_strategy") }}</option>
-          <option value="overwrite_important_files">{{ label("overwrite_important_files") }}</option>
-          <option value="shell_commands">{{ label("shell_commands") }}</option>
-          <option value="spending_money">{{ label("spending_money") }}</option>
-        </select>
-      </label>
-      <label class="full">
-        <span>{{ t("reason") }}</span>
-        <input type="text" name="reason" value="{{ t('manual_checkpoint_reason') }}" />
-      </label>
-      <div class="full actions">
-        <button type="submit" class="secondary">{{ t("create_approval") }}</button>
+    <details class="glass-panel executive-details">
+      <summary>
+        <span>{{ t("documents_and_memory") }}</span>
+        <small>{{ knowledge.decisions|length }} {{ t("matter_decisions") }} · {{ memory_promotion_reviews|length }} {{ t("memory_promotion") }}</small>
+      </summary>
+      <div class="detail-body">
+        <div class="grid two">
+          <section>
+            <h4>{{ t("document_registry") }}</h4>
+            <div class="list">
+              {% for document in knowledge.documents %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ document.title }}</strong>
+                    <div class="muted">{{ t("current_version") }}: v{{ "%03d"|format(document.current_version) }} · {{ label(document.status) }}</div>
+                    {% if document.versions %}
+                      <details class="quiet-details">
+                        <summary>{{ t("document_versions") }}</summary>
+                        <ul class="compact-list">
+                          {% for version in document.versions %}
+                            <li>v{{ "%03d"|format(version.version) }} · {{ version.path }}</li>
+                          {% endfor %}
+                        </ul>
+                      </details>
+                    {% endif %}
+                  </div>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("no_documents_registered") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+          <section>
+            <h4>{{ t("matter_decisions") }}</h4>
+            <div class="list">
+              {% for decision in knowledge.decisions %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ decision.summary }}</strong>
+                    {% if decision.rationale %}<div class="muted">{{ decision.rationale }}</div>{% endif %}
+                  </div>
+                  <span class="status">{{ label(decision.status) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("no_matter_decisions") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+
+        <div class="section-heading nested-heading">
+          <div>
+            <h4>{{ t("memory_promotion") }}</h4>
+            <p>{{ t("memory_promotion_desc") }}</p>
+          </div>
+          <form method="post" action="/app/missions/{{ mission.id }}/memory-promotion">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button type="submit" class="secondary">{{ t("create_memory_promotion") }}</button>
+          </form>
+        </div>
+        <div class="list">
+          {% for review in memory_promotion_reviews %}
+            <div class="list-row soft-row">
+              <div>
+                <strong>{{ review.summary }}</strong>
+                <div class="muted">{{ t("promotion_findings") }}: {{ review.findings|length }}</div>
+              </div>
+              <span class="status">{{ label(review.status) }}</span>
+            </div>
+          {% else %}
+            <p class="muted">{{ t("no_memory_promotion") }}</p>
+          {% endfor %}
+        </div>
       </div>
-    </form>
-  </section>
+    </details>
 
-  <section class="grid two">
-    <section class="panel">
-      <h3>{{ t("status_file") }}</h3>
-      <pre>{{ texts["STATUS.md"] }}</pre>
-    </section>
-    <section class="panel">
-      <h3>{{ t("pm_report") }}</h3>
-      <pre>{{ texts["PM_REPORT.md"] }}</pre>
-    </section>
-  </section>
-  <section class="panel">
-    <h3>{{ t("tasks_file") }}</h3>
-    <pre>{{ texts["TASKS.md"] }}</pre>
+    <details class="glass-panel executive-details">
+      <summary>
+        <span>{{ t("ai_operations") }}</span>
+        <small>{{ tasks|length }} {{ t("task_logs") }} · {{ work_sessions|length }} {{ t("work_sessions") }} · {{ run_attempts|length }} {{ t("run_attempts") }}</small>
+      </summary>
+      <div class="detail-body">
+        <div class="grid two">
+          <section>
+            <h4>{{ t("task_logs") }}</h4>
+            <div class="list">
+              {% for task in tasks %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ task.title }}</strong>
+                    <div class="muted">{{ t("executor") }}: {{ task.current_executor or t("not_available") }}</div>
+                  </div>
+                  <span class="status">{{ label(task.status) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("no_task_logs") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+          <section>
+            <h4>{{ t("run_attempts") }}</h4>
+            <div class="list">
+              {% for attempt in run_attempts %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ attempt.executor or t("not_available") }}</strong>
+                    <div class="muted">{{ t("last_event") }}: {{ label(attempt.last_event) if attempt.last_event else t("none") }}</div>
+                  </div>
+                  <span class="status">{{ label(attempt.status) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("no_run_attempts") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+        <section>
+          <h4>{{ t("work_sessions") }}</h4>
+          <div class="list">
+            {% for session in work_sessions %}
+              <div class="list-row activity-row soft-row">
+                <div>
+                  <strong>{{ session.manager_role }} -> {{ session.executor_role }}</strong>
+                  <div class="muted">{{ t("status") }}: {{ label(session.status) }} · {{ t("session_turns") }}: {{ session.turns|length }}</div>
+                  {% if session.current_blocker %}<div class="muted">{{ t("current_blocker") }}: {{ session.current_blocker }}</div>{% endif %}
+                </div>
+                {% if session.turns %}
+                  <details class="quiet-details">
+                    <summary>{{ t("session_turns") }}</summary>
+                    <div class="list">
+                      {% for turn in session.turns %}
+                        <div class="message {{ 'praetor-message' if turn.from_role in ['project_manager', 'praetor'] else 'founder-message' }}">
+                          <strong>{{ turn.from_role }} -> {{ turn.to_role }} · {{ label(turn.turn_type) }}</strong>
+                          <p>{{ turn.body }}</p>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </details>
+                {% endif %}
+              </div>
+            {% else %}
+              <p class="muted">{{ t("no_work_sessions") }}</p>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+    </details>
+
+    <details class="glass-panel executive-details">
+      <summary>
+        <span>{{ t("technical_appendix") }}</span>
+        <small>{{ t("workspace_scope") }} · {{ t("run_budget") }} · {{ t("status_file") }}</small>
+      </summary>
+      <div class="detail-body">
+        <div class="grid two">
+          <section>
+            <h4>{{ t("workspace_scope") }}</h4>
+            <ul class="compact-list">
+              <li>{{ t("folder") }}: {{ workspace_scope.root }}</li>
+              <li>{{ t("workflow_contract") }}: {{ workspace_scope.workflow_path or t("none") }}</li>
+              <li>{{ t("allowed_write") }}: {{ workspace_scope.allowed_write|join(', ') or t("none") }}</li>
+              <li>{{ t("denied_write") }}: {{ workspace_scope.denied_write|join(', ') or t("none") }}</li>
+            </ul>
+          </section>
+          <section>
+            <h4>{{ t("run_budget") }}</h4>
+            <ul class="compact-list">
+              <li>{{ t("max_steps") }}: {{ mission.run_budget.max_steps }}</li>
+              <li>{{ t("max_tokens") }}: {{ mission.run_budget.max_tokens }}</li>
+              <li>{{ t("max_time_minutes") }}: {{ mission.run_budget.max_time_minutes }}</li>
+              <li>{{ t("max_cost_eur") }}: {{ mission.run_budget.max_cost_eur }}</li>
+            </ul>
+          </section>
+        </div>
+        <section>
+          <h4>{{ t("report") }}</h4>
+          <pre>{{ texts["REPORT.md"] }}</pre>
+        </section>
+        <details class="quiet-details">
+          <summary>{{ t("raw_files") }}</summary>
+          <div class="grid two">
+            <section>
+              <h4>{{ t("status_file") }}</h4>
+              <pre>{{ texts["STATUS.md"] }}</pre>
+            </section>
+            <section>
+              <h4>{{ t("pm_report") }}</h4>
+              <pre>{{ texts["PM_REPORT.md"] }}</pre>
+            </section>
+          </div>
+          <h4>{{ t("tasks_file") }}</h4>
+          <pre>{{ texts["TASKS.md"] }}</pre>
+        </details>
+        <section>
+          <h4>{{ t("request_approval_checkpoint") }}</h4>
+          <form class="form-grid" method="post" action="/app/missions/{{ mission.id }}/approval">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <label>
+              <span>{{ t("category") }}</span>
+              <select name="category">
+                <option value="change_strategy">{{ label("change_strategy") }}</option>
+                <option value="overwrite_important_files">{{ label("overwrite_important_files") }}</option>
+                <option value="shell_commands">{{ label("shell_commands") }}</option>
+                <option value="spending_money">{{ label("spending_money") }}</option>
+              </select>
+            </label>
+            <label class="full">
+              <span>{{ t("reason") }}</span>
+              <input type="text" name="reason" value="{{ t('manual_checkpoint_reason') }}" />
+            </label>
+            <div class="full actions">
+              <button type="submit" class="secondary">{{ t("create_approval") }}</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </details>
   </section>
 {% endblock %}
