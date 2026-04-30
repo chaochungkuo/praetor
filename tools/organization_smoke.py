@@ -123,6 +123,7 @@ def main() -> int:
         )["data"]
         organization = request("GET", f"/api/missions/{mission['id']}/organization")["data"]
         contract = request("GET", f"/api/missions/{mission['id']}/completion-contract")["data"]
+        board_briefing = request("POST", f"/api/missions/{mission['id']}/board-briefings")["data"]
         snapshot = request("GET", "/api/office/snapshot")["data"]
 
         action_types = [item["type"] for item in chat["actions"]]
@@ -146,6 +147,8 @@ def main() -> int:
             raise AssertionError("escalation was not created")
         if not snapshot["organization"]["standing_orders"]:
             raise AssertionError("standing orders are missing")
+        if board_briefing["status"] != "ready_for_chairman":
+            raise AssertionError(f"board briefing not ready: {board_briefing['status']}")
 
         print(
             json.dumps(
@@ -157,6 +160,8 @@ def main() -> int:
                     "teams": len(organization["teams"]),
                     "delegations": len(organization["delegations"]),
                     "escalations": len(organization["escalations"]),
+                    "board_briefing_id": board_briefing["id"],
+                    "board_briefing_participants": board_briefing["participants"],
                     "standing_orders": len(snapshot["organization"]["standing_orders"]),
                     "completion_can_close": contract["can_close"],
                     "completion_blockers": contract["blockers"],

@@ -206,6 +206,64 @@
   <section class="panel">
     <div class="section-heading">
       <div>
+        <h3>{{ t("board_briefing") }}</h3>
+        <p>{{ t("board_briefing_desc") }}</p>
+      </div>
+      <form method="post" action="/app/missions/{{ mission.id }}/board-briefing">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="secondary">{{ t("create_board_briefing") }}</button>
+      </form>
+    </div>
+    {% if board_briefings %}
+      <div class="list">
+        {% for briefing in board_briefings %}
+          <div class="list-row">
+            <div>
+              <strong>{{ briefing.title }}</strong>
+              <div class="muted">
+                {{ t("status") }}: {{ label(briefing.status) }} ·
+                {{ t("role") }}: {{ briefing.participants|join(', ') }}
+              </div>
+              <p>{{ briefing.executive_summary }}</p>
+              <div class="grid two">
+                <div>
+                  <h4>{{ t("recommendations") }}</h4>
+                  <ul class="compact-list">
+                    {% for item in briefing.recommendations %}<li>{{ item }}</li>{% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h4>{{ t("decisions_needed") }}</h4>
+                  <ul class="compact-list">
+                    {% for item in briefing.decisions_needed %}<li>{{ item }}</li>{% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h4>{{ t("assumptions") }}</h4>
+                  <ul class="compact-list">
+                    {% for item in briefing.assumptions %}<li>{{ item }}</li>{% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h4>{{ t("risks") }}</h4>
+                  <ul class="compact-list">
+                    {% for item in briefing.risks %}<li>{{ item }}</li>{% endfor %}
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <span class="status">{{ label(briefing.status) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t("no_board_briefing") }}</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
         <h3>{{ t("memory_promotion") }}</h3>
         <p>{{ t("memory_promotion_desc") }}</p>
       </div>

@@ -37,6 +37,7 @@ class DeterministicCEOPlanner:
         intent = "briefing"
 
         wants_staffing = self._wants_staffing(lowered)
+        wants_board_briefing = self._wants_board_briefing(lowered)
         wants_new_mission = self._wants_mission(lowered) and not (
             context.related_mission_id and wants_staffing and not self._explicit_new_mission(lowered)
         )
@@ -121,6 +122,22 @@ class DeterministicCEOPlanner:
             if intent == "briefing":
                 intent = "staffing_proposal"
 
+        if wants_board_briefing:
+            actions.append(
+                PlannerAction(
+                    type="board_briefing",
+                    title="Prepare board briefing",
+                    body=(
+                        "Form the mission planning team, assign role-specific planning work, "
+                        "and produce an owner-visible briefing before execution."
+                    ),
+                    mission_id=context.related_mission_id,
+                    metadata={"requires_existing_mission": True},
+                )
+            )
+            if intent == "briefing":
+                intent = "board_briefing"
+
         if self._wants_escalation(lowered):
             actions.append(
                 PlannerAction(
@@ -166,7 +183,10 @@ class DeterministicCEOPlanner:
 
     @staticmethod
     def _wants_mission(lowered: str) -> bool:
-        return any(word in lowered for word in ["create", "建立", "新增", "任務", "mission"])
+        return any(
+            word in lowered
+            for word in ["create", "start", "建立", "新增", "開始", "开始", "任務", "任务", "專案", "项目", "project", "mission"]
+        )
 
     @staticmethod
     def _explicit_new_mission(lowered: str) -> bool:
@@ -208,6 +228,37 @@ class DeterministicCEOPlanner:
                 "安全",
                 "隱私",
                 "隐私",
+            ]
+        )
+
+    @staticmethod
+    def _wants_board_briefing(lowered: str) -> bool:
+        return any(
+            word in lowered
+            for word in [
+                "board briefing",
+                "briefing",
+                "presentation",
+                "proposal",
+                "plan",
+                "planning",
+                "product",
+                "revenue",
+                "logo",
+                "ui",
+                "ux",
+                "簡報",
+                "汇报",
+                "匯報",
+                "規劃",
+                "规划",
+                "產品",
+                "产品",
+                "收益",
+                "介面",
+                "界面",
+                "設計",
+                "设计",
             ]
         )
 
@@ -281,6 +332,8 @@ class DeterministicCEOPlanner:
             return "我已把這段指令轉成 approval request；若有指定 mission，會直接掛到該 mission。"
         if intent == "memory_update":
             return "我已把這段內容整理成 memory update，寫入公司記憶，之後的任務會參考它。"
+        if intent == "board_briefing":
+            return "我會讓 PM 組成任務小組，整理角色意見並產生董事長簡報；在你授權前不會直接進入高風險執行。"
         _ = context
         return "收到。我會用 briefing action 保留這段脈絡，並在需要任務、記憶或批准時轉成明確 action。"
 
@@ -331,14 +384,15 @@ class LLMCEOPlanner:
                 "- decision_escalation: escalate a decision to PM, CEO, or chairman.",
                 "- mission_closeout: request mission completion against the completion contract.",
                 "- standing_order_update: record durable chairman policy or authority guidance.",
+                "- board_briefing: form a planning team and produce an owner-visible briefing before execution.",
                 "",
                 "Required JSON shape:",
                 "{",
-                '  "intent": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update",',
+                '  "intent": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update|board_briefing",',
                 '  "response": "short CEO response to the chairman",',
                 '  "actions": [',
                 "    {",
-                '      "type": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update",',
+                '      "type": "mission_draft|approval_request|memory_update|briefing|staffing_proposal|agent_create|delegation_create|decision_escalation|mission_closeout|standing_order_update|board_briefing",',
                 '      "title": "short title",',
                 '      "body": "details",',
                 '      "mission_id": "optional existing mission id",',
@@ -356,6 +410,7 @@ class LLMCEOPlanner:
                 '- delegation_create metadata may include "from_role", "to_role", "success_criteria", "constraints".',
                 '- decision_escalation metadata may include "from_role", "to_level", "category", "options".',
                 '- standing_order_update metadata may include "scope" and "effect".',
+                "- board_briefing requires a mission_id or should follow a mission_draft action.",
                 "",
                 f"Existing mission count: {context.mission_count}",
                 f"Pending approvals: {context.pending_approvals}",
@@ -427,6 +482,8 @@ class LLMCEOPlanner:
                     scope = "global"
                 metadata["scope"] = scope
                 metadata["effect"] = LLMCEOPlanner._clean_text(str(metadata.get("effect") or "guidance"), limit=80)
+            elif action.type == "board_briefing":
+                metadata["requires_existing_mission"] = True
             actions.append(action.model_copy(update={"title": title, "body": body, "metadata": metadata}))
         if not actions:
             actions = [PlannerAction(type="briefing", title="Planner produced no action", body=plan.response)]

@@ -86,12 +86,14 @@ PlannerActionType = Literal[
     "decision_escalation",
     "mission_closeout",
     "standing_order_update",
+    "board_briefing",
 ]
 PlannerActionStatus = Literal["proposed", "applied", "skipped"]
 AgentStatus = Literal["active", "paused", "retired"]
 EscalationLevel = Literal["project_manager", "ceo", "chairman"]
 EscalationStatus = Literal["pending", "resolved", "dismissed"]
 DelegationStatus = Literal["assigned", "running", "blocked", "review", "done", "cancelled"]
+BoardBriefingStatus = Literal["draft", "ready_for_chairman", "approved", "superseded"]
 StandingOrderScope = Literal["global", "mission", "security", "privacy", "legal", "finance", "product", "engineering"]
 WorkSessionStatus = Literal["open", "running", "waiting_manager", "waiting_approval", "completed", "failed", "blocked"]
 WorkSessionTurnType = Literal[
@@ -278,6 +280,22 @@ class DelegationRecord(BaseModel):
     success_criteria: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     status: DelegationStatus = "assigned"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class BoardBriefing(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("briefing"))
+    mission_id: str
+    title: str
+    status: BoardBriefingStatus = "ready_for_chairman"
+    participants: list[str] = Field(default_factory=list)
+    executive_summary: str
+    recommendations: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    decisions_needed: list[str] = Field(default_factory=list)
+    artifacts: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

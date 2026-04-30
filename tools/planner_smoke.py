@@ -95,14 +95,14 @@ def stop(proc: subprocess.Popen[str]) -> None:
 def assert_deterministic_planner_contract() -> list[str]:
     plan = DeterministicCEOPlanner().plan(
         CEOPlannerContext(
-            instruction="建立任務：改善 Office。請建立 approval checkpoint，並記住這個原則。",
+            instruction="建立任務：改善 Office。請建立 approval checkpoint，記住這個原則，並讓團隊做規劃簡報。",
             related_mission_id="mission_existing",
             mission_count=2,
             pending_approvals=1,
         )
     )
     action_types = [item.type for item in plan.actions]
-    expected = {"mission_draft", "approval_request", "memory_update"}
+    expected = {"mission_draft", "approval_request", "memory_update", "board_briefing"}
     missing = sorted(expected.difference(action_types))
     if missing:
         raise AssertionError(f"deterministic planner missing actions: {missing}")

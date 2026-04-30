@@ -15,6 +15,7 @@ from .models import (
     AgentRoleSpec,
     AppSettings,
     ApprovalRequest,
+    BoardBriefing,
     GovernanceReview,
     ClientRecord,
     ConversationMessage,
@@ -165,6 +166,7 @@ class FilesystemStore:
         self.open_questions_path = self.state_dir / "open_questions.json"
         self.knowledge_updates_path = self.state_dir / "knowledge_updates.json"
         self.memory_promotion_reviews_path = self.state_dir / "memory_promotion_reviews.json"
+        self.board_briefings_path = self.state_dir / "board_briefings.json"
         self.agent_roles_path = self.state_dir / "agent_roles.json"
         self.agents_path = self.state_dir / "agents.json"
         self.teams_path = self.state_dir / "mission_teams.json"
@@ -704,6 +706,19 @@ class FilesystemStore:
         reviews.sort(key=lambda item: item.updated_at, reverse=True)
         return reviews[:limit]
 
+    def save_board_briefing(self, briefing: BoardBriefing) -> None:
+        briefings = self.list_board_briefings(limit=10_000)
+        briefings = [item for item in briefings if item.id != briefing.id] + [briefing]
+        briefings.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.board_briefings_path, briefings)
+
+    def list_board_briefings(self, mission_id: str | None = None, limit: int = 50) -> list[BoardBriefing]:
+        briefings = self._read_model_list(self.board_briefings_path, BoardBriefing)
+        if mission_id is not None:
+            briefings = [item for item in briefings if item.mission_id == mission_id]
+        briefings.sort(key=lambda item: item.updated_at, reverse=True)
+        return briefings[:limit]
+
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         roles = self.list_agent_roles()
         roles = [item for item in roles if item.id != role.id and item.name != role.name] + [role]
@@ -957,6 +972,12 @@ class AppStorage:
         limit: int = 50,
     ) -> list[MemoryPromotionReview]:
         return self.fs.list_memory_promotion_reviews(mission_id=mission_id, limit=limit)
+
+    def save_board_briefing(self, briefing: BoardBriefing) -> None:
+        self.fs.save_board_briefing(briefing)
+
+    def list_board_briefings(self, mission_id: str | None = None, limit: int = 50) -> list[BoardBriefing]:
+        return self.fs.list_board_briefings(mission_id=mission_id, limit=limit)
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         self.fs.save_agent_role(role)

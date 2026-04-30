@@ -367,6 +367,26 @@ def create_review_meeting(mission_id: str):
         fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
+@app.get("/api/missions/{mission_id}/board-briefings")
+def mission_board_briefings(mission_id: str):
+    try:
+        return ok({"briefings": get_ctx().service.list_board_briefings(mission_id)})
+    except RuntimeError as exc:
+        fail(400, "runtime_error", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.post("/api/missions/{mission_id}/board-briefings")
+def create_board_briefing(mission_id: str):
+    try:
+        return ok(get_ctx().service.create_board_briefing(mission_id))
+    except RuntimeError as exc:
+        fail(400, "runtime_error", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
 @app.get("/approvals")
 def list_approvals():
     return ok({"approvals": get_ctx().service.list_approvals()})

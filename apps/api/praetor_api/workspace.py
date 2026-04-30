@@ -36,9 +36,18 @@ This workspace contract is versioned with the company workspace. It defines how 
 ## Operating Model
 
 - The CEO is the owner-facing entry point, not the storage location for every detail.
+- The CEO may form a mission team when work needs product, market, design, legal, security, or engineering judgment.
+- The Project Manager coordinates role-specific delegations and prepares board briefings before major execution.
 - Every mission must have a clear workspace scope before execution.
 - Raw conversation is audit material; durable memory is promoted only through confirmed decisions, approved knowledge updates, and document registry records.
 - A successful agent run is not the same as a completed matter.
+
+## Team Planning Contract
+
+- Planning teams produce board briefings, not unfiltered agent transcripts.
+- Board briefings must separate recommendations, assumptions, risks, decisions needed, and related artifacts.
+- Low-risk sequencing can be decided by the PM inside mission scope.
+- Security, privacy, legal, spending, external communication, destructive file actions, and material strategy changes must be escalated.
 
 ## Completion Contract
 

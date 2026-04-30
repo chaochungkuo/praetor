@@ -245,6 +245,8 @@ def main() -> int:
         run_attempts = request("GET", f"/api/missions/{mission_id}/run-attempts")
         work_sessions = request("GET", f"/api/missions/{mission_id}/work-sessions")
         completion = request("GET", f"/api/missions/{mission_id}/completion-contract")
+        board_briefing = request("POST", f"/api/missions/{mission_id}/board-briefings")
+        board_briefing_list = request("GET", f"/api/missions/{mission_id}/board-briefings")
         promotion = request("POST", f"/api/missions/{mission_id}/memory-promotion")
         promotion_list = request("GET", f"/api/missions/{mission_id}/memory-promotion")
         meeting = request("POST", f"/missions/{mission_id}/meeting")
@@ -324,6 +326,8 @@ def main() -> int:
                     "governance_review_items": len(governance_review_run["data"]["items"]),
                     "run_attempt_status": run_attempts["data"]["attempts"][0]["status"],
                     "completion_has_workspace_scope": completion["data"]["workspace_scope_defined"],
+                    "board_briefing_status": board_briefing["data"]["status"],
+                    "board_briefings": len(board_briefing_list["data"]["briefings"]),
                     "promotion_findings": len(promotion["data"]["findings"]),
                     "promotion_reviews": len(promotion_list["data"]["reviews"]),
                     "task_status": run_result["data"]["task"]["status"],

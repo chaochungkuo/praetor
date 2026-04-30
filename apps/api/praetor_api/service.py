@@ -14,6 +14,7 @@ from .models import (
     AppSettings,
     ApprovalCreateRequest,
     ApprovalRequest,
+    BoardBriefing,
     ChairmanInboxItem,
     ClientRecord,
     CompletionContract,
@@ -200,6 +201,46 @@ class PraetorService:
                 escalation_triggers=["contract", "non-permissive license", "external claim"],
                 decision_authority=["request legal escalation"],
                 default_supervisor_role="ceo",
+            ),
+            AgentRoleSpec(
+                name="Product Manager",
+                purpose="Clarify product intent, target users, scope, success metrics, and release shape.",
+                responsibilities=["product framing", "scope definition", "success criteria"],
+                skills=["product strategy", "user research synthesis", "prioritization"],
+                constraints=["must separate assumptions from confirmed chairman decisions"],
+                escalation_triggers=["unclear target user", "conflicting product goals", "material strategy choice"],
+                decision_authority=["low-risk product tradeoffs inside approved mission scope"],
+                default_supervisor_role="project_manager",
+            ),
+            AgentRoleSpec(
+                name="Marketing Lead",
+                purpose="Define positioning, audience, go-to-market assumptions, and revenue hypotheses.",
+                responsibilities=["positioning", "audience analysis", "business assumptions"],
+                skills=["market research", "messaging", "pricing and revenue hypothesis"],
+                constraints=["must not treat unverified market claims as durable company knowledge"],
+                escalation_triggers=["external communication", "unverified claims", "pricing commitment"],
+                decision_authority=["draft positioning and forecast assumptions for review"],
+                default_supervisor_role="project_manager",
+            ),
+            AgentRoleSpec(
+                name="Design Lead",
+                purpose="Explore product experience, interface direction, and visual presentation options.",
+                responsibilities=["UX framing", "interface proposal", "visual direction"],
+                skills=["UX design", "interaction design", "visual systems"],
+                constraints=["must present design options before committing major brand or UX changes"],
+                escalation_triggers=["brand change", "accessibility risk", "unclear user workflow"],
+                decision_authority=["draft design directions and interface recommendations"],
+                default_supervisor_role="project_manager",
+            ),
+            AgentRoleSpec(
+                name="Sales Manager",
+                purpose="Clarify customer-facing path, buyer assumptions, and sales risks.",
+                responsibilities=["customer discovery", "sales assumptions", "external communication review"],
+                skills=["sales strategy", "customer qualification", "business development"],
+                constraints=["cannot contact customers or make commitments without chairman approval"],
+                escalation_triggers=["external communication", "pricing commitment", "customer promise"],
+                decision_authority=["draft sales options and customer discovery questions"],
+                default_supervisor_role="project_manager",
             ),
         ]
         for role in defaults:
@@ -617,9 +658,31 @@ class PraetorService:
 
     def _ensure_mission_team(self, mission: MissionDefinition, requested_roles: list[str] | None = None) -> MissionTeam:
         existing = self.storage.list_teams(mission_id=mission.id)
+        roles = list(dict.fromkeys(requested_roles or self._recommended_roles_for_mission(mission)))
         if existing:
-            return existing[0]
-        roles = requested_roles or self._recommended_roles_for_mission(mission)
+            team = existing[0]
+            existing_agents = self.storage.list_agents(mission_id=mission.id)
+            existing_roles = {agent.role_name for agent in existing_agents}
+            missing_roles = [role for role in roles if role not in existing_roles]
+            if not missing_roles:
+                return team
+            new_agents = [self._create_agent_for_role(role, mission) for role in missing_roles]
+            member_ids = list(dict.fromkeys([*team.member_agent_ids, *[agent.id for agent in new_agents]]))
+            pm = next((agent for agent in [*existing_agents, *new_agents] if agent.role_name == "Project Manager"), None)
+            team.member_agent_ids = member_ids
+            team.lead_agent_id = team.lead_agent_id or (pm.id if pm else member_ids[0] if member_ids else None)
+            team.status = "active"
+            team.updated_at = utc_now()
+            self.storage.save_team(team)
+            self._audit(
+                "mission_team_expanded",
+                {
+                    "mission_id": mission.id,
+                    "team_id": team.id,
+                    "roles": missing_roles,
+                },
+            )
+            return team
         agents = [self._create_agent_for_role(role, mission) for role in roles]
         pm = next((agent for agent in agents if agent.role_name == "Project Manager"), None)
         team = MissionTeam(
@@ -643,11 +706,17 @@ class PraetorService:
     def _recommended_roles_for_mission(self, mission: MissionDefinition) -> list[str]:
         roles = ["Project Manager", "Developer", "Reviewer"]
         text = " ".join([mission.title, mission.summary or "", " ".join(mission.domains)]).lower()
+        if any(word in text for word in ["product", "產品", "产品", "feature", "功能", "專案", "项目"]):
+            roles.append("Product Manager")
+        if any(word in text for word in ["marketing", "market", "revenue", "sales", "收益", "市場", "市场", "行銷", "营销", "業務", "销售"]):
+            roles.append("Marketing Lead")
+        if any(word in text for word in ["design", "ui", "ux", "logo", "interface", "介面", "界面", "設計", "设计"]):
+            roles.append("Design Lead")
         if any(word in text for word in ["security", "privacy", "安全", "隱私", "隐私"]):
             roles.append("Security Officer")
         if any(word in text for word in ["legal", "law", "license", "合約", "法律", "法務"]):
             roles.append("Legal Counsel")
-        return roles
+        return list(dict.fromkeys(roles))
 
     def _create_agent_for_role(self, role_name: str, mission: MissionDefinition) -> AgentInstance:
         existing = [agent for agent in self.storage.list_agents(mission_id=mission.id) if agent.role_name == role_name]
@@ -1262,6 +1331,229 @@ class PraetorService:
         )
         self._audit("meeting_created", {"meeting_id": meeting.id, "mission_id": mission_id, "type": meeting.type})
         return meeting
+
+    def list_board_briefings(self, mission_id: str, limit: int = 10) -> list[BoardBriefing]:
+        self.get_mission(mission_id)
+        return self.storage.list_board_briefings(mission_id=mission_id, limit=limit)
+
+    def create_board_briefing(self, mission_id: str) -> BoardBriefing:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        mission = self.get_mission(mission_id)
+        existing = self.storage.list_board_briefings(mission_id=mission_id, limit=1)
+        if existing and existing[0].status in {"draft", "ready_for_chairman"}:
+            return existing[0]
+
+        roles = self._planning_roles_for_mission(mission)
+        team = self._ensure_mission_team(mission, requested_roles=roles)
+        agents = self.storage.list_agents(mission_id=mission_id)
+        role_to_agent = {agent.role_name: agent for agent in agents}
+        delegations = self._ensure_planning_delegations(mission, roles, role_to_agent)
+
+        participants = [role for role in roles if role in role_to_agent or role == "Project Manager"]
+        title = f"Board briefing: {mission.title}"
+        briefing = BoardBriefing(
+            mission_id=mission.id,
+            title=title,
+            participants=participants,
+            executive_summary=(
+                f"CEO formed a mission planning team for '{mission.title}'. "
+                "The team is expected to clarify scope, assumptions, risks, owner decisions, and the next authorized execution step."
+            ),
+            recommendations=[
+                "Keep this mission in planning until the chairman approves the next execution step.",
+                "Separate confirmed decisions from assumptions before promoting anything to company knowledge.",
+                "Use the mission workspace as the source of truth for documents, versions, decisions, and open questions.",
+            ],
+            assumptions=[
+                mission.summary or "The chairman's latest instruction is the current source of intent.",
+                "Team members may decide low-risk sequencing details inside the mission scope.",
+            ],
+            risks=[
+                "Unverified product, market, legal, or revenue claims must stay as assumptions.",
+                "Security, privacy, external communication, spending, and destructive file actions still require escalation.",
+            ],
+            decisions_needed=[
+                "Approve the proposed direction, ask for a revised briefing, or authorize execution.",
+                "Confirm which output should become the authoritative deliverable for closeout.",
+            ],
+            artifacts=[
+                f"Missions/{mission.id}/PM_REPORT.md",
+                f"Missions/{mission.id}/meetings/",
+                *(mission.requested_outputs or []),
+            ],
+        )
+        self.storage.save_board_briefing(briefing)
+        self.storage.save_meeting(
+            workspace_root,
+            MeetingRecord(
+                mission_id=mission.id,
+                type="project_review",
+                moderator="project_manager",
+                participants=participants,
+                agenda=[
+                    "confirm chairman intent",
+                    "assign role-specific planning work",
+                    "identify assumptions, risks, and decisions needed",
+                    "prepare owner-visible board briefing",
+                ],
+                outputs=[
+                    briefing.executive_summary,
+                    *briefing.recommendations,
+                    f"Delegations opened: {len(delegations)}",
+                ],
+            ),
+        )
+        self.storage.append_pm_report(
+            workspace_root,
+            mission.id,
+            "\n".join(
+                [
+                    f"Board briefing created: {briefing.id}",
+                    f"Team: {team.name}",
+                    f"Participants: {', '.join(participants)}",
+                    "Recommendations:",
+                    *[f"- {item}" for item in briefing.recommendations],
+                    "Decisions needed:",
+                    *[f"- {item}" for item in briefing.decisions_needed],
+                ]
+            ),
+        )
+        mission.status = "ready_for_ceo"
+        mission.updated_at = utc_now()
+        self.storage.save_mission(workspace_root, mission)
+        self.storage.append_agent_message(
+            AgentMessage(
+                mission_id=mission.id,
+                role="ceo",
+                body=f"Board briefing is ready for chairman review: {briefing.title}",
+            )
+        )
+        self._audit(
+            "board_briefing_created",
+            {
+                "briefing_id": briefing.id,
+                "mission_id": mission.id,
+                "team_id": team.id,
+                "roles": roles,
+                "delegations": len(delegations),
+            },
+        )
+        return briefing
+
+    def _planning_roles_for_mission(self, mission: MissionDefinition) -> list[str]:
+        roles = ["Project Manager", "Product Manager", "Marketing Lead", "Developer", "Reviewer"]
+        text = " ".join([mission.title, mission.summary or "", " ".join(mission.domains)]).lower()
+        if any(word in text for word in ["design", "ui", "ux", "logo", "介面", "界面", "設計", "设计"]):
+            roles.insert(3, "Design Lead")
+        if any(word in text for word in ["sales", "customer", "客戶", "客户", "業務", "銷售", "销售"]):
+            roles.append("Sales Manager")
+        if any(word in text for word in ["legal", "law", "contract", "合約", "合同", "法律", "法務"]):
+            roles.append("Legal Counsel")
+        if any(word in text for word in ["security", "privacy", "安全", "隱私", "隐私"]):
+            roles.append("Security Officer")
+        return list(dict.fromkeys(roles))
+
+    def _ensure_planning_delegations(
+        self,
+        mission: MissionDefinition,
+        roles: list[str],
+        role_to_agent: dict[str, AgentInstance],
+    ) -> list[DelegationRecord]:
+        existing = {
+            (delegation.to_role, delegation.title)
+            for delegation in self.storage.list_delegations(mission_id=mission.id)
+        }
+        templates = {
+            "Project Manager": (
+                "Coordinate planning team",
+                "Create the planning sequence, reconcile role outputs, and prepare the owner-visible briefing.",
+                ["role outputs are reconciled", "blockers and owner decisions are visible"],
+            ),
+            "Product Manager": (
+                "Define product scope",
+                "Clarify user problem, target audience, scope boundaries, success metrics, and first useful version.",
+                ["target user is explicit", "scope and success metrics are reviewable"],
+            ),
+            "Marketing Lead": (
+                "Draft market and revenue assumptions",
+                "Prepare positioning, audience assumptions, competitive questions, and revenue hypothesis without treating unverified claims as facts.",
+                ["assumptions are labeled", "revenue hypothesis is reviewable"],
+            ),
+            "Design Lead": (
+                "Explore interface direction",
+                "Propose practical UI/UX directions, key screens, and visual constraints for chairman review.",
+                ["design options are understandable", "accessibility and workflow risks are noted"],
+            ),
+            "Developer": (
+                "Assess implementation path",
+                "Identify feasible technical approach, first-version milestones, dependencies, and engineering risks.",
+                ["first build step is concrete", "technical risks are visible"],
+            ),
+            "Reviewer": (
+                "Prepare acceptance review",
+                "Define quality checks, completion criteria, and what would block mission closeout.",
+                ["acceptance criteria are clear", "closeout blockers are explicit"],
+            ),
+            "Legal Counsel": (
+                "Review legal exposure",
+                "Identify contract, licensing, external claim, or compliance issues that require escalation.",
+                ["legal assumptions are separated from advice", "escalation items are visible"],
+            ),
+            "Security Officer": (
+                "Review security and privacy boundaries",
+                "Identify user data, credential, file safety, and external sharing risks before execution.",
+                ["safety boundaries are explicit", "privacy risks are escalated"],
+            ),
+            "Sales Manager": (
+                "Assess customer-facing path",
+                "Draft customer discovery questions, sales assumptions, and external communication risks.",
+                ["customer assumptions are explicit", "external communication needs approval"],
+            ),
+        }
+        created: list[DelegationRecord] = []
+        for role in roles:
+            title, instructions, success_criteria = templates.get(
+                role,
+                (
+                    f"Plan {role} contribution",
+                    f"Contribute {role} expertise to the board briefing and report blockers.",
+                    ["contribution is clear", "blockers are reported"],
+                ),
+            )
+            if (role, title) in existing:
+                continue
+            delegation = DelegationRecord(
+                mission_id=mission.id,
+                from_role="Project Manager" if role != "Project Manager" else "CEO",
+                to_role=role,
+                to_agent_id=role_to_agent.get(role).id if role_to_agent.get(role) else None,
+                title=title,
+                instructions=append_safety_policy(
+                    instructions,
+                    build_prompt_safety_policy(
+                        settings=self._require_settings(),
+                        standing_orders=self.storage.list_standing_orders(),
+                        mission=mission,
+                        role_name=role,
+                    ).text,
+                ),
+                success_criteria=success_criteria,
+                constraints=[
+                    "Do not promote raw discussion into durable memory.",
+                    "Escalate security, privacy, legal, spending, external communication, and destructive file actions.",
+                ],
+            )
+            self.storage.save_delegation(delegation)
+            self.storage.append_agent_message(
+                AgentMessage(
+                    mission_id=mission.id,
+                    role=self._agent_message_role(role),
+                    body=f"Planning delegation received: {title}.",
+                )
+            )
+            created.append(delegation)
+        return created
 
     def resolve_approval(self, approval_id: str, status: str) -> ApprovalRequest:
         for approval in self.storage.list_approvals():
@@ -2206,6 +2498,18 @@ class PraetorService:
             mission.updated_at = utc_now()
             self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
             return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": mission.id})
+
+        if action.type == "board_briefing":
+            mission_id = action.mission_id or related_mission_id
+            if not mission_id:
+                return action.model_copy(
+                    update={
+                        "status": "skipped",
+                        "metadata": {**action.metadata, "skip_reason": "board briefing requires a mission_id"},
+                    }
+                )
+            briefing = self.create_board_briefing(mission_id)
+            return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": briefing.id})
 
         return action.model_copy(update={"status": "applied"})
 

@@ -246,6 +246,43 @@ meeting:
     - follow_ups
 ```
 
+### 3.9 Board Briefing
+
+`BoardBriefing` 是專案規劃與正式執行之間的 owner-facing artifact。
+
+董事長可以先和 CEO 討論想法；CEO 需要時建立 mission，組成 PM-led planning team，讓 Product Manager、Marketing Lead、Design Lead、Developer、Reviewer、Legal Counsel、Security Officer 等角色各自提出結構化意見。這些 AI-to-AI 訊息不直接等於公司記憶，最後要整理成 `BoardBriefing`：
+
+```yaml
+board_briefing:
+  id: briefing_product_plan_001
+  mission_id: mission_new_product
+  status: ready_for_chairman
+  participants:
+    - Project Manager
+    - Product Manager
+    - Marketing Lead
+    - Developer
+    - Reviewer
+  executive_summary: owner_visible_summary
+  recommendations:
+    - recommended_next_step
+  assumptions:
+    - unverified_market_or_product_assumption
+  risks:
+    - security_privacy_legal_or_execution_risk
+  decisions_needed:
+    - approve_direction_or_request_revision
+```
+
+這個設計讓 Praetor 像公司一樣運作：
+
+- CEO 對董事長負責
+- PM 對 CEO 負責
+- specialist roles 對 PM 負責
+- Reviewer 可以阻擋 closeout
+- 高風險事項往 CEO / 董事長升級
+- briefing 才是正式結論，raw chat 只作為 evidence
+
 ## 4. 狀態機
 
 ### 4.1 Mission 狀態
