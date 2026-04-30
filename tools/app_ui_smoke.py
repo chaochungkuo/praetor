@@ -140,6 +140,8 @@ def main() -> int:
                     "overview_has_total": "Total missions" in overview,
                     "tasks_has_board": "Mission board" in tasks,
                     "mission_detail_has_work_sessions": "AI work sessions" in mission_detail,
+                    "mission_detail_has_knowledge_workspace": "Knowledge workspace" in mission_detail,
+                    "memory_has_client_record": "Client record" in memory,
                     "agents_has_directory": "Agent Directory" in agents,
                     "activity_has_audit": "Audit stream" in activity,
                     "memory_has_wiki": "Company memory" in memory,

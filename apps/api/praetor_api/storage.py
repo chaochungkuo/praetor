@@ -15,12 +15,18 @@ from .models import (
     AgentRoleSpec,
     AppSettings,
     ApprovalRequest,
+    ClientRecord,
     ConversationMessage,
     DelegationRecord,
+    DocumentRecord,
     EscalationRecord,
+    KnowledgeUpdate,
+    MatterDecisionRecord,
+    MatterRecord,
     MeetingRecord,
     MissionDefinition,
     MissionTeam,
+    OpenQuestionRecord,
     OwnerAuthRecord,
     StandingOrder,
     TaskDefinition,
@@ -145,6 +151,12 @@ class FilesystemStore:
         self.conversation_path = self.state_dir / "office_conversation.json"
         self.agent_messages_path = self.state_dir / "agent_messages.json"
         self.work_sessions_path = self.state_dir / "work_sessions.json"
+        self.clients_path = self.state_dir / "clients.json"
+        self.matters_path = self.state_dir / "matters.json"
+        self.documents_path = self.state_dir / "documents.json"
+        self.matter_decisions_path = self.state_dir / "matter_decisions.json"
+        self.open_questions_path = self.state_dir / "open_questions.json"
+        self.knowledge_updates_path = self.state_dir / "knowledge_updates.json"
         self.agent_roles_path = self.state_dir / "agent_roles.json"
         self.agents_path = self.state_dir / "agents.json"
         self.teams_path = self.state_dir / "mission_teams.json"
@@ -465,6 +477,149 @@ class FilesystemStore:
         sessions.sort(key=lambda item: item.updated_at, reverse=True)
         return sessions[:limit]
 
+    def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
+        clients = self.list_clients()
+        clients = [item for item in clients if item.id != client.id and item.slug != client.slug] + [client]
+        clients.sort(key=lambda item: item.name.lower())
+        self._write_model_list(self.clients_path, clients)
+        client_dir = workspace_root / client.folder
+        _write_workspace_text(
+            client_dir / "profile.md",
+            "\n".join(
+                [
+                    f"# {client.name}",
+                    "",
+                    client.summary or "Client profile managed by Praetor.",
+                    "",
+                ]
+            ),
+        )
+        _write_workspace_text(
+            client_dir / "knowledge.md",
+            f"# {client.name} Knowledge\n\nStable, confirmed knowledge about this client belongs here.\n",
+        )
+
+    def list_clients(self) -> list[ClientRecord]:
+        return self._read_model_list(self.clients_path, ClientRecord)
+
+    def save_matter(self, workspace_root: Path, matter: MatterRecord) -> None:
+        matters = self.list_matters()
+        matters = [item for item in matters if item.id != matter.id] + [matter]
+        matters.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.matters_path, matters)
+        matter_dir = workspace_root / matter.folder
+        _write_workspace_text(
+            workspace_root / matter.brief_path,
+            f"# {matter.title}\n\nStatus: {matter.status}\n\n",
+        )
+        _write_workspace_text(workspace_root / matter.decisions_path, "# Decisions\n\n")
+        _write_workspace_text(workspace_root / matter.open_questions_path, "# Open Questions\n\n")
+        for name in ["documents", "versions", "sources"]:
+            (matter_dir / name).mkdir(parents=True, exist_ok=True)
+        registry = {
+            "matter_id": matter.id,
+            "client_id": matter.client_id,
+            "mission_id": matter.mission_id,
+            "title": matter.title,
+            "status": matter.status,
+        }
+        _write_workspace_text(
+            matter_dir / "registry.json",
+            json.dumps(registry, indent=2, ensure_ascii=True),
+        )
+
+    def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
+        matters = self._read_model_list(self.matters_path, MatterRecord)
+        if client_id is not None:
+            matters = [item for item in matters if item.client_id == client_id]
+        if mission_id is not None:
+            matters = [item for item in matters if item.mission_id == mission_id]
+        return matters
+
+    def save_document(self, document: DocumentRecord) -> None:
+        documents = self.list_documents()
+        documents = [item for item in documents if item.id != document.id] + [document]
+        documents.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.documents_path, documents)
+
+    def list_documents(self, matter_id: str | None = None, mission_id: str | None = None) -> list[DocumentRecord]:
+        documents = self._read_model_list(self.documents_path, DocumentRecord)
+        if matter_id is not None:
+            documents = [item for item in documents if item.matter_id == matter_id]
+        if mission_id is not None:
+            documents = [item for item in documents if item.mission_id == mission_id]
+        return documents
+
+    def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
+        decisions = self.list_matter_decisions()
+        decisions = [item for item in decisions if item.id != decision.id] + [decision]
+        decisions.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.matter_decisions_path, decisions)
+        matter = next((item for item in self.list_matters() if item.id == decision.matter_id), None)
+        if matter is not None:
+            path = workspace_root / matter.decisions_path
+            existing = path.read_text(encoding="utf-8") if path.exists() else "# Decisions\n\n"
+            text = f"- {decision.summary}"
+            if decision.rationale:
+                text += f" Reason: {decision.rationale}"
+            _write_workspace_text(path, existing.rstrip() + "\n" + text + "\n")
+
+    def list_matter_decisions(self, matter_id: str | None = None, mission_id: str | None = None) -> list[MatterDecisionRecord]:
+        decisions = self._read_model_list(self.matter_decisions_path, MatterDecisionRecord)
+        if matter_id is not None:
+            decisions = [item for item in decisions if item.matter_id == matter_id]
+        if mission_id is not None:
+            decisions = [item for item in decisions if item.mission_id == mission_id]
+        return decisions
+
+    def save_open_question(self, workspace_root: Path, question: OpenQuestionRecord) -> None:
+        questions = self.list_open_questions()
+        questions = [item for item in questions if item.id != question.id] + [question]
+        questions.sort(key=lambda item: item.asked_at, reverse=True)
+        self._write_model_list(self.open_questions_path, questions)
+        matter = next((item for item in self.list_matters() if item.id == question.matter_id), None)
+        if matter is not None:
+            path = workspace_root / matter.open_questions_path
+            existing = path.read_text(encoding="utf-8") if path.exists() else "# Open Questions\n\n"
+            blocking = f" Blocking: {question.blocking}" if question.blocking else ""
+            _write_workspace_text(path, existing.rstrip() + f"\n- [{question.status}] {question.question}{blocking}\n")
+
+    def list_open_questions(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[OpenQuestionRecord]:
+        questions = self._read_model_list(self.open_questions_path, OpenQuestionRecord)
+        if matter_id is not None:
+            questions = [item for item in questions if item.matter_id == matter_id]
+        if mission_id is not None:
+            questions = [item for item in questions if item.mission_id == mission_id]
+        if status is not None:
+            questions = [item for item in questions if item.status == status]
+        return questions
+
+    def save_knowledge_update(self, update: KnowledgeUpdate) -> None:
+        updates = self.list_knowledge_updates()
+        updates = [item for item in updates if item.id != update.id] + [update]
+        updates.sort(key=lambda item: item.created_at, reverse=True)
+        self._write_model_list(self.knowledge_updates_path, updates)
+
+    def list_knowledge_updates(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[KnowledgeUpdate]:
+        updates = self._read_model_list(self.knowledge_updates_path, KnowledgeUpdate)
+        if matter_id is not None:
+            updates = [item for item in updates if item.matter_id == matter_id]
+        if mission_id is not None:
+            updates = [item for item in updates if item.mission_id == mission_id]
+        if status is not None:
+            updates = [item for item in updates if item.status == status]
+        return updates
+
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         roles = self.list_agent_roles()
         roles = [item for item in roles if item.id != role.id and item.name != role.name] + [role]
@@ -643,6 +798,56 @@ class AppStorage:
 
     def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
         return self.fs.list_work_sessions(mission_id=mission_id, limit=limit)
+
+    def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
+        self.fs.save_client(workspace_root, client)
+
+    def list_clients(self) -> list[ClientRecord]:
+        return self.fs.list_clients()
+
+    def save_matter(self, workspace_root: Path, matter: MatterRecord) -> None:
+        self.fs.save_matter(workspace_root, matter)
+
+    def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
+        return self.fs.list_matters(client_id=client_id, mission_id=mission_id)
+
+    def save_document(self, document: DocumentRecord) -> None:
+        self.fs.save_document(document)
+
+    def list_documents(self, matter_id: str | None = None, mission_id: str | None = None) -> list[DocumentRecord]:
+        return self.fs.list_documents(matter_id=matter_id, mission_id=mission_id)
+
+    def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
+        self.fs.save_matter_decision(workspace_root, decision)
+
+    def list_matter_decisions(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+    ) -> list[MatterDecisionRecord]:
+        return self.fs.list_matter_decisions(matter_id=matter_id, mission_id=mission_id)
+
+    def save_open_question(self, workspace_root: Path, question: OpenQuestionRecord) -> None:
+        self.fs.save_open_question(workspace_root, question)
+
+    def list_open_questions(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[OpenQuestionRecord]:
+        return self.fs.list_open_questions(matter_id=matter_id, mission_id=mission_id, status=status)
+
+    def save_knowledge_update(self, update: KnowledgeUpdate) -> None:
+        self.fs.save_knowledge_update(update)
+
+    def list_knowledge_updates(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[KnowledgeUpdate]:
+        return self.fs.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id, status=status)
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         self.fs.save_agent_role(role)

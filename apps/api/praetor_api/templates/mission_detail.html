@@ -49,6 +49,140 @@
     </ul>
   </section>
 
+  <section class="panel">
+    <h3>{{ t("knowledge_workspace") }}</h3>
+    <div class="grid two">
+      <div>
+        <h4>{{ t("client_record") }}</h4>
+        {% if knowledge.clients %}
+          {% for client in knowledge.clients %}
+            <div class="list-row">
+              <div>
+                <strong>{{ client.name }}</strong>
+                <div class="muted">{{ t("folder") }}: {{ client.folder }}</div>
+                {% if client.summary %}<div class="muted">{{ client.summary }}</div>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted">{{ t("none") }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <h4>{{ t("matter_record") }}</h4>
+        {% if knowledge.matters %}
+          {% for matter in knowledge.matters %}
+            <div class="list-row">
+              <div>
+                <strong>{{ matter.title }}</strong>
+                <div class="muted">{{ t("status") }}: {{ label(matter.status) }}</div>
+                <div class="muted">{{ t("folder") }}: {{ matter.folder }}</div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted">{{ t("none") }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <section class="panel">
+      <h3>{{ t("document_registry") }}</h3>
+      {% if knowledge.documents %}
+        <div class="list">
+          {% for document in knowledge.documents %}
+            <div class="list-row">
+              <div>
+                <strong>{{ document.title }}</strong>
+                <div class="muted">
+                  {{ t("status") }}: {{ label(document.status) }} ·
+                  {{ t("current_version") }}: v{{ "%03d"|format(document.current_version) }}
+                </div>
+                {% if document.versions %}
+                  <details>
+                    <summary>{{ t("document_versions") }}</summary>
+                    <ul class="compact-list">
+                      {% for version in document.versions %}
+                        <li>
+                          v{{ "%03d"|format(version.version) }} · {{ version.path }}
+                          <span class="muted">{{ t("reason") }}: {{ version.reason }}</span>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </details>
+                {% endif %}
+              </div>
+              <span class="status">{{ label(document.document_type) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_documents_registered") }}</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h3>{{ t("open_questions") }}</h3>
+      {% if knowledge.open_questions %}
+        <div class="list">
+          {% for question in knowledge.open_questions %}
+            <div class="list-row">
+              <div>
+                <strong>{{ question.question }}</strong>
+                <div class="muted">{{ t("status") }}: {{ label(question.status) }} · {{ t("owner") }}: {{ question.owner }}</div>
+                {% if question.blocking %}<div class="muted">{{ t("current_blocker") }}: {{ question.blocking }}</div>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_open_questions") }}</p>
+      {% endif %}
+    </section>
+  </section>
+
+  <section class="grid two">
+    <section class="panel">
+      <h3>{{ t("matter_decisions") }}</h3>
+      {% if knowledge.decisions %}
+        <div class="list">
+          {% for decision in knowledge.decisions %}
+            <div class="list-row">
+              <div>
+                <strong>{{ decision.summary }}</strong>
+                {% if decision.rationale %}<div class="muted">{{ decision.rationale }}</div>{% endif %}
+              </div>
+              <span class="status">{{ label(decision.status) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_matter_decisions") }}</p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h3>{{ t("knowledge_updates") }}</h3>
+      {% if knowledge.knowledge_updates %}
+        <div class="list">
+          {% for update in knowledge.knowledge_updates %}
+            <div class="list-row">
+              <div>
+                <strong>{{ update.summary }}</strong>
+                <div class="muted">{{ update.target_page }}</div>
+                <div class="muted">{{ update.content }}</div>
+              </div>
+              <span class="status">{{ label(update.status) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_knowledge_updates") }}</p>
+      {% endif %}
+    </section>
+  </section>
+
   <section class="grid two">
     <section class="panel">
       <h3>{{ t("task_logs") }}</h3>
