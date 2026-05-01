@@ -447,6 +447,29 @@ def organization_snapshot():
         fail(400, "not_initialized", str(exc))
 
 
+@app.post("/api/organization/skill-sources")
+def add_skill_source(payload: dict[str, str]):
+    try:
+        source = get_ctx().service.add_skill_source(
+            url=payload.get("url", ""),
+            name=payload.get("name") or None,
+            branch=payload.get("branch") or "main",
+        )
+        return ok(source)
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+
+
+@app.post("/api/organization/skill-sources/{source_id}/import")
+def import_skill_source(source_id: str):
+    try:
+        return ok(get_ctx().service.import_skill_source(source_id))
+    except RuntimeError as exc:
+        fail(400, "skill_import_failed", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Skill source not found: {source_id}")
+
+
 @app.get("/api/knowledge")
 def api_knowledge_snapshot():
     try:

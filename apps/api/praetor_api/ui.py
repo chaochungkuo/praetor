@@ -318,6 +318,23 @@ TRANSLATIONS = {
         "mission_teams_desc": "How Praetor groups agents around active work.",
         "role_library": "Role library",
         "role_library_desc": "Available role charters. These are capability definitions, not necessarily active staff.",
+        "skill_sources": "Skill sources",
+        "skill_sources_desc": "GitHub repositories Praetor can import as governed agent capability libraries.",
+        "skill_registry": "Skill registry",
+        "skill_registry_desc": "Imported skills are treated as untrusted summaries until reviewed by Praetor governance.",
+        "add_skill_source": "Add skill source",
+        "github_repo_url": "GitHub repository URL",
+        "source_name": "Source name",
+        "branch": "Branch",
+        "imported_skills": "Imported skills",
+        "trust_status": "Trust status",
+        "last_imported": "Last imported",
+        "add_and_import": "Add and import",
+        "import_skill_source": "Import",
+        "skill_source_added": "Skill source imported.",
+        "skill_source_failed": "Skill source import failed.",
+        "no_skill_sources": "No skill sources connected yet.",
+        "no_imported_skills": "No imported skills yet.",
         "open_agent_mission": "Open mission",
         "working_on_mission": "Working on mission",
         "waiting_for_assignment": "Waiting for assignment",
@@ -789,6 +806,23 @@ TRANSLATIONS = {
         "mission_teams_desc": "Praetor 如何圍繞任務組成 AI 團隊。",
         "role_library": "角色能力庫",
         "role_library_desc": "可用的角色章程。這是能力定義，不一定代表目前有 agent 正在工作。",
+        "skill_sources": "Skill 來源",
+        "skill_sources_desc": "Praetor 可匯入的 GitHub repository，作為受治理的 agent 能力庫。",
+        "skill_registry": "Skill Registry",
+        "skill_registry_desc": "外部匯入的 skill 先視為未信任摘要，通過 Praetor 治理後才可作為正式能力。",
+        "add_skill_source": "加入 Skill 來源",
+        "github_repo_url": "GitHub repository URL",
+        "source_name": "來源名稱",
+        "branch": "分支",
+        "imported_skills": "已匯入 Skills",
+        "trust_status": "信任狀態",
+        "last_imported": "最後匯入",
+        "add_and_import": "加入並匯入",
+        "import_skill_source": "匯入",
+        "skill_source_added": "Skill 來源已匯入。",
+        "skill_source_failed": "Skill 來源匯入失敗。",
+        "no_skill_sources": "尚未連接 skill 來源。",
+        "no_imported_skills": "尚未匯入 skill。",
         "open_agent_mission": "打開任務",
         "working_on_mission": "正在處理任務",
         "waiting_for_assignment": "等待指派",
@@ -1919,6 +1953,41 @@ def agents_page(request: Request):
             **_build_agent_directory(service),
         },
     )
+
+
+@router.post("/app/agents/skill-sources")
+async def add_skill_source_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    try:
+        source = request.app.state.ctx.service.add_skill_source(
+            url=str(form.get("url", "")).strip(),
+            name=str(form.get("name", "")).strip() or None,
+            branch=str(form.get("branch", "")).strip() or "main",
+        )
+        request.app.state.ctx.service.import_skill_source(source.id)
+    except Exception as exc:
+        return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
+    return _redirect("/app/agents", t("skill_source_added"), "success")
+
+
+@router.post("/app/agents/skill-sources/{source_id}/import")
+async def import_skill_source_submit(request: Request, source_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    try:
+        request.app.state.ctx.service.import_skill_source(source_id)
+    except Exception as exc:
+        return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
+    return _redirect("/app/agents", t("skill_source_added"), "success")
 
 
 @router.get("/app/overview", response_class=HTMLResponse)

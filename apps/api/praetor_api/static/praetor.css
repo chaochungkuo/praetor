@@ -687,6 +687,45 @@ pre {
   border-color: rgba(185,78,72,0.25);
   background: rgba(185,78,72,0.065);
 }
+.skill-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.26rem 0.6rem;
+  border: 1px solid rgba(213,179,106,0.22);
+  border-radius: 999px;
+  background: rgba(213,179,106,0.07);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.skill-chip.risk {
+  border-color: rgba(185,78,72,0.22);
+  background: rgba(185,78,72,0.07);
+}
+.compact-form {
+  margin-bottom: 1rem;
+}
+.skill-source-list {
+  margin-top: 1rem;
+}
+.skill-source-list .team-card {
+  align-items: stretch;
+}
+.skill-source-list form {
+  align-self: center;
+}
+.skill-registry-list {
+  display: grid;
+  gap: 0.7rem;
+  max-height: 34rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
 .status-blocked {
   border-color: rgba(185,78,72,0.24);
   color: #ffb1aa;
@@ -1513,9 +1552,13 @@ button.secondary:hover {
     grid-template-columns: 1fr;
   }
 
-  .team-card,
-  .agent-work-topline {
+.team-card,
+.agent-work-topline {
     flex-direction: column;
+  }
+
+  .skill-source-list .team-card {
+    gap: 0.85rem;
   }
 
   .agent-work-meta.compact {

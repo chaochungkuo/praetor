@@ -69,6 +69,13 @@
                 <dd>{{ format_time(card.last_activity) }}</dd>
               </div>
             </dl>
+            {% if card.agent.skills %}
+              <div class="skill-chip-row">
+                {% for skill in card.agent.skills[:6] %}
+                  <span class="skill-chip">{{ phrase_label(skill) }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
             {% if card.session and card.session.current_blocker %}
               <div class="agent-blocker">
                 <span>{{ t("blocked_by") }}</span>
@@ -81,6 +88,103 @@
     {% else %}
       <p class="muted">{{ t("no_active_agents") }}</p>
     {% endif %}
+  </section>
+
+  <section class="grid two">
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("skill_sources") }}</h3>
+          <p>{{ t("skill_sources_desc") }}</p>
+        </div>
+      </div>
+      <form class="form-grid compact-form" method="post" action="/app/agents/skill-sources">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label class="full">
+          {{ t("github_repo_url") }}
+          <input name="url" value="https://github.com/msitarzewski/agency-agents" placeholder="https://github.com/owner/repo" />
+        </label>
+        <label>
+          {{ t("source_name") }}
+          <input name="name" placeholder="agency-agents" />
+        </label>
+        <label>
+          {{ t("branch") }}
+          <input name="branch" value="main" />
+        </label>
+        <div class="actions full">
+          <button type="submit" data-loading-label="{{ t("import_skill_source") }}">{{ t("add_and_import") }}</button>
+        </div>
+      </form>
+      {% if organization.skill_sources %}
+        <div class="command-list skill-source-list">
+          {% for source in organization.skill_sources %}
+            <div class="team-card">
+              <div class="team-card-main">
+                <span class="eyebrow">{{ t("skill_sources") }}</span>
+                <strong>{{ source.name }}</strong>
+                <p>{{ source.url }}</p>
+              </div>
+              <dl class="agent-work-meta compact">
+                <div>
+                  <dt>{{ t("imported_skills") }}</dt>
+                  <dd>{{ source.imported_skill_count }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("trust_status") }}</dt>
+                  <dd>{{ label(source.trust_status) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("last_imported") }}</dt>
+                  <dd>{{ format_time(source.last_imported_at) or t("not_available") }}</dd>
+                </div>
+              </dl>
+              <form method="post" action="/app/agents/skill-sources/{{ source.id }}/import">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button class="small secondary" type="submit" data-loading-label="{{ t("import_skill_source") }}">{{ t("import_skill_source") }}</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_skill_sources") }}</p>
+      {% endif %}
+    </section>
+
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("skill_registry") }}</h3>
+          <p>{{ t("skill_registry_desc") }}</p>
+        </div>
+        <span class="status">{{ organization.skill_registry|length }} {{ t("imported_skills") }}</span>
+      </div>
+      {% if organization.skill_registry %}
+        <div class="skill-registry-list">
+          {% for skill in organization.skill_registry[:18] %}
+            <details class="agent-card role-detail">
+              <summary>
+                <span>
+                  <span class="eyebrow">{{ skill.domains|join(", ") }}</span>
+                  <strong>{{ skill.name }}</strong>
+                </span>
+                <span class="status">{{ label(skill.status) }}</span>
+              </summary>
+              <p>{{ skill.description or t("not_available") }}</p>
+              <div class="skill-chip-row">
+                {% for item in skill.risk_flags %}
+                  <span class="skill-chip risk">{{ label(item) }}</span>
+                {% else %}
+                  <span class="skill-chip">{{ t("all_clear") }}</span>
+                {% endfor %}
+              </div>
+            </details>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t("no_imported_skills") }}</p>
+      {% endif %}
+    </section>
   </section>
 
   <section class="grid two">

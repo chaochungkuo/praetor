@@ -251,6 +251,42 @@ class AgentRoleSpec(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class SkillSource(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("skillsrc"))
+    name: str
+    url: str
+    source_type: str = "github"
+    branch: str = "main"
+    status: str = "enabled"
+    trust_status: str = "unreviewed"
+    last_imported_at: datetime | None = None
+    imported_skill_count: int = 0
+    notes: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentSkillSpec(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("agentskill"))
+    source_id: str | None = None
+    source_url: str | None = None
+    source_path: str | None = None
+    name: str
+    description: str | None = None
+    domains: list[str] = Field(default_factory=list)
+    suitable_for: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    escalation_triggers: list[str] = Field(default_factory=list)
+    output_contract: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    safety_notes: list[str] = Field(default_factory=list)
+    status: str = "imported_requires_review"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class AgentInstance(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("agent"))
     role_name: str
@@ -515,6 +551,8 @@ class OrganizationSnapshot(BaseModel):
     delegations: list[DelegationRecord] = Field(default_factory=list)
     escalations: list[EscalationRecord] = Field(default_factory=list)
     standing_orders: list[StandingOrder] = Field(default_factory=list)
+    skill_sources: list[SkillSource] = Field(default_factory=list)
+    skill_registry: list[AgentSkillSpec] = Field(default_factory=list)
 
 
 class AgentMessage(BaseModel):

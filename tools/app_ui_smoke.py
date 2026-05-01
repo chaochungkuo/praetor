@@ -152,6 +152,8 @@ def main() -> int:
                     "agents_has_command_center": "AI command center" in agents,
                     "agents_has_current_work": "Current work" in agents,
                     "agents_has_mission_teams": "Mission teams" in agents,
+                    "agents_has_skill_sources": "Skill sources" in agents,
+                    "agents_has_skill_registry": "Skill registry" in agents,
                     "activity_has_audit": "Audit stream" in activity,
                     "memory_has_wiki": "Company memory" in memory,
                     "decisions_has_audit": "Audit trail" in decisions,

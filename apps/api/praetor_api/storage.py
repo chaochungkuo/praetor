@@ -13,6 +13,7 @@ from .models import (
     AgentMessage,
     AgentInstance,
     AgentRoleSpec,
+    AgentSkillSpec,
     AppSettings,
     ApprovalRequest,
     BoardBriefing,
@@ -36,6 +37,7 @@ from .models import (
     OwnerAuthRecord,
     RunAttempt,
     StandingOrder,
+    SkillSource,
     TaskDefinition,
     WorkflowContract,
     WorkspaceRestructurePlan,
@@ -176,6 +178,8 @@ class FilesystemStore:
         self.memory_promotion_reviews_path = self.state_dir / "memory_promotion_reviews.json"
         self.board_briefings_path = self.state_dir / "board_briefings.json"
         self.agent_roles_path = self.state_dir / "agent_roles.json"
+        self.skill_sources_path = self.state_dir / "skill_sources.json"
+        self.agent_skills_path = self.state_dir / "agent_skills.json"
         self.agents_path = self.state_dir / "agents.json"
         self.teams_path = self.state_dir / "mission_teams.json"
         self.delegations_path = self.state_dir / "delegations.json"
@@ -823,6 +827,32 @@ class FilesystemStore:
     def list_agent_roles(self) -> list[AgentRoleSpec]:
         return self._read_model_list(self.agent_roles_path, AgentRoleSpec)
 
+    def save_skill_source(self, source: SkillSource) -> None:
+        sources = self.list_skill_sources()
+        sources = [item for item in sources if item.id != source.id and item.url != source.url] + [source]
+        sources.sort(key=lambda item: item.updated_at, reverse=True)
+        self._write_model_list(self.skill_sources_path, sources)
+
+    def list_skill_sources(self) -> list[SkillSource]:
+        return self._read_model_list(self.skill_sources_path, SkillSource)
+
+    def save_agent_skill(self, skill: AgentSkillSpec) -> None:
+        skills = self.list_agent_skills()
+        skills = [
+            item
+            for item in skills
+            if item.id != skill.id
+            and not (skill.source_id is not None and item.source_id == skill.source_id and item.source_path == skill.source_path)
+        ] + [skill]
+        skills.sort(key=lambda item: (item.name.lower(), item.source_path or ""))
+        self._write_model_list(self.agent_skills_path, skills)
+
+    def list_agent_skills(self, source_id: str | None = None) -> list[AgentSkillSpec]:
+        skills = self._read_model_list(self.agent_skills_path, AgentSkillSpec)
+        if source_id is not None:
+            skills = [item for item in skills if item.source_id == source_id]
+        return skills
+
     def save_agent(self, agent: AgentInstance) -> None:
         agents = self.list_agents()
         agents = [item for item in agents if item.id != agent.id] + [agent]
@@ -1120,6 +1150,18 @@ class AppStorage:
 
     def list_agent_roles(self) -> list[AgentRoleSpec]:
         return self.fs.list_agent_roles()
+
+    def save_skill_source(self, source: SkillSource) -> None:
+        self.fs.save_skill_source(source)
+
+    def list_skill_sources(self) -> list[SkillSource]:
+        return self.fs.list_skill_sources()
+
+    def save_agent_skill(self, skill: AgentSkillSpec) -> None:
+        self.fs.save_agent_skill(skill)
+
+    def list_agent_skills(self, source_id: str | None = None) -> list[AgentSkillSpec]:
+        return self.fs.list_agent_skills(source_id=source_id)
 
     def save_agent(self, agent: AgentInstance) -> None:
         self.fs.save_agent(agent)
