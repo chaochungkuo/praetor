@@ -94,6 +94,320 @@ class SQLiteIndex:
                 )
                 """
             )
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS _migrations (table_name TEXT PRIMARY KEY, migrated_at TEXT NOT NULL)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS approvals (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS governance_reviews (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_messages (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_messages_mission ON agent_messages(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS work_sessions (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_work_sessions_mission ON work_sessions(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS run_attempts (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_run_attempts_mission ON run_attempts(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS clients (
+                    id TEXT PRIMARY KEY,
+                    slug TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_slug ON clients(slug)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS matters (
+                    id TEXT PRIMARY KEY,
+                    client_id TEXT,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_matters_client ON matters(client_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_matters_mission ON matters(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS documents (
+                    id TEXT PRIMARY KEY,
+                    matter_id TEXT,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_matter ON documents(matter_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_mission ON documents(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS file_assets (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    matter_id TEXT,
+                    document_id TEXT,
+                    document_version_id TEXT,
+                    current_path TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_mission ON file_assets(mission_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_matter ON file_assets(matter_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_document ON file_assets(document_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_path ON file_assets(current_path)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_docver ON file_assets(document_version_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS file_moves (
+                    id TEXT PRIMARY KEY,
+                    asset_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_moves_asset ON file_moves(asset_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS workspace_reconciliation_reports (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_recon_reports_mission ON workspace_reconciliation_reports(mission_id)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS workspace_restructure_plans (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_restructure_plans_mission ON workspace_restructure_plans(mission_id)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS matter_decisions (
+                    id TEXT PRIMARY KEY,
+                    matter_id TEXT,
+                    mission_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_matter_decisions_matter ON matter_decisions(matter_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_matter_decisions_mission ON matter_decisions(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS open_questions (
+                    id TEXT PRIMARY KEY,
+                    matter_id TEXT,
+                    mission_id TEXT,
+                    status TEXT,
+                    asked_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_open_questions_matter ON open_questions(matter_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_open_questions_mission ON open_questions(mission_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_open_questions_status ON open_questions(status)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_updates (
+                    id TEXT PRIMARY KEY,
+                    matter_id TEXT,
+                    mission_id TEXT,
+                    status TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_updates_matter ON knowledge_updates(matter_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_updates_mission ON knowledge_updates(mission_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_updates_status ON knowledge_updates(status)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS memory_promotion_reviews (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mem_reviews_mission ON memory_promotion_reviews(mission_id)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS board_briefings (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_board_briefings_mission ON board_briefings(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_roles (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_roles_name ON agent_roles(name)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS skill_sources (
+                    id TEXT PRIMARY KEY,
+                    url TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_sources_url ON skill_sources(url)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_skills (
+                    id TEXT PRIMARY KEY,
+                    source_id TEXT,
+                    source_path TEXT,
+                    name TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_skills_source ON agent_skills(source_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agents (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_agents_mission ON agents(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mission_teams (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_mission_teams_mission ON mission_teams(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS delegations (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_delegations_mission ON delegations(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS escalations (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    status TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_escalations_mission ON escalations(mission_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS standing_orders (
+                    id TEXT PRIMARY KEY,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
         try:
             os.chmod(self.db_path, 0o600)
         except OSError:
@@ -150,6 +464,836 @@ class SQLiteIndex:
                 "SELECT payload_json FROM missions ORDER BY updated_at DESC, mission_id DESC"
             ).fetchall()
         return [MissionDefinition.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Migration tracking ---
+
+    def is_migrated(self, table_name: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM _migrations WHERE table_name = ?", (table_name,)
+            ).fetchone()
+        return row is not None
+
+    def mark_migrated(self, table_name: str) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO _migrations (table_name, migrated_at) VALUES (?, ?)",
+                (table_name, now),
+            )
+
+    # --- Approvals ---
+
+    def upsert_approval(self, approval: ApprovalRequest) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO approvals (id, mission_id, status, created_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    approval.id,
+                    approval.mission_id,
+                    approval.status,
+                    approval.created_at.isoformat(),
+                    approval.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_approvals(self) -> list[ApprovalRequest]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM approvals ORDER BY created_at DESC"
+            ).fetchall()
+        return [ApprovalRequest.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- GovernanceReviews ---
+
+    def upsert_governance_review(self, review: GovernanceReview) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO governance_reviews (id, created_at, payload_json)
+                VALUES (?, ?, ?)
+                """,
+                (review.id, review.created_at.isoformat(), review.model_dump_json(indent=2)),
+            )
+
+    def list_governance_reviews(self, limit: int = 20) -> list[GovernanceReview]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM governance_reviews ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [GovernanceReview.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- ConversationMessages ---
+
+    def upsert_conversation_message(self, message: ConversationMessage) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO conversation_messages (id, created_at, payload_json)
+                VALUES (?, ?, ?)
+                """,
+                (message.id, message.created_at.isoformat(), message.model_dump_json(indent=2)),
+            )
+
+    def list_conversation_messages(self, limit: int = 50) -> list[ConversationMessage]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT payload_json FROM (
+                    SELECT payload_json, created_at FROM conversation_messages
+                    ORDER BY created_at DESC LIMIT ?
+                ) ORDER BY created_at ASC
+                """,
+                (limit,),
+            ).fetchall()
+        return [ConversationMessage.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- AgentMessages ---
+
+    def upsert_agent_message(self, message: AgentMessage) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_messages (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    message.id,
+                    message.mission_id,
+                    message.created_at.isoformat(),
+                    message.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM (
+                        SELECT payload_json, created_at FROM agent_messages WHERE mission_id = ?
+                        ORDER BY created_at DESC LIMIT ?
+                    ) ORDER BY created_at ASC
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM (
+                        SELECT payload_json, created_at FROM agent_messages
+                        ORDER BY created_at DESC LIMIT ?
+                    ) ORDER BY created_at ASC
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [AgentMessage.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- WorkSessions ---
+
+    def upsert_work_session(self, session: WorkSession) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO work_sessions (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    session.id,
+                    session.mission_id,
+                    session.updated_at.isoformat(),
+                    session.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM work_sessions WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?",
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM work_sessions ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [WorkSession.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- RunAttempts ---
+
+    def upsert_run_attempt(self, attempt: RunAttempt) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO run_attempts (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    attempt.id,
+                    attempt.mission_id,
+                    attempt.updated_at.isoformat(),
+                    attempt.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM run_attempts WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?",
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM run_attempts ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [RunAttempt.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Clients ---
+
+    def upsert_client(self, client: ClientRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM clients WHERE id != ? AND slug = ?", (client.id, client.slug)
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO clients (id, slug, name, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (client.id, client.slug, client.name, client.model_dump_json(indent=2)),
+            )
+
+    def list_clients(self) -> list[ClientRecord]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM clients ORDER BY name ASC"
+            ).fetchall()
+        return [ClientRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Matters ---
+
+    def get_matter(self, matter_id: str) -> MatterRecord | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM matters WHERE id = ?", (matter_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return MatterRecord.model_validate_json(row["payload_json"])
+
+    def upsert_matter(self, matter: MatterRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO matters (id, client_id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    matter.id,
+                    matter.client_id,
+                    matter.mission_id,
+                    matter.updated_at.isoformat(),
+                    matter.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_matters(
+        self, client_id: str | None = None, mission_id: str | None = None
+    ) -> list[MatterRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM matters WHERE 1=1"
+            params: list = []
+            if client_id is not None:
+                sql += " AND client_id = ?"
+                params.append(client_id)
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            sql += " ORDER BY updated_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [MatterRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Documents ---
+
+    def upsert_document(self, document: DocumentRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO documents (id, matter_id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    document.id,
+                    document.matter_id,
+                    document.mission_id,
+                    document.updated_at.isoformat(),
+                    document.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_documents(
+        self, matter_id: str | None = None, mission_id: str | None = None
+    ) -> list[DocumentRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM documents WHERE 1=1"
+            params: list = []
+            if matter_id is not None:
+                sql += " AND matter_id = ?"
+                params.append(matter_id)
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            sql += " ORDER BY updated_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [DocumentRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- FileAssets ---
+
+    def upsert_file_asset(self, asset: FileAssetRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM file_assets WHERE id != ? AND current_path = ?",
+                (asset.id, asset.current_path),
+            )
+            if asset.document_version_id is not None:
+                conn.execute(
+                    "DELETE FROM file_assets WHERE id != ? AND document_version_id = ?",
+                    (asset.id, asset.document_version_id),
+                )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO file_assets
+                    (id, mission_id, matter_id, document_id, document_version_id, current_path, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    asset.id,
+                    asset.mission_id,
+                    asset.matter_id,
+                    asset.document_id,
+                    asset.document_version_id,
+                    asset.current_path,
+                    asset.updated_at.isoformat(),
+                    asset.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_file_assets(
+        self,
+        mission_id: str | None = None,
+        matter_id: str | None = None,
+        document_id: str | None = None,
+        limit: int = 50,
+    ) -> list[FileAssetRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM file_assets WHERE 1=1"
+            params: list = []
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            if matter_id is not None:
+                sql += " AND matter_id = ?"
+                params.append(matter_id)
+            if document_id is not None:
+                sql += " AND document_id = ?"
+                params.append(document_id)
+            sql += " ORDER BY updated_at DESC LIMIT ?"
+            params.append(limit)
+            rows = conn.execute(sql, params).fetchall()
+        return [FileAssetRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- FileMoves ---
+
+    def upsert_file_move(self, move: FileMoveRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO file_moves (id, asset_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (move.id, move.asset_id, move.created_at.isoformat(), move.model_dump_json(indent=2)),
+            )
+
+    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
+        with self.connect() as conn:
+            if asset_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM file_moves WHERE asset_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (asset_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM file_moves ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+        return [FileMoveRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- WorkspaceReconciliationReports ---
+
+    def upsert_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO workspace_reconciliation_reports (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    report.id,
+                    report.mission_id,
+                    report.created_at.isoformat(),
+                    report.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_workspace_reconciliation_reports(
+        self, mission_id: str | None = None, limit: int = 20
+    ) -> list[WorkspaceReconciliationReport]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM workspace_reconciliation_reports
+                    WHERE mission_id = ? ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM workspace_reconciliation_reports
+                    ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [WorkspaceReconciliationReport.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- WorkspaceRestructurePlans ---
+
+    def upsert_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO workspace_restructure_plans (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (plan.id, plan.mission_id, plan.updated_at.isoformat(), plan.model_dump_json(indent=2)),
+            )
+
+    def list_workspace_restructure_plans(
+        self, mission_id: str | None = None, limit: int = 20
+    ) -> list[WorkspaceRestructurePlan]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM workspace_restructure_plans
+                    WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM workspace_restructure_plans
+                    ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [WorkspaceRestructurePlan.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- MatterDecisions ---
+
+    def upsert_matter_decision(self, decision: MatterDecisionRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO matter_decisions (id, matter_id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    decision.id,
+                    decision.matter_id,
+                    decision.mission_id,
+                    decision.created_at.isoformat(),
+                    decision.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_matter_decisions(
+        self, matter_id: str | None = None, mission_id: str | None = None
+    ) -> list[MatterDecisionRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM matter_decisions WHERE 1=1"
+            params: list = []
+            if matter_id is not None:
+                sql += " AND matter_id = ?"
+                params.append(matter_id)
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            sql += " ORDER BY created_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [MatterDecisionRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- OpenQuestions ---
+
+    def upsert_open_question(self, question: OpenQuestionRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO open_questions
+                    (id, matter_id, mission_id, status, asked_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    question.id,
+                    question.matter_id,
+                    question.mission_id,
+                    question.status,
+                    question.asked_at.isoformat(),
+                    question.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_open_questions(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[OpenQuestionRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM open_questions WHERE 1=1"
+            params: list = []
+            if matter_id is not None:
+                sql += " AND matter_id = ?"
+                params.append(matter_id)
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            if status is not None:
+                sql += " AND status = ?"
+                params.append(status)
+            sql += " ORDER BY asked_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [OpenQuestionRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- KnowledgeUpdates ---
+
+    def upsert_knowledge_update(self, update: KnowledgeUpdate) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO knowledge_updates
+                    (id, matter_id, mission_id, status, created_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    update.id,
+                    update.matter_id,
+                    update.mission_id,
+                    update.status,
+                    update.created_at.isoformat(),
+                    update.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_knowledge_updates(
+        self,
+        matter_id: str | None = None,
+        mission_id: str | None = None,
+        status: str | None = None,
+    ) -> list[KnowledgeUpdate]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM knowledge_updates WHERE 1=1"
+            params: list = []
+            if matter_id is not None:
+                sql += " AND matter_id = ?"
+                params.append(matter_id)
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            if status is not None:
+                sql += " AND status = ?"
+                params.append(status)
+            sql += " ORDER BY created_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [KnowledgeUpdate.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- MemoryPromotionReviews ---
+
+    def upsert_memory_promotion_review(self, review: MemoryPromotionReview) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO memory_promotion_reviews (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (review.id, review.mission_id, review.updated_at.isoformat(), review.model_dump_json(indent=2)),
+            )
+
+    def list_memory_promotion_reviews(
+        self, mission_id: str | None = None, limit: int = 50
+    ) -> list[MemoryPromotionReview]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM memory_promotion_reviews
+                    WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM memory_promotion_reviews ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [MemoryPromotionReview.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- BoardBriefings ---
+
+    def upsert_board_briefing(self, briefing: BoardBriefing) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO board_briefings (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    briefing.id,
+                    briefing.mission_id,
+                    briefing.updated_at.isoformat(),
+                    briefing.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_board_briefings(self, mission_id: str | None = None, limit: int = 50) -> list[BoardBriefing]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM board_briefings
+                    WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM board_briefings ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [BoardBriefing.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- AgentRoles ---
+
+    def upsert_agent_role(self, role: AgentRoleSpec) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM agent_roles WHERE id != ? AND name = ?", (role.id, role.name)
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO agent_roles (id, name, payload_json) VALUES (?, ?, ?)",
+                (role.id, role.name, role.model_dump_json(indent=2)),
+            )
+
+    def list_agent_roles(self) -> list[AgentRoleSpec]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT payload_json FROM agent_roles ORDER BY name ASC").fetchall()
+        return [AgentRoleSpec.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- SkillSources ---
+
+    def upsert_skill_source(self, source: SkillSource) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM skill_sources WHERE id != ? AND url = ?", (source.id, source.url)
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO skill_sources (id, url, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (source.id, source.url, source.updated_at.isoformat(), source.model_dump_json(indent=2)),
+            )
+
+    def list_skill_sources(self) -> list[SkillSource]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM skill_sources ORDER BY updated_at DESC"
+            ).fetchall()
+        return [SkillSource.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- AgentSkills ---
+
+    def upsert_agent_skill(self, skill: AgentSkillSpec) -> None:
+        with self.connect() as conn:
+            if skill.source_id is not None:
+                conn.execute(
+                    "DELETE FROM agent_skills WHERE id != ? AND source_id = ? AND source_path = ?",
+                    (skill.id, skill.source_id, skill.source_path),
+                )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_skills (id, source_id, source_path, name, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (skill.id, skill.source_id, skill.source_path, skill.name, skill.model_dump_json(indent=2)),
+            )
+
+    def list_agent_skills(self, source_id: str | None = None) -> list[AgentSkillSpec]:
+        with self.connect() as conn:
+            if source_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM agent_skills WHERE source_id = ? ORDER BY name ASC",
+                    (source_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM agent_skills ORDER BY name ASC"
+                ).fetchall()
+        return [AgentSkillSpec.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Agents ---
+
+    def upsert_agent(self, agent: AgentInstance) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agents (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (agent.id, agent.mission_id, agent.created_at.isoformat(), agent.model_dump_json(indent=2)),
+            )
+
+    def list_agents(self, mission_id: str | None = None) -> list[AgentInstance]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM agents WHERE mission_id = ? ORDER BY created_at DESC",
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM agents ORDER BY created_at DESC"
+                ).fetchall()
+        return [AgentInstance.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- MissionTeams ---
+
+    def upsert_team(self, team: MissionTeam) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM mission_teams WHERE id != ? AND mission_id = ?", (team.id, team.mission_id)
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO mission_teams (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (team.id, team.mission_id, team.updated_at.isoformat(), team.model_dump_json(indent=2)),
+            )
+
+    def list_teams(self, mission_id: str | None = None) -> list[MissionTeam]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM mission_teams WHERE mission_id = ? ORDER BY updated_at DESC",
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM mission_teams ORDER BY updated_at DESC"
+                ).fetchall()
+        return [MissionTeam.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Delegations ---
+
+    def upsert_delegation(self, delegation: DelegationRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO delegations (id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    delegation.id,
+                    delegation.mission_id,
+                    delegation.updated_at.isoformat(),
+                    delegation.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_delegations(self, mission_id: str | None = None) -> list[DelegationRecord]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM delegations WHERE mission_id = ? ORDER BY updated_at DESC",
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM delegations ORDER BY updated_at DESC"
+                ).fetchall()
+        return [DelegationRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Escalations ---
+
+    def upsert_escalation(self, escalation: EscalationRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO escalations (id, mission_id, status, created_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    escalation.id,
+                    escalation.mission_id,
+                    escalation.status,
+                    escalation.created_at.isoformat(),
+                    escalation.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_escalations(
+        self, mission_id: str | None = None, status: str | None = None
+    ) -> list[EscalationRecord]:
+        with self.connect() as conn:
+            sql = "SELECT payload_json FROM escalations WHERE 1=1"
+            params: list = []
+            if mission_id is not None:
+                sql += " AND mission_id = ?"
+                params.append(mission_id)
+            if status is not None:
+                sql += " AND status = ?"
+                params.append(status)
+            sql += " ORDER BY created_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+        return [EscalationRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- StandingOrders ---
+
+    def upsert_standing_order(self, order: StandingOrder) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO standing_orders (id, updated_at, payload_json)
+                VALUES (?, ?, ?)
+                """,
+                (order.id, order.updated_at.isoformat(), order.model_dump_json(indent=2)),
+            )
+
+    def list_standing_orders(self) -> list[StandingOrder]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM standing_orders ORDER BY updated_at DESC"
+            ).fetchall()
+        return [StandingOrder.model_validate_json(row["payload_json"]) for row in rows]
 
 
 class FilesystemStore:
@@ -528,6 +1672,9 @@ class FilesystemStore:
         clients = [item for item in clients if item.id != client.id and item.slug != client.slug] + [client]
         clients.sort(key=lambda item: item.name.lower())
         self._write_model_list(self.clients_path, clients)
+        self.save_client_workspace_files(workspace_root, client)
+
+    def save_client_workspace_files(self, workspace_root: Path, client: ClientRecord) -> None:
         client_dir = workspace_root / client.folder
         _write_workspace_text(
             client_dir / "profile.md",
@@ -553,6 +1700,9 @@ class FilesystemStore:
         matters = [item for item in matters if item.id != matter.id] + [matter]
         matters.sort(key=lambda item: item.updated_at, reverse=True)
         self._write_model_list(self.matters_path, matters)
+        self.save_matter_workspace_files(workspace_root, matter)
+
+    def save_matter_workspace_files(self, workspace_root: Path, matter: MatterRecord) -> None:
         matter_dir = workspace_root / matter.folder
         _write_workspace_text(
             workspace_root / matter.brief_path,
@@ -723,6 +1873,11 @@ class FilesystemStore:
         decisions = [item for item in decisions if item.id != decision.id] + [decision]
         decisions.sort(key=lambda item: item.created_at, reverse=True)
         self._write_model_list(self.matter_decisions_path, decisions)
+        self.append_matter_decision_workspace_file(workspace_root, decision)
+
+    def append_matter_decision_workspace_file(
+        self, workspace_root: Path, decision: MatterDecisionRecord
+    ) -> None:
         matter = next((item for item in self.list_matters() if item.id == decision.matter_id), None)
         if matter is not None:
             path = workspace_root / matter.decisions_path
@@ -745,12 +1900,19 @@ class FilesystemStore:
         questions = [item for item in questions if item.id != question.id] + [question]
         questions.sort(key=lambda item: item.asked_at, reverse=True)
         self._write_model_list(self.open_questions_path, questions)
+        self.append_open_question_workspace_file(workspace_root, question)
+
+    def append_open_question_workspace_file(
+        self, workspace_root: Path, question: OpenQuestionRecord
+    ) -> None:
         matter = next((item for item in self.list_matters() if item.id == question.matter_id), None)
         if matter is not None:
             path = workspace_root / matter.open_questions_path
             existing = path.read_text(encoding="utf-8") if path.exists() else "# Open Questions\n\n"
             blocking = f" Blocking: {question.blocking}" if question.blocking else ""
-            _write_workspace_text(path, existing.rstrip() + f"\n- [{question.status}] {question.question}{blocking}\n")
+            _write_workspace_text(
+                path, existing.rstrip() + f"\n- [{question.status}] {question.question}{blocking}\n"
+            )
 
     def list_open_questions(
         self,
@@ -931,6 +2093,125 @@ class AppStorage:
     def __init__(self, state_dir: Path) -> None:
         self.fs = FilesystemStore(state_dir)
         self.index = SQLiteIndex(state_dir / "index.sqlite3")
+        self._run_migrations()
+
+    # --- Migration helpers ---
+
+    def _run_migrations(self) -> None:
+        _migrations = {
+            "approvals": (self.fs.approvals_path, self.fs.list_approvals, self.index.upsert_approval),
+            "governance_reviews": (
+                self.fs.governance_reviews_path,
+                self.fs.list_governance_reviews,
+                self.index.upsert_governance_review,
+            ),
+            "conversation_messages": (
+                self.fs.conversation_path,
+                self.fs.list_conversation_messages,
+                self.index.upsert_conversation_message,
+            ),
+            "agent_messages": (
+                self.fs.agent_messages_path,
+                lambda: self.fs.list_agent_messages(limit=100_000),
+                self.index.upsert_agent_message,
+            ),
+            "work_sessions": (
+                self.fs.work_sessions_path,
+                lambda: self.fs.list_work_sessions(limit=100_000),
+                self.index.upsert_work_session,
+            ),
+            "run_attempts": (
+                self.fs.run_attempts_path,
+                lambda: self.fs.list_run_attempts(limit=100_000),
+                self.index.upsert_run_attempt,
+            ),
+            "clients": (self.fs.clients_path, self.fs.list_clients, self.index.upsert_client),
+            "matters": (self.fs.matters_path, self.fs.list_matters, self.index.upsert_matter),
+            "documents": (self.fs.documents_path, self.fs.list_documents, self.index.upsert_document),
+            "file_assets": (
+                self.fs.file_assets_path,
+                lambda: self.fs.list_file_assets(limit=100_000),
+                self.index.upsert_file_asset,
+            ),
+            "file_moves": (
+                self.fs.file_moves_path,
+                lambda: self.fs.list_file_moves(limit=100_000),
+                self.index.upsert_file_move,
+            ),
+            "workspace_reconciliation_reports": (
+                self.fs.workspace_reconciliation_reports_path,
+                lambda: self.fs.list_workspace_reconciliation_reports(limit=100_000),
+                self.index.upsert_workspace_reconciliation_report,
+            ),
+            "workspace_restructure_plans": (
+                self.fs.workspace_restructure_plans_path,
+                lambda: self.fs.list_workspace_restructure_plans(limit=100_000),
+                self.index.upsert_workspace_restructure_plan,
+            ),
+            "matter_decisions": (
+                self.fs.matter_decisions_path,
+                self.fs.list_matter_decisions,
+                self.index.upsert_matter_decision,
+            ),
+            "open_questions": (
+                self.fs.open_questions_path,
+                self.fs.list_open_questions,
+                self.index.upsert_open_question,
+            ),
+            "knowledge_updates": (
+                self.fs.knowledge_updates_path,
+                self.fs.list_knowledge_updates,
+                self.index.upsert_knowledge_update,
+            ),
+            "memory_promotion_reviews": (
+                self.fs.memory_promotion_reviews_path,
+                lambda: self.fs.list_memory_promotion_reviews(limit=100_000),
+                self.index.upsert_memory_promotion_review,
+            ),
+            "board_briefings": (
+                self.fs.board_briefings_path,
+                lambda: self.fs.list_board_briefings(limit=100_000),
+                self.index.upsert_board_briefing,
+            ),
+            "agent_roles": (self.fs.agent_roles_path, self.fs.list_agent_roles, self.index.upsert_agent_role),
+            "skill_sources": (
+                self.fs.skill_sources_path,
+                self.fs.list_skill_sources,
+                self.index.upsert_skill_source,
+            ),
+            "agent_skills": (
+                self.fs.agent_skills_path,
+                self.fs.list_agent_skills,
+                self.index.upsert_agent_skill,
+            ),
+            "agents": (self.fs.agents_path, self.fs.list_agents, self.index.upsert_agent),
+            "mission_teams": (self.fs.teams_path, self.fs.list_teams, self.index.upsert_team),
+            "delegations": (
+                self.fs.delegations_path,
+                self.fs.list_delegations,
+                self.index.upsert_delegation,
+            ),
+            "escalations": (
+                self.fs.escalations_path,
+                self.fs.list_escalations,
+                self.index.upsert_escalation,
+            ),
+            "standing_orders": (
+                self.fs.standing_orders_path,
+                self.fs.list_standing_orders,
+                self.index.upsert_standing_order,
+            ),
+        }
+        for table_name, (json_path, list_fn, upsert_fn) in _migrations.items():
+            if not self.index.is_migrated(table_name) and json_path.exists():
+                try:
+                    for item in list_fn():
+                        upsert_fn(item)
+                except Exception:
+                    pass
+                self.index.mark_migrated(table_name)
+
+    # --- Settings & Auth ---
 
     def save_settings(self, settings: AppSettings) -> None:
         self.fs.save_settings(settings)
@@ -948,6 +2229,8 @@ class AppStorage:
             self.index.save_settings(settings)
             return settings
         return self.index.load_settings()
+
+    # --- Missions ---
 
     def save_mission(self, workspace_root: Path, mission: MissionDefinition) -> Path:
         path = self.fs.save_mission(workspace_root, mission)
@@ -968,6 +2251,8 @@ class AppStorage:
                 self.index.upsert_mission(mission)
             return missions
         return self.index.list_missions()
+
+    # --- Workspace files (filesystem-only) ---
 
     def save_task(self, workspace_root: Path, task: TaskDefinition) -> Path:
         return self.fs.save_task(workspace_root, task)
@@ -1005,42 +2290,6 @@ class AppStorage:
     def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
         return self.fs.list_meetings(workspace_root, mission_id=mission_id)
 
-    def append_conversation_message(self, message: ConversationMessage) -> None:
-        self.fs.append_conversation_message(message)
-
-    def list_conversation_messages(self, limit: int = 50) -> list[ConversationMessage]:
-        return self.fs.list_conversation_messages(limit=limit)
-
-    def append_agent_message(self, message: AgentMessage) -> None:
-        self.fs.append_agent_message(message)
-
-    def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
-        return self.fs.list_agent_messages(mission_id=mission_id, limit=limit)
-
-    def save_work_session(self, session: WorkSession) -> None:
-        self.fs.save_work_session(session)
-
-    def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
-        return self.fs.list_work_sessions(mission_id=mission_id, limit=limit)
-
-    def save_run_attempt(self, attempt: RunAttempt) -> None:
-        self.fs.save_run_attempt(attempt)
-
-    def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
-        return self.fs.list_run_attempts(mission_id=mission_id, limit=limit)
-
-    def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
-        self.fs.save_client(workspace_root, client)
-
-    def list_clients(self) -> list[ClientRecord]:
-        return self.fs.list_clients()
-
-    def save_matter(self, workspace_root: Path, matter: MatterRecord) -> None:
-        self.fs.save_matter(workspace_root, matter)
-
-    def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
-        return self.fs.list_matters(client_id=client_id, mission_id=mission_id)
-
     def save_workspace_scope(self, workspace_root: Path, scope: WorkspaceScope) -> Path:
         return self.fs.save_workspace_scope(workspace_root, scope)
 
@@ -1050,14 +2299,95 @@ class AppStorage:
     def load_workflow_contract(self, workspace_root: Path) -> WorkflowContract:
         return self.fs.load_workflow_contract(workspace_root)
 
+    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
+        return self.fs.write_workspace_manifest(workspace_root, assets)
+
+    # --- Audit log (filesystem-only, append log) ---
+
+    def append_audit_event(self, payload: dict) -> None:
+        self.fs.append_audit_event(payload)
+
+    def list_audit_events(self, limit: int = 50) -> list[dict]:
+        return self.fs.list_audit_events(limit=limit)
+
+    # --- Approvals (SQLite-primary) ---
+
+    def save_approval(self, approval: ApprovalRequest) -> None:
+        self.index.upsert_approval(approval)
+
+    def list_approvals(self) -> list[ApprovalRequest]:
+        return self.index.list_approvals()
+
+    # --- GovernanceReviews (SQLite-primary) ---
+
+    def save_governance_review(self, review: GovernanceReview) -> None:
+        self.index.upsert_governance_review(review)
+
+    def list_governance_reviews(self, limit: int = 20) -> list[GovernanceReview]:
+        return self.index.list_governance_reviews(limit=limit)
+
+    # --- ConversationMessages (SQLite-primary) ---
+
+    def append_conversation_message(self, message: ConversationMessage) -> None:
+        self.index.upsert_conversation_message(message)
+
+    def list_conversation_messages(self, limit: int = 50) -> list[ConversationMessage]:
+        return self.index.list_conversation_messages(limit=limit)
+
+    # --- AgentMessages (SQLite-primary) ---
+
+    def append_agent_message(self, message: AgentMessage) -> None:
+        self.index.upsert_agent_message(message)
+
+    def list_agent_messages(self, mission_id: str | None = None, limit: int = 50) -> list[AgentMessage]:
+        return self.index.list_agent_messages(mission_id=mission_id, limit=limit)
+
+    # --- WorkSessions (SQLite-primary) ---
+
+    def save_work_session(self, session: WorkSession) -> None:
+        self.index.upsert_work_session(session)
+
+    def list_work_sessions(self, mission_id: str | None = None, limit: int = 50) -> list[WorkSession]:
+        return self.index.list_work_sessions(mission_id=mission_id, limit=limit)
+
+    # --- RunAttempts (SQLite-primary) ---
+
+    def save_run_attempt(self, attempt: RunAttempt) -> None:
+        self.index.upsert_run_attempt(attempt)
+
+    def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
+        return self.index.list_run_attempts(mission_id=mission_id, limit=limit)
+
+    # --- Clients (SQLite-primary + workspace files) ---
+
+    def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
+        self.index.upsert_client(client)
+        self.fs.save_client_workspace_files(workspace_root, client)
+
+    def list_clients(self) -> list[ClientRecord]:
+        return self.index.list_clients()
+
+    # --- Matters (SQLite-primary + workspace files) ---
+
+    def save_matter(self, workspace_root: Path, matter: MatterRecord) -> None:
+        self.index.upsert_matter(matter)
+        self.fs.save_matter_workspace_files(workspace_root, matter)
+
+    def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
+        return self.index.list_matters(client_id=client_id, mission_id=mission_id)
+
+    # --- Documents (SQLite-primary) ---
+
     def save_document(self, document: DocumentRecord) -> None:
-        self.fs.save_document(document)
+        self.index.upsert_document(document)
 
     def list_documents(self, matter_id: str | None = None, mission_id: str | None = None) -> list[DocumentRecord]:
-        return self.fs.list_documents(matter_id=matter_id, mission_id=mission_id)
+        return self.index.list_documents(matter_id=matter_id, mission_id=mission_id)
+
+    # --- FileAssets (SQLite-primary) ---
 
     def save_file_asset(self, asset: FileAssetRecord) -> None:
-        self.fs.save_file_asset(asset)
+        self.index.upsert_file_asset(asset)
 
     def list_file_assets(
         self,
@@ -1066,49 +2396,74 @@ class AppStorage:
         document_id: str | None = None,
         limit: int = 50,
     ) -> list[FileAssetRecord]:
-        return self.fs.list_file_assets(mission_id=mission_id, matter_id=matter_id, document_id=document_id, limit=limit)
+        return self.index.list_file_assets(
+            mission_id=mission_id, matter_id=matter_id, document_id=document_id, limit=limit
+        )
+
+    # --- FileMoves (SQLite-primary) ---
 
     def save_file_move(self, move: FileMoveRecord) -> None:
-        self.fs.save_file_move(move)
+        self.index.upsert_file_move(move)
 
     def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
-        return self.fs.list_file_moves(asset_id=asset_id, limit=limit)
+        return self.index.list_file_moves(asset_id=asset_id, limit=limit)
+
+    # --- WorkspaceReconciliationReports (SQLite-primary) ---
 
     def save_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
-        self.fs.save_workspace_reconciliation_report(report)
+        self.index.upsert_workspace_reconciliation_report(report)
 
     def list_workspace_reconciliation_reports(
         self,
         mission_id: str | None = None,
         limit: int = 20,
     ) -> list[WorkspaceReconciliationReport]:
-        return self.fs.list_workspace_reconciliation_reports(mission_id=mission_id, limit=limit)
+        return self.index.list_workspace_reconciliation_reports(mission_id=mission_id, limit=limit)
+
+    # --- WorkspaceRestructurePlans (SQLite-primary) ---
 
     def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
-        self.fs.save_workspace_restructure_plan(plan)
+        self.index.upsert_workspace_restructure_plan(plan)
 
     def list_workspace_restructure_plans(
         self,
         mission_id: str | None = None,
         limit: int = 20,
     ) -> list[WorkspaceRestructurePlan]:
-        return self.fs.list_workspace_restructure_plans(mission_id=mission_id, limit=limit)
+        return self.index.list_workspace_restructure_plans(mission_id=mission_id, limit=limit)
 
-    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
-        return self.fs.write_workspace_manifest(workspace_root, assets)
+    # --- MatterDecisions (SQLite-primary + workspace files) ---
 
     def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
-        self.fs.save_matter_decision(workspace_root, decision)
+        self.index.upsert_matter_decision(decision)
+        matter = self.index.get_matter(decision.matter_id)
+        if matter is not None:
+            path = workspace_root / matter.decisions_path
+            existing = path.read_text(encoding="utf-8") if path.exists() else "# Decisions\n\n"
+            text = f"- {decision.summary}"
+            if decision.rationale:
+                text += f" Reason: {decision.rationale}"
+            _write_workspace_text(path, existing.rstrip() + "\n" + text + "\n")
 
     def list_matter_decisions(
         self,
         matter_id: str | None = None,
         mission_id: str | None = None,
     ) -> list[MatterDecisionRecord]:
-        return self.fs.list_matter_decisions(matter_id=matter_id, mission_id=mission_id)
+        return self.index.list_matter_decisions(matter_id=matter_id, mission_id=mission_id)
+
+    # --- OpenQuestions (SQLite-primary + workspace files) ---
 
     def save_open_question(self, workspace_root: Path, question: OpenQuestionRecord) -> None:
-        self.fs.save_open_question(workspace_root, question)
+        self.index.upsert_open_question(question)
+        matter = self.index.get_matter(question.matter_id)
+        if matter is not None:
+            path = workspace_root / matter.open_questions_path
+            existing = path.read_text(encoding="utf-8") if path.exists() else "# Open Questions\n\n"
+            blocking = f" Blocking: {question.blocking}" if question.blocking else ""
+            _write_workspace_text(
+                path, existing.rstrip() + f"\n- [{question.status}] {question.question}{blocking}\n"
+            )
 
     def list_open_questions(
         self,
@@ -1116,10 +2471,12 @@ class AppStorage:
         mission_id: str | None = None,
         status: str | None = None,
     ) -> list[OpenQuestionRecord]:
-        return self.fs.list_open_questions(matter_id=matter_id, mission_id=mission_id, status=status)
+        return self.index.list_open_questions(matter_id=matter_id, mission_id=mission_id, status=status)
+
+    # --- KnowledgeUpdates (SQLite-primary) ---
 
     def save_knowledge_update(self, update: KnowledgeUpdate) -> None:
-        self.fs.save_knowledge_update(update)
+        self.index.upsert_knowledge_update(update)
 
     def list_knowledge_updates(
         self,
@@ -1127,89 +2484,91 @@ class AppStorage:
         mission_id: str | None = None,
         status: str | None = None,
     ) -> list[KnowledgeUpdate]:
-        return self.fs.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id, status=status)
+        return self.index.list_knowledge_updates(matter_id=matter_id, mission_id=mission_id, status=status)
+
+    # --- MemoryPromotionReviews (SQLite-primary) ---
 
     def save_memory_promotion_review(self, review: MemoryPromotionReview) -> None:
-        self.fs.save_memory_promotion_review(review)
+        self.index.upsert_memory_promotion_review(review)
 
     def list_memory_promotion_reviews(
         self,
         mission_id: str | None = None,
         limit: int = 50,
     ) -> list[MemoryPromotionReview]:
-        return self.fs.list_memory_promotion_reviews(mission_id=mission_id, limit=limit)
+        return self.index.list_memory_promotion_reviews(mission_id=mission_id, limit=limit)
+
+    # --- BoardBriefings (SQLite-primary) ---
 
     def save_board_briefing(self, briefing: BoardBriefing) -> None:
-        self.fs.save_board_briefing(briefing)
+        self.index.upsert_board_briefing(briefing)
 
     def list_board_briefings(self, mission_id: str | None = None, limit: int = 50) -> list[BoardBriefing]:
-        return self.fs.list_board_briefings(mission_id=mission_id, limit=limit)
+        return self.index.list_board_briefings(mission_id=mission_id, limit=limit)
+
+    # --- AgentRoles (SQLite-primary) ---
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
-        self.fs.save_agent_role(role)
+        self.index.upsert_agent_role(role)
 
     def list_agent_roles(self) -> list[AgentRoleSpec]:
-        return self.fs.list_agent_roles()
+        return self.index.list_agent_roles()
+
+    # --- SkillSources (SQLite-primary) ---
 
     def save_skill_source(self, source: SkillSource) -> None:
-        self.fs.save_skill_source(source)
+        self.index.upsert_skill_source(source)
 
     def list_skill_sources(self) -> list[SkillSource]:
-        return self.fs.list_skill_sources()
+        return self.index.list_skill_sources()
+
+    # --- AgentSkills (SQLite-primary) ---
 
     def save_agent_skill(self, skill: AgentSkillSpec) -> None:
-        self.fs.save_agent_skill(skill)
+        self.index.upsert_agent_skill(skill)
 
     def list_agent_skills(self, source_id: str | None = None) -> list[AgentSkillSpec]:
-        return self.fs.list_agent_skills(source_id=source_id)
+        return self.index.list_agent_skills(source_id=source_id)
+
+    # --- Agents (SQLite-primary) ---
 
     def save_agent(self, agent: AgentInstance) -> None:
-        self.fs.save_agent(agent)
+        self.index.upsert_agent(agent)
 
     def list_agents(self, mission_id: str | None = None) -> list[AgentInstance]:
-        return self.fs.list_agents(mission_id=mission_id)
+        return self.index.list_agents(mission_id=mission_id)
+
+    # --- MissionTeams (SQLite-primary) ---
 
     def save_team(self, team: MissionTeam) -> None:
-        self.fs.save_team(team)
+        self.index.upsert_team(team)
 
     def list_teams(self, mission_id: str | None = None) -> list[MissionTeam]:
-        return self.fs.list_teams(mission_id=mission_id)
+        return self.index.list_teams(mission_id=mission_id)
+
+    # --- Delegations (SQLite-primary) ---
 
     def save_delegation(self, delegation: DelegationRecord) -> None:
-        self.fs.save_delegation(delegation)
+        self.index.upsert_delegation(delegation)
 
     def list_delegations(self, mission_id: str | None = None) -> list[DelegationRecord]:
-        return self.fs.list_delegations(mission_id=mission_id)
+        return self.index.list_delegations(mission_id=mission_id)
+
+    # --- Escalations (SQLite-primary) ---
 
     def save_escalation(self, escalation: EscalationRecord) -> None:
-        self.fs.save_escalation(escalation)
+        self.index.upsert_escalation(escalation)
 
     def list_escalations(self, mission_id: str | None = None, status: str | None = None) -> list[EscalationRecord]:
-        return self.fs.list_escalations(mission_id=mission_id, status=status)
+        return self.index.list_escalations(mission_id=mission_id, status=status)
+
+    # --- StandingOrders (SQLite-primary) ---
 
     def save_standing_order(self, order: StandingOrder) -> None:
-        self.fs.save_standing_order(order)
+        self.index.upsert_standing_order(order)
 
     def list_standing_orders(self) -> list[StandingOrder]:
-        return self.fs.list_standing_orders()
-
-    def save_approval(self, approval: ApprovalRequest) -> None:
-        self.fs.save_approval(approval)
-
-    def list_approvals(self) -> list[ApprovalRequest]:
-        return self.fs.list_approvals()
-
-    def save_governance_review(self, review: GovernanceReview) -> None:
-        self.fs.save_governance_review(review)
-
-    def list_governance_reviews(self, limit: int = 20) -> list[GovernanceReview]:
-        return self.fs.list_governance_reviews(limit=limit)
-
-    def append_audit_event(self, payload: dict) -> None:
-        self.fs.append_audit_event(payload)
-
-    def list_audit_events(self, limit: int = 50) -> list[dict]:
-        return self.fs.list_audit_events(limit=limit)
+        return self.index.list_standing_orders()
 
 
 def parse_timestamp(value: str) -> datetime:
