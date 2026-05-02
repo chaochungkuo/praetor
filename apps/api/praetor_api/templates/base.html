@@ -8,6 +8,18 @@
     <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', path='/praetor-favicon.png') }}?v={{ static_asset_version }}" />
     <link rel="apple-touch-icon" href="{{ url_for('static', path='/praetor-icon-180.png') }}?v={{ static_asset_version }}" />
     <link rel="stylesheet" href="{{ url_for('static', path='/praetor.css') }}?v={{ static_asset_version }}" />
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("praetor_theme");
+          const prefers = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+          const theme = stored || (prefers ? "light" : "dark");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div class="shell">
@@ -47,6 +59,15 @@
             <button type="button" class="search-trigger" data-search-open aria-label="{{ t('search_open') }}" title="{{ t('search_hint') }}">
               <span class="search-trigger-text">{{ t("search_open") }}</span>
               <kbd class="search-kbd">⌘K</kbd>
+            </button>
+            <button type="button" class="theme-toggle" data-theme-toggle aria-label="{{ t('toggle_theme') }}" title="{{ t('toggle_theme') }}">
+              <svg class="theme-icon-light" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <circle cx="10" cy="10" r="3.5"/>
+                <path d="M10 1.5v2M10 16.5v2M3.5 10h-2M18.5 10h-2M5.05 5.05L3.64 3.64M16.36 16.36l-1.41-1.41M5.05 14.95l-1.41 1.41M16.36 3.64l-1.41 1.41" stroke-linecap="round"/>
+              </svg>
+              <svg class="theme-icon-dark" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M14.5 12.5a6 6 0 0 1-7-7 6 6 0 1 0 7 7z"/>
+              </svg>
             </button>
             <div class="language-switch" aria-label="{{ t("language") }}">
               {% for code, label in language_options.items() %}
@@ -222,6 +243,14 @@
             loadingOverlay.hidden = true;
             loadingOverlay.setAttribute("aria-hidden", "true");
           }
+        });
+
+        document.addEventListener("click", (event) => {
+          const toggle = event.target.closest("[data-theme-toggle]");
+          if (!toggle) return;
+          const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", next);
+          try { localStorage.setItem("praetor_theme", next); } catch (_) {}
         });
 
         const flash = document.querySelector("[data-flash]");
