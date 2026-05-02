@@ -6,8 +6,9 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from .models import (
     AgentMessage,
@@ -2145,7 +2146,35 @@ class AppStorage:
     def __init__(self, state_dir: Path) -> None:
         self.fs = FilesystemStore(state_dir)
         self.index = SQLiteIndex(state_dir / "index.sqlite3")
+        self._local = threading.local()
         self._run_migrations()
+
+    # --- Thread-local read cache ---
+
+    def _get_cache(self) -> dict[Any, Any]:
+        if not hasattr(self._local, "cache"):
+            self._local.cache = {}
+        return self._local.cache
+
+    def cache_clear(self) -> None:
+        self._local.cache = {}
+
+    def _cached(self, key: Any, fn) -> Any:
+        cache = self._get_cache()
+        if key not in cache:
+            cache[key] = fn()
+        return cache[key]
+
+    def _invalidate(self, *keys: Any) -> None:
+        cache = self._get_cache()
+        for k in keys:
+            cache.pop(k, None)
+
+    def _invalidate_prefix(self, prefix: Any) -> None:
+        cache = self._get_cache()
+        to_delete = [k for k in cache if k == prefix or (isinstance(k, tuple) and k[0] == prefix)]
+        for k in to_delete:
+            del cache[k]
 
     # --- Migration helpers ---
 
@@ -2268,6 +2297,7 @@ class AppStorage:
     def save_settings(self, settings: AppSettings) -> None:
         self.fs.save_settings(settings)
         self.index.save_settings(settings)
+        self._invalidate("settings")
 
     def save_auth(self, auth_record: OwnerAuthRecord) -> None:
         self.fs.save_auth(auth_record)
@@ -2276,38 +2306,45 @@ class AppStorage:
         return self.fs.load_auth()
 
     def load_settings(self) -> AppSettings | None:
-        settings = self.index.load_settings()
-        if settings is not None:
-            return settings
-        settings = self.fs.load_settings()
-        if settings is not None:
-            self.index.save_settings(settings)
-        return settings
+        def _fetch():
+            s = self.index.load_settings()
+            if s is not None:
+                return s
+            s = self.fs.load_settings()
+            if s is not None:
+                self.index.save_settings(s)
+            return s
+        return self._cached("settings", _fetch)
 
     # --- Missions ---
 
     def save_mission(self, workspace_root: Path, mission: MissionDefinition) -> Path:
         path = self.fs.save_mission(workspace_root, mission)
         self.index.upsert_mission(mission)
+        self._invalidate("missions", ("mission", mission.id))
         return path
 
     def load_mission(self, workspace_root: Path, mission_id: str) -> MissionDefinition | None:
-        mission = self.index.get_mission(mission_id)
-        if mission is not None:
-            return mission
-        mission = self.fs.load_mission(workspace_root, mission_id)
-        if mission is not None:
-            self.index.upsert_mission(mission)
-        return mission
+        def _fetch():
+            m = self.index.get_mission(mission_id)
+            if m is not None:
+                return m
+            m = self.fs.load_mission(workspace_root, mission_id)
+            if m is not None:
+                self.index.upsert_mission(m)
+            return m
+        return self._cached(("mission", mission_id), _fetch)
 
     def list_missions(self, workspace_root: Path) -> list[MissionDefinition]:
-        missions = self.index.list_missions()
-        if missions:
-            return missions
-        missions = self.fs.list_missions(workspace_root)
-        for mission in missions:
-            self.index.upsert_mission(mission)
-        return missions
+        def _fetch():
+            ms = self.index.list_missions()
+            if ms:
+                return ms
+            ms = self.fs.list_missions(workspace_root)
+            for m in ms:
+                self.index.upsert_mission(m)
+            return ms
+        return self._cached("missions", _fetch)
 
     # --- Workspace files (filesystem-only) ---
 
@@ -2344,16 +2381,20 @@ class AppStorage:
     def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
         path = self.fs.save_meeting(workspace_root, meeting)
         self.index.upsert_meeting(meeting)
+        self._invalidate_prefix("meetings")
         return path
 
     def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
-        meetings = self.index.list_meetings(mission_id=mission_id)
-        if meetings:
-            return meetings
-        meetings = self.fs.list_meetings(workspace_root, mission_id=mission_id)
-        for meeting in meetings:
-            self.index.upsert_meeting(meeting)
-        return meetings
+        key = ("meetings", mission_id)
+        def _fetch():
+            ms = self.index.list_meetings(mission_id=mission_id)
+            if ms:
+                return ms
+            ms = self.fs.list_meetings(workspace_root, mission_id=mission_id)
+            for m in ms:
+                self.index.upsert_meeting(m)
+            return ms
+        return self._cached(key, _fetch)
 
     def save_workspace_scope(self, workspace_root: Path, scope: WorkspaceScope) -> Path:
         return self.fs.save_workspace_scope(workspace_root, scope)
@@ -2379,9 +2420,10 @@ class AppStorage:
 
     def save_approval(self, approval: ApprovalRequest) -> None:
         self.index.upsert_approval(approval)
+        self._invalidate("approvals")
 
     def list_approvals(self) -> list[ApprovalRequest]:
-        return self.index.list_approvals()
+        return self._cached("approvals", self.index.list_approvals)
 
     # --- GovernanceReviews (SQLite-primary) ---
 
@@ -2428,18 +2470,21 @@ class AppStorage:
     def save_client(self, workspace_root: Path, client: ClientRecord) -> None:
         self.index.upsert_client(client)
         self.fs.save_client_workspace_files(workspace_root, client)
+        self._invalidate("clients")
 
     def list_clients(self) -> list[ClientRecord]:
-        return self.index.list_clients()
+        return self._cached("clients", self.index.list_clients)
 
     # --- Matters (SQLite-primary + workspace files) ---
 
     def save_matter(self, workspace_root: Path, matter: MatterRecord) -> None:
         self.index.upsert_matter(matter)
         self.fs.save_matter_workspace_files(workspace_root, matter)
+        self._invalidate_prefix("matters")
 
     def list_matters(self, client_id: str | None = None, mission_id: str | None = None) -> list[MatterRecord]:
-        return self.index.list_matters(client_id=client_id, mission_id=mission_id)
+        key = ("matters", client_id, mission_id)
+        return self._cached(key, lambda: self.index.list_matters(client_id=client_id, mission_id=mission_id))
 
     # --- Documents (SQLite-primary) ---
 
@@ -2453,6 +2498,7 @@ class AppStorage:
 
     def save_file_asset(self, asset: FileAssetRecord) -> None:
         self.index.upsert_file_asset(asset)
+        self._invalidate_prefix("file_assets")
 
     def list_file_assets(
         self,
@@ -2461,9 +2507,10 @@ class AppStorage:
         document_id: str | None = None,
         limit: int = 50,
     ) -> list[FileAssetRecord]:
-        return self.index.list_file_assets(
+        key = ("file_assets", mission_id, matter_id, document_id, limit)
+        return self._cached(key, lambda: self.index.list_file_assets(
             mission_id=mission_id, matter_id=matter_id, document_id=document_id, limit=limit
-        )
+        ))
 
     # --- FileMoves (SQLite-primary) ---
 
@@ -2575,33 +2622,39 @@ class AppStorage:
 
     def save_agent_role(self, role: AgentRoleSpec) -> None:
         self.index.upsert_agent_role(role)
+        self._invalidate("agent_roles")
 
     def list_agent_roles(self) -> list[AgentRoleSpec]:
-        return self.index.list_agent_roles()
+        return self._cached("agent_roles", self.index.list_agent_roles)
 
     # --- SkillSources (SQLite-primary) ---
 
     def save_skill_source(self, source: SkillSource) -> None:
         self.index.upsert_skill_source(source)
+        self._invalidate("skill_sources")
 
     def list_skill_sources(self) -> list[SkillSource]:
-        return self.index.list_skill_sources()
+        return self._cached("skill_sources", self.index.list_skill_sources)
 
     # --- AgentSkills (SQLite-primary) ---
 
     def save_agent_skill(self, skill: AgentSkillSpec) -> None:
         self.index.upsert_agent_skill(skill)
+        self._invalidate_prefix("agent_skills")
 
     def list_agent_skills(self, source_id: str | None = None) -> list[AgentSkillSpec]:
-        return self.index.list_agent_skills(source_id=source_id)
+        key = ("agent_skills", source_id)
+        return self._cached(key, lambda: self.index.list_agent_skills(source_id=source_id))
 
     # --- Agents (SQLite-primary) ---
 
     def save_agent(self, agent: AgentInstance) -> None:
         self.index.upsert_agent(agent)
+        self._invalidate_prefix("agents")
 
     def list_agents(self, mission_id: str | None = None) -> list[AgentInstance]:
-        return self.index.list_agents(mission_id=mission_id)
+        key = ("agents", mission_id)
+        return self._cached(key, lambda: self.index.list_agents(mission_id=mission_id))
 
     # --- MissionTeams (SQLite-primary) ---
 
@@ -2631,9 +2684,10 @@ class AppStorage:
 
     def save_standing_order(self, order: StandingOrder) -> None:
         self.index.upsert_standing_order(order)
+        self._invalidate("standing_orders")
 
     def list_standing_orders(self) -> list[StandingOrder]:
-        return self.index.list_standing_orders()
+        return self._cached("standing_orders", self.index.list_standing_orders)
 
 
 def parse_timestamp(value: str) -> datetime:
