@@ -408,6 +408,18 @@ class SQLiteIndex:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS meetings (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_meetings_mission ON meetings(mission_id)")
         try:
             os.chmod(self.db_path, 0o600)
         except OSError:
@@ -464,6 +476,46 @@ class SQLiteIndex:
                 "SELECT payload_json FROM missions ORDER BY updated_at DESC, mission_id DESC"
             ).fetchall()
         return [MissionDefinition.model_validate_json(row["payload_json"]) for row in rows]
+
+    def get_mission(self, mission_id: str) -> MissionDefinition | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM missions WHERE mission_id = ?", (mission_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return MissionDefinition.model_validate_json(row["payload_json"])
+
+    # --- Meetings ---
+
+    def upsert_meeting(self, meeting: MeetingRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO meetings (id, mission_id, type, created_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    meeting.id,
+                    meeting.mission_id,
+                    meeting.type,
+                    meeting.created_at.isoformat(),
+                    meeting.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_meetings(self, mission_id: str | None = None) -> list[MeetingRecord]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM meetings WHERE mission_id = ? ORDER BY created_at DESC",
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM meetings ORDER BY created_at DESC"
+                ).fetchall()
+        return [MeetingRecord.model_validate_json(row["payload_json"]) for row in rows]
 
     # --- Migration tracking ---
 
@@ -2224,11 +2276,13 @@ class AppStorage:
         return self.fs.load_auth()
 
     def load_settings(self) -> AppSettings | None:
+        settings = self.index.load_settings()
+        if settings is not None:
+            return settings
         settings = self.fs.load_settings()
         if settings is not None:
             self.index.save_settings(settings)
-            return settings
-        return self.index.load_settings()
+        return settings
 
     # --- Missions ---
 
@@ -2238,19 +2292,22 @@ class AppStorage:
         return path
 
     def load_mission(self, workspace_root: Path, mission_id: str) -> MissionDefinition | None:
+        mission = self.index.get_mission(mission_id)
+        if mission is not None:
+            return mission
         mission = self.fs.load_mission(workspace_root, mission_id)
         if mission is not None:
             self.index.upsert_mission(mission)
-            return mission
-        return None
+        return mission
 
     def list_missions(self, workspace_root: Path) -> list[MissionDefinition]:
-        missions = self.fs.list_missions(workspace_root)
+        missions = self.index.list_missions()
         if missions:
-            for mission in missions:
-                self.index.upsert_mission(mission)
             return missions
-        return self.index.list_missions()
+        missions = self.fs.list_missions(workspace_root)
+        for mission in missions:
+            self.index.upsert_mission(mission)
+        return missions
 
     # --- Workspace files (filesystem-only) ---
 
@@ -2285,10 +2342,18 @@ class AppStorage:
         return self.fs.append_wiki_page(workspace_root, page_name, text)
 
     def save_meeting(self, workspace_root: Path, meeting: MeetingRecord) -> Path:
-        return self.fs.save_meeting(workspace_root, meeting)
+        path = self.fs.save_meeting(workspace_root, meeting)
+        self.index.upsert_meeting(meeting)
+        return path
 
     def list_meetings(self, workspace_root: Path, mission_id: str | None = None) -> list[MeetingRecord]:
-        return self.fs.list_meetings(workspace_root, mission_id=mission_id)
+        meetings = self.index.list_meetings(mission_id=mission_id)
+        if meetings:
+            return meetings
+        meetings = self.fs.list_meetings(workspace_root, mission_id=mission_id)
+        for meeting in meetings:
+            self.index.upsert_meeting(meeting)
+        return meetings
 
     def save_workspace_scope(self, workspace_root: Path, scope: WorkspaceScope) -> Path:
         return self.fs.save_workspace_scope(workspace_root, scope)
