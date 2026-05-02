@@ -264,6 +264,246 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
+/* Search trigger in topbar */
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0.32rem 0.6rem 0.32rem 0.75rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.025);
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.search-trigger:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.16);
+}
+.search-kbd,
+kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  color: var(--accent-2);
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+/* Overlay framework */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.overlay[hidden] { display: none; }
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4,4,6,0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.palette {
+  position: relative;
+  width: min(560px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(18,19,23,0.96);
+  box-shadow: 0 28px 80px rgba(0,0,0,0.55);
+  overflow: hidden;
+}
+#search-palette-input {
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+.palette-results {
+  overflow-y: auto;
+  flex: 1;
+}
+.palette-result {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.palette-result:hover,
+.palette-result.active {
+  background: rgba(213,179,106,0.10);
+}
+.palette-type {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.palette-title { font-weight: 600; }
+.palette-subtitle {
+  grid-column: 2;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-empty,
+.palette-footer {
+  padding: 0.85rem 1.1rem;
+  font-size: 0.82rem;
+  border-top: 1px solid var(--line);
+}
+.palette-empty { border-top: 0; border-bottom: 1px solid var(--line); }
+
+/* Shortcuts overlay */
+.shortcuts-card {
+  padding: 1.4rem 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+  max-height: none;
+}
+.shortcuts-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shortcuts-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+}
+.shortcuts-list li span:not(.muted) { margin-left: auto; color: var(--muted); }
+.shortcuts-section {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+  color: var(--accent-2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.74rem;
+  display: block !important;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4,4,6,0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.loading-overlay[hidden] { display: none; }
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgba(255,255,255,0.16);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Tasks page filter tabs + search */
+.filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.025);
+  color: var(--muted);
+  font-size: 0.84rem;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.filter-tab:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,0.18);
+}
+.filter-tab.active {
+  color: var(--accent-2);
+  background: rgba(213,179,106,0.14);
+  border-color: rgba(213,179,106,0.32);
+}
+.filter-count {
+  display: inline-block;
+  min-width: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-align: center;
+}
+.filter-tab.active .filter-count {
+  background: rgba(213,179,106,0.22);
+  color: var(--accent-2);
+}
+.filter-search input[type="search"] {
+  width: 16rem;
+  max-width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.025);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 520px) {
+  .search-trigger-text { display: none; }
+  .palette {
+    width: 96vw;
+    max-height: 80vh;
+  }
+  .palette-result { grid-template-columns: 1fr; }
+  .palette-type { font-size: 0.7rem; }
+  .filter-search input[type="search"] { width: 100%; }
+}
+
 .panel {
   background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
   border: 1px solid var(--line);

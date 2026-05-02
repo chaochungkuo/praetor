@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
@@ -309,6 +309,29 @@ TRANSLATIONS = {
         "tasks_empty_cta": "Use the CEO chat to describe your first mission.",
         "open_ceo_chat": "Open CEO chat",
         "configure_runtime": "Configure runtime",
+        "filter_all": "All",
+        "filter_search_placeholder": "Filter missions…",
+        "no_results": "No matches.",
+        "search_placeholder": "Search missions, agents, decisions…",
+        "search_hint": "Press Cmd/Ctrl+K to search · ? for shortcuts",
+        "search_open": "Open search",
+        "shortcuts_title": "Keyboard shortcuts",
+        "shortcuts_search": "Open search",
+        "shortcuts_help": "Show this help",
+        "shortcuts_close": "Close overlay",
+        "shortcuts_then": "then",
+        "shortcuts_nav": "Jump to",
+        "shortcuts_nav_praetor": "Praetor home",
+        "shortcuts_nav_inbox": "Inbox",
+        "shortcuts_nav_tasks": "Tasks",
+        "shortcuts_nav_agents": "Agents",
+        "shortcuts_nav_settings": "Settings",
+        "result_mission": "Mission",
+        "result_agent": "Agent",
+        "result_decision": "Decision",
+        "result_meeting": "Meeting",
+        "wizard_step_required": "Please fill the required fields before continuing.",
+        "wizard_password_mismatch": "Passwords do not match.",
         "review_item": "Review item",
         "agent_directory": "Agent Directory",
         "agent_directory_desc": "The AI organization: who exists, what each agent is working on, who manages whom, and what needs attention.",
@@ -588,6 +611,29 @@ TRANSLATIONS = {
         "tasks_empty_cta": "用 CEO 對話描述你的第一個任務。",
         "open_ceo_chat": "開啟 CEO 對話",
         "configure_runtime": "設定執行環境",
+        "filter_all": "全部",
+        "filter_search_placeholder": "搜尋任務…",
+        "no_results": "沒有符合的結果。",
+        "search_placeholder": "搜尋任務、agent、決議…",
+        "search_hint": "按 Cmd/Ctrl+K 搜尋 · ? 看快捷鍵",
+        "search_open": "開啟搜尋",
+        "shortcuts_title": "鍵盤快捷鍵",
+        "shortcuts_search": "開啟搜尋",
+        "shortcuts_help": "顯示此說明",
+        "shortcuts_close": "關閉覆蓋層",
+        "shortcuts_then": "接著",
+        "shortcuts_nav": "跳到",
+        "shortcuts_nav_praetor": "Praetor 首頁",
+        "shortcuts_nav_inbox": "收件匣",
+        "shortcuts_nav_tasks": "任務",
+        "shortcuts_nav_agents": "Agent",
+        "shortcuts_nav_settings": "設定",
+        "result_mission": "任務",
+        "result_agent": "Agent",
+        "result_decision": "決議",
+        "result_meeting": "會議",
+        "wizard_step_required": "請先填完此步驟必填欄位。",
+        "wizard_password_mismatch": "兩次密碼不一致。",
         "runtime": "執行環境",
         "telegram": "Telegram",
         "telegram_settings": "Telegram CEO 入口",
@@ -2042,14 +2088,75 @@ def tasks_page(request: Request):
         return _redirect("/app/praetor", "Complete onboarding first.", "error")
     service = request.app.state.ctx.service
     missions = service.list_missions()
+    status_filter = request.query_params.get("status", "").strip()
+    query = request.query_params.get("q", "").strip().lower()
+    status_counts: dict[str, int] = {}
+    for mission in missions:
+        status_counts[mission.status] = status_counts.get(mission.status, 0) + 1
+    filtered = list(missions)
+    if status_filter:
+        filtered = [m for m in filtered if m.status == status_filter]
+    if query:
+        filtered = [
+            m for m in filtered
+            if query in (m.title or "").lower()
+            or (m.summary and query in m.summary.lower())
+        ]
     return templates.TemplateResponse(
         request=request,
         name="tasks.html",
         context={
             **_base_context(request, "tasks", "Tasks"),
-            "missions": missions,
+            "missions": filtered,
+            "all_missions_count": len(missions),
+            "status_counts": status_counts,
+            "active_status": status_filter,
+            "active_query": request.query_params.get("q", ""),
         },
     )
+
+
+@router.get("/app/search.json")
+def search_json(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return JSONResponse({"results": []})
+    query = request.query_params.get("q", "").strip().lower()
+    if len(query) < 2:
+        return JSONResponse({"results": []})
+    service = request.app.state.ctx.service
+    results: list[dict] = []
+    try:
+        for mission in service.list_missions():
+            if len(results) >= 8:
+                break
+            haystack = f"{mission.title or ''} {mission.summary or ''}".lower()
+            if query in haystack:
+                results.append({
+                    "type": "mission",
+                    "title": mission.title or mission.id,
+                    "subtitle": (mission.summary or "")[:120],
+                    "url": f"/app/missions/{mission.id}",
+                })
+    except Exception:
+        pass
+    try:
+        organization = service.organization_snapshot()
+        for agent in (organization.agents or [])[:60]:
+            if len(results) >= 16:
+                break
+            name = getattr(agent, "name", "") or getattr(agent, "role_name", "")
+            role = getattr(agent, "role_name", "")
+            if query in str(name).lower() or query in str(role).lower():
+                results.append({
+                    "type": "agent",
+                    "title": str(name) or str(role),
+                    "subtitle": str(role),
+                    "url": "/app/agents",
+                })
+    except Exception:
+        pass
+    return JSONResponse({"results": results[:20]})
 
 
 @router.get("/app/activity", response_class=HTMLResponse)

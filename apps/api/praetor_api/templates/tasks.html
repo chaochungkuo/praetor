@@ -2,7 +2,25 @@
 
 {% block content %}
   <section class="panel">
-    <h2>{{ t("mission_board") }}</h2>
+    <div class="section-heading">
+      <h2>{{ t("mission_board") }}</h2>
+      <form method="get" action="/app/tasks" class="filter-search" role="search">
+        {% if active_status %}<input type="hidden" name="status" value="{{ active_status }}" />{% endif %}
+        <input type="search" name="q" value="{{ active_query }}" placeholder="{{ t('filter_search_placeholder') }}" autocomplete="off" />
+      </form>
+    </div>
+    {% if all_missions_count %}
+      <nav class="filter-tabs" aria-label="{{ t('status') }}">
+        <a class="filter-tab {{ 'active' if not active_status else '' }}" href="/app/tasks{% if active_query %}?q={{ active_query }}{% endif %}">
+          {{ t("filter_all") }} <span class="filter-count">{{ all_missions_count }}</span>
+        </a>
+        {% for status_key, count in status_counts.items() %}
+          <a class="filter-tab {{ 'active' if active_status == status_key else '' }}" href="/app/tasks?status={{ status_key }}{% if active_query %}&q={{ active_query }}{% endif %}">
+            {{ label(status_key) }} <span class="filter-count">{{ count }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
     {% if missions %}
       <table class="table">
         <thead>
@@ -29,13 +47,15 @@
               <td class="table-actions">
                 <form method="post" action="/app/missions/{{ mission.id }}/run">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                  <button type="submit">{{ t("run") }}</button>
+                  <button type="submit" data-loading-label="…">{{ t("run") }}</button>
                 </form>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+    {% elif all_missions_count %}
+      <p class="muted">{{ t("no_results") }}</p>
     {% else %}
       <div class="empty-state">
         <p class="muted">{{ t("no_missions_available") }}</p>
