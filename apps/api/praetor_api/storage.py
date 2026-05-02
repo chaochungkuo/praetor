@@ -2159,6 +2159,10 @@ class AppStorage:
     def cache_clear(self) -> None:
         self._local.cache = {}
 
+    def compute_cached(self, key: Any, fn) -> Any:
+        """Cache a computed value (not storage data) in the current thread scope."""
+        return self._cached(key, fn)
+
     def _cached(self, key: Any, fn) -> Any:
         cache = self._get_cache()
         if key not in cache:
@@ -2297,7 +2301,7 @@ class AppStorage:
     def save_settings(self, settings: AppSettings) -> None:
         self.fs.save_settings(settings)
         self.index.save_settings(settings)
-        self._invalidate("settings")
+        self._invalidate("settings", "_runtime_health")
 
     def save_auth(self, auth_record: OwnerAuthRecord) -> None:
         self.fs.save_auth(auth_record)

@@ -45,6 +45,9 @@ WEB_DIST_DIR = BASE_DIR.parents[1] / "web" / "dist"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(include_in_schema=False)
 
+_css_path = STATIC_DIR / "praetor.css"
+_STATIC_ASSET_VERSION: int = int(_css_path.stat().st_mtime) if _css_path.exists() else 0
+
 UI_COOKIE_NAME = "praetor_ui_lang"
 SUPPORTED_LANGUAGES = {
     "en": "English",
@@ -1476,7 +1479,9 @@ def _page_title(current_page: str, fallback: str, t) -> str:
 
 def _base_context(request: Request, current_page: str, page_title: str) -> dict:
     service = request.app.state.ctx.service
-    initialized_settings = service.get_settings()
+    if not hasattr(request.state, "ui_settings"):
+        request.state.ui_settings = service.get_settings()
+    initialized_settings = request.state.ui_settings
     ui_language = _ui_language(request, initialized_settings)
     t = _translator(ui_language)
     display_title = _page_title(current_page, page_title, t)
@@ -1519,7 +1524,7 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "session_owner": getattr(request.state, "session_owner", None),
         "csrf_token": csrf_token(request),
         "setup_token": request.query_params.get("setup_token", ""),
-        "static_asset_version": int((STATIC_DIR / "praetor.css").stat().st_mtime),
+        "static_asset_version": _STATIC_ASSET_VERSION,
     }
 
 
@@ -1813,7 +1818,9 @@ def _build_agent_directory(service) -> dict[str, Any]:
 
 
 def _require_initialized(request: Request):
-    settings = request.app.state.ctx.service.get_settings()
+    if not hasattr(request.state, "ui_settings"):
+        request.state.ui_settings = request.app.state.ctx.service.get_settings()
+    settings = request.state.ui_settings
     if settings is None:
         return None
     return settings

@@ -2352,8 +2352,11 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         return actions
 
     def runtime_health(self) -> dict:
-        runtime = MissionRuntime()
-        return runtime.probe(self._require_settings().runtime)
+        settings = self._require_settings()
+        return self.storage.compute_cached(
+            "_runtime_health",
+            lambda: MissionRuntime().probe(settings.runtime),
+        )
 
     def test_runtime_connection(self, runtime: RuntimeSelection | None = None, api_key: str | None = None) -> dict:
         selected = runtime or self._require_settings().runtime
