@@ -37,7 +37,13 @@
         </tbody>
       </table>
     {% else %}
-      <p class="muted">{{ t("no_missions_available") }}</p>
+      <div class="empty-state">
+        <p class="muted">{{ t("no_missions_available") }}</p>
+        <p>{{ t("tasks_empty_cta") }}</p>
+        <div class="actions">
+          <a class="small-button" href="/app/praetor#ceo-chat">{{ t("open_ceo_chat") }}</a>
+        </div>
+      </div>
     {% endif %}
   </section>
 {% endblock %}

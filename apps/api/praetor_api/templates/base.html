@@ -52,7 +52,7 @@
             <div class="account-actions">
               {% if authenticated %}
                 <span class="user-chip">{{ session_owner or t("owner") }}</span>
-                <form method="post" action="/app/logout">
+                <form method="post" action="/app/logout" data-confirm="{{ t('confirm_logout') }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                   <button type="submit" class="small secondary text-button">{{ t("logout") }}</button>
                 </form>
@@ -61,9 +61,11 @@
               {% endif %}
             </div>
             <div class="runtime-chips">
-              <span class="runtime-chip {{ 'ok' if runtime_ready else 'warn' }}">
-                {{ t("runtime_ready") if runtime_ready else t("runtime_not_configured") }}
-              </span>
+              {% if runtime_ready %}
+                <span class="runtime-chip ok">{{ t("runtime_ready") }}</span>
+              {% else %}
+                <a class="runtime-chip warn runtime-chip-link" href="/app/settings#runtime" title="{{ t('configure_runtime') }}">{{ t("runtime_not_configured") }}</a>
+              {% endif %}
               {% if settings %}
                 <span class="runtime-chip">{{ label(settings.runtime.mode) }}</span>
                 <span class="runtime-chip">{{ settings.runtime.executor or settings.runtime.provider or settings.runtime.model or 'default' }}</span>
@@ -73,7 +75,10 @@
         </header>
 
         {% if flash %}
-          <section class="flash flash-{{ flash_level }}">{{ flash }}</section>
+          <section class="flash flash-{{ flash_level }}" data-flash role="status">
+            <span class="flash-text">{{ flash }}</span>
+            <button type="button" class="flash-close" data-flash-close aria-label="{{ t('flash_dismiss') }}">×</button>
+          </section>
         {% endif %}
 
         {% block content %}{% endblock %}
@@ -92,7 +97,12 @@
           {% endif %}
         </section>
         <section class="panel">
-          <h3>{{ t("pending_approvals") }}</h3>
+          <div class="section-heading">
+            <h3>{{ t("pending_approvals") }}</h3>
+            {% if approvals and approvals|length > 5 %}
+              <span class="muted">+{{ approvals|length - 5 }} {{ t("more_pending") }}</span>
+            {% endif %}
+          </div>
           {% if approvals %}
             <div class="list">
               {% for approval in approvals[:5] %}
@@ -106,7 +116,7 @@
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                       <button type="submit" class="small">{{ t("approve") }}</button>
                     </form>
-                    <form method="post" action="/app/approvals/{{ approval.id }}/rejected">
+                    <form method="post" action="/app/approvals/{{ approval.id }}/rejected" data-confirm="{{ t('confirm_reject') }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                       <button type="submit" class="small secondary">{{ t("reject") }}</button>
                     </form>
@@ -141,6 +151,14 @@
     </div>
     <script>
       document.addEventListener("submit", (event) => {
+        const form = event.target;
+        if (form instanceof HTMLFormElement) {
+          const confirmText = form.dataset.confirm;
+          if (confirmText && !window.confirm(confirmText)) {
+            event.preventDefault();
+            return;
+          }
+        }
         const submitter = event.submitter;
         if (!(submitter instanceof HTMLButtonElement)) return;
         const loadingLabel = submitter.dataset.loadingLabel;
@@ -148,6 +166,19 @@
         submitter.disabled = true;
         submitter.textContent = loadingLabel;
       });
+
+      (() => {
+        const flash = document.querySelector("[data-flash]");
+        if (!flash) return;
+        const dismiss = () => {
+          flash.classList.add("flash-dismissed");
+          setTimeout(() => flash.remove(), 350);
+        };
+        flash.querySelector("[data-flash-close]")?.addEventListener("click", dismiss);
+        if (!flash.classList.contains("flash-error")) {
+          setTimeout(dismiss, 5000);
+        }
+      })();
     </script>
   </body>
 </html>

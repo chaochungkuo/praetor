@@ -48,7 +48,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <button type="submit" class="secondary">{{ t("create_review") }}</button>
           </form>
-          <form method="post" action="/app/missions/{{ mission.id }}/stop">
+          <form method="post" action="/app/missions/{{ mission.id }}/stop" data-confirm="{{ t('confirm_stop_mission') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <button type="submit" class="secondary">{{ t("stop_mission") }}</button>
           </form>
