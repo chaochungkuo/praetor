@@ -1874,6 +1874,9 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             raise KeyError(mission_id)
         return self.storage.list_work_sessions(mission_id=mission_id, limit=limit)
 
+    def all_work_sessions(self, limit: int = 500) -> list[WorkSession]:
+        return self.storage.list_work_sessions(mission_id=None, limit=limit)
+
     def _open_run_attempt(
         self,
         *,

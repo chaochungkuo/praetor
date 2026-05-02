@@ -1712,12 +1712,8 @@ def _build_agent_directory(service) -> dict[str, Any]:
     for event in activity:
         activity_by_role.setdefault(event.actor.replace("_", " ").title(), []).append(event)
     work_sessions_by_mission: dict[str, list[Any]] = {}
-    for mission in missions:
-        try:
-            sessions = service.mission_work_sessions(mission.id)
-        except KeyError:
-            sessions = []
-        work_sessions_by_mission[mission.id] = sessions
+    for session in service.all_work_sessions():
+        work_sessions_by_mission.setdefault(session.mission_id, []).append(session)
     delegations_by_agent: dict[str, list[Any]] = {}
     delegations_by_role: dict[str, list[Any]] = {}
     for delegation in organization.delegations:
@@ -1830,7 +1826,7 @@ def _require_initialized(request: Request):
 def set_language(request: Request, language_code: str):
     if language_code not in SUPPORTED_LANGUAGES:
         language_code = "en"
-    next_path = request.query_params.get("next", "/app/welcome")
+    next_path = _safe_redirect_path(request.query_params.get("next"), "/app/welcome")
     response = RedirectResponse(url=next_path, status_code=303)
     response.set_cookie(
         UI_COOKIE_NAME,
@@ -2075,7 +2071,7 @@ def settings_page(request: Request):
                 "bot_token": bool(get_telegram_bot_token()),
                 "webhook_secret": bool(get_telegram_webhook_secret()),
             },
-            "telegram_pairing_code": request.query_params.get("telegram_pairing_code", ""),
+            "telegram_pairing_code": request.session.pop("telegram_pairing_code", ""),
             "telegram_webhook_url": str(request.url_for("telegram_webhook")),
         },
     )
@@ -2175,7 +2171,8 @@ async def create_telegram_pairing_submit(request: Request):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
     code = await run_in_threadpool(request.app.state.ctx.service.create_telegram_pairing_code)
-    return _redirect(f"/app/settings?telegram_pairing_code={quote(code)}", t("telegram_pairing_created"), "success")
+    request.session["telegram_pairing_code"] = code
+    return _redirect("/app/settings", t("telegram_pairing_created"), "success")
 
 
 @router.post("/app/ceo/conversation")
@@ -2374,7 +2371,7 @@ async def login_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     password = str(form.get("password", "")).strip()
-    next_path = str(form.get("next_path", "/app/praetor")).strip() or "/app/praetor"
+    next_path = _safe_redirect_path(str(form.get("next_path", "")).strip(), "/app/praetor")
     rate_key = request.client.host if request.client else "unknown"
     login_rate_limiter.check(rate_key)
     try:
@@ -2425,9 +2422,12 @@ async def create_mission_submit(request: Request):
 
 @router.post("/app/missions/{mission_id}/run")
 async def run_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
         await run_in_threadpool(request.app.state.ctx.service.run_mission, mission_id)
     except Exception as exc:
@@ -2437,9 +2437,12 @@ async def run_mission_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/pause")
 async def pause_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
         await run_in_threadpool(request.app.state.ctx.service.pause_mission, mission_id, MissionPauseRequest())
     except Exception as exc:
@@ -2449,9 +2452,12 @@ async def pause_mission_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/continue")
 async def continue_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
         await run_in_threadpool(request.app.state.ctx.service.continue_mission, mission_id, MissionContinueRequest())
     except Exception as exc:
@@ -2461,9 +2467,12 @@ async def continue_mission_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/stop")
 async def stop_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
         await run_in_threadpool(request.app.state.ctx.service.stop_mission, mission_id, MissionStopRequest())
     except Exception as exc:
