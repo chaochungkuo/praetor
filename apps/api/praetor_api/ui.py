@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from .config import (
     ANTHROPIC_STATE_SECRET,
@@ -1935,7 +1936,7 @@ async def run_governance_review_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
-    request.app.state.ctx.service.run_governance_review()
+    await run_in_threadpool(request.app.state.ctx.service.run_governance_review)
     return _redirect("/app/inbox", t("governance_review"), "success")
 
 
@@ -1964,12 +1965,13 @@ async def add_skill_source_submit(request: Request):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
     try:
-        source = request.app.state.ctx.service.add_skill_source(
-            url=str(form.get("url", "")).strip(),
-            name=str(form.get("name", "")).strip() or None,
-            branch=str(form.get("branch", "")).strip() or "main",
+        source = await run_in_threadpool(
+            request.app.state.ctx.service.add_skill_source,
+            str(form.get("url", "")).strip(),
+            str(form.get("name", "")).strip() or None,
+            str(form.get("branch", "")).strip() or "main",
         )
-        request.app.state.ctx.service.import_skill_source(source.id)
+        await run_in_threadpool(request.app.state.ctx.service.import_skill_source, source.id)
     except Exception as exc:
         return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect("/app/agents", t("skill_source_added"), "success")
@@ -1984,7 +1986,7 @@ async def import_skill_source_submit(request: Request, source_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
     try:
-        request.app.state.ctx.service.import_skill_source(source_id)
+        await run_in_threadpool(request.app.state.ctx.service.import_skill_source, source_id)
     except Exception as exc:
         return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect("/app/agents", t("skill_source_added"), "success")
@@ -2089,7 +2091,7 @@ async def update_runtime_submit(request: Request):
         base_url=str(form.get("runtime_base_url", "")).strip() or None,
     )
     try:
-        request.app.state.ctx.service.update_runtime(runtime)
+        await run_in_threadpool(request.app.state.ctx.service.update_runtime, runtime)
         if provider is not None:
             _save_provider_api_key(provider, str(form.get("api_key", "")))
     except Exception as exc:
@@ -2116,7 +2118,7 @@ async def test_runtime_submit(request: Request):
     )
     next_path = _safe_redirect_path(str(form.get("next_path", "/app/models")), "/app/models")
     try:
-        request.app.state.ctx.service.test_runtime_connection(runtime, str(form.get("api_key", "")))
+        await run_in_threadpool(request.app.state.ctx.service.test_runtime_connection, runtime, str(form.get("api_key", "")))
     except Exception as exc:
         return _redirect(next_path, f"{t('api_connection_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect(next_path, t("api_connection_ok"), "success")
@@ -2141,7 +2143,8 @@ async def update_telegram_submit(request: Request):
         allowed_user_id = int(allowed_raw) if allowed_raw else None
     except ValueError:
         return _redirect("/app/settings", "Telegram user ID must be a number.", "error")
-    request.app.state.ctx.service.update_telegram_settings(
+    await run_in_threadpool(
+        request.app.state.ctx.service.update_telegram_settings,
         settings.telegram.model_copy(
             update={
                 "enabled": bool(form.get("telegram_enabled")),
@@ -2151,7 +2154,7 @@ async def update_telegram_submit(request: Request):
                 "notify_approvals": bool(form.get("telegram_notify_approvals")),
                 "allow_low_risk_approval": bool(form.get("telegram_allow_low_risk_approval")),
             }
-        )
+        ),
     )
     return _redirect("/app/settings", t("telegram_settings_saved"), "success")
 
@@ -2164,7 +2167,7 @@ async def create_telegram_pairing_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
-    code = request.app.state.ctx.service.create_telegram_pairing_code()
+    code = await run_in_threadpool(request.app.state.ctx.service.create_telegram_pairing_code)
     return _redirect(f"/app/settings?telegram_pairing_code={quote(code)}", t("telegram_pairing_created"), "success")
 
 
@@ -2180,7 +2183,7 @@ async def create_ceo_conversation_submit(request: Request):
     if not body:
         return _redirect("/app/praetor", t("message_to_ceo_placeholder"), "error")
     try:
-        request.app.state.ctx.service.create_ceo_message(ConversationCreateRequest(body=body))
+        await run_in_threadpool(request.app.state.ctx.service.create_ceo_message, ConversationCreateRequest(body=body))
     except Exception as exc:
         return _redirect("/app/praetor", _friendly_runtime_error(exc, t), "error")
     return _redirect("/app/praetor?focus=ceo-chat", t("ceo_message_sent"), "success")
@@ -2347,7 +2350,7 @@ async def onboarding_submit(request: Request):
     if answers.owner_password != password_confirm:
         return _redirect("/app/praetor", "Password confirmation does not match.", "error")
     try:
-        settings = request.app.state.ctx.service.complete_onboarding(answers)
+        settings = await run_in_threadpool(request.app.state.ctx.service.complete_onboarding, answers)
         provider = answers.runtime.get("provider") if isinstance(answers.runtime, dict) else answers.runtime.provider
         if provider:
             _save_provider_api_key(str(provider), str(form.get("api_key", "")))
@@ -2368,7 +2371,7 @@ async def login_submit(request: Request):
     rate_key = request.client.host if request.client else "unknown"
     login_rate_limiter.check(rate_key)
     try:
-        settings = request.app.state.ctx.service.authenticate_owner(LoginRequest(password=password))
+        settings = await run_in_threadpool(request.app.state.ctx.service.authenticate_owner, LoginRequest(password=password))
     except Exception as exc:
         login_rate_limiter.record_failure(rate_key)
         return _redirect("/app/login", str(exc), "error")
@@ -2400,14 +2403,15 @@ async def create_mission_submit(request: Request):
         return _redirect("/app/praetor", "Mission title is required.", "error")
     requested_outputs_raw = str(form.get("requested_outputs", "")).strip()
     requested_outputs = [line.strip() for line in requested_outputs_raw.splitlines() if line.strip()]
-    mission = request.app.state.ctx.service.create_mission(
+    mission = await run_in_threadpool(
+        request.app.state.ctx.service.create_mission,
         MissionCreateRequest(
             title=title,
             summary=str(form.get("summary", "")).strip() or None,
             domains=[str(form.get("domain", "operations"))],
             priority=str(form.get("priority", "normal")),
             requested_outputs=requested_outputs,
-        )
+        ),
     )
     return _redirect(f"/app/missions/{mission.id}", "Mission created.", "success")
 
@@ -2418,7 +2422,7 @@ async def run_mission_submit(request: Request, mission_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
-        request.app.state.ctx.service.run_mission(mission_id)
+        await run_in_threadpool(request.app.state.ctx.service.run_mission, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_run_completed"), "success")
@@ -2430,7 +2434,7 @@ async def pause_mission_submit(request: Request, mission_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
-        request.app.state.ctx.service.pause_mission(mission_id, MissionPauseRequest())
+        await run_in_threadpool(request.app.state.ctx.service.pause_mission, mission_id, MissionPauseRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_paused"), "success")
@@ -2442,7 +2446,7 @@ async def continue_mission_submit(request: Request, mission_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
-        request.app.state.ctx.service.continue_mission(mission_id, MissionContinueRequest())
+        await run_in_threadpool(request.app.state.ctx.service.continue_mission, mission_id, MissionContinueRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_resumed"), "success")
@@ -2454,7 +2458,7 @@ async def stop_mission_submit(request: Request, mission_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
     try:
-        request.app.state.ctx.service.stop_mission(mission_id, MissionStopRequest())
+        await run_in_threadpool(request.app.state.ctx.service.stop_mission, mission_id, MissionStopRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_stopped"), "success")
@@ -2465,7 +2469,7 @@ async def create_meeting_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        meeting = request.app.state.ctx.service.create_review_meeting(mission_id)
+        meeting = await run_in_threadpool(request.app.state.ctx.service.create_review_meeting, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect("/app/meetings", f"Meeting created: {meeting.id}", "success")
@@ -2476,7 +2480,7 @@ async def create_memory_promotion_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        review = request.app.state.ctx.service.create_memory_promotion_review(mission_id)
+        review = await run_in_threadpool(request.app.state.ctx.service.create_memory_promotion_review, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Memory promotion review created: {review.id}", "success")
@@ -2487,7 +2491,7 @@ async def create_workspace_restructure_plan_submit(request: Request, mission_id:
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        plan = request.app.state.ctx.service.create_workspace_restructure_plan(mission_id=mission_id)
+        plan = await run_in_threadpool(lambda: request.app.state.ctx.service.create_workspace_restructure_plan(mission_id=mission_id))
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Workspace restructure plan created: {plan.id}", "success")
@@ -2498,7 +2502,7 @@ async def reconcile_workspace_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        report = request.app.state.ctx.service.reconcile_workspace(mission_id=mission_id)
+        report = await run_in_threadpool(lambda: request.app.state.ctx.service.reconcile_workspace(mission_id=mission_id))
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     issues = (
@@ -2516,7 +2520,7 @@ async def create_board_briefing_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        briefing = request.app.state.ctx.service.create_board_briefing(mission_id)
+        briefing = await run_in_threadpool(request.app.state.ctx.service.create_board_briefing, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Board briefing ready: {briefing.id}", "success")
@@ -2527,12 +2531,13 @@ async def create_approval_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        request.app.state.ctx.service.create_approval(
+        await run_in_threadpool(
+            request.app.state.ctx.service.create_approval,
             ApprovalCreateRequest(
                 mission_id=mission_id,
                 category=str(form.get("category", "change_strategy")),
                 reason=str(form.get("reason", "Manual checkpoint requested by owner.")),
-            )
+            ),
         )
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
@@ -2544,7 +2549,7 @@ async def resolve_approval_submit(request: Request, approval_id: str, status: st
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        request.app.state.ctx.service.resolve_approval(approval_id, status)
+        await run_in_threadpool(request.app.state.ctx.service.resolve_approval, approval_id, status)
     except Exception as exc:
         return _redirect("/app/overview", str(exc), "error")
     return _redirect("/app/overview", f"Approval {status}.", "success")
