@@ -534,6 +534,62 @@ kbd {
   display: block !important;
 }
 
+/* Live run panel (SSE) */
+.live-run-panel {
+  border-color: rgba(213,179,106,0.32);
+  background: linear-gradient(180deg, rgba(213,179,106,0.06), rgba(255,255,255,0.01));
+}
+.live-run-panel.live-run-completed {
+  border-color: rgba(47,143,101,0.45);
+  background: linear-gradient(180deg, rgba(47,143,101,0.08), rgba(255,255,255,0.01));
+}
+.live-run-panel.live-run-failed {
+  border-color: rgba(161,77,77,0.55);
+  background: linear-gradient(180deg, rgba(161,77,77,0.10), rgba(255,255,255,0.01));
+}
+.live-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.4rem 0 0.75rem;
+  font-size: 0.86rem;
+}
+.live-run-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+  position: relative;
+}
+.live-run-bar-fill {
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: live-run-slide 1.6s linear infinite;
+}
+.live-run-completed .live-run-bar-fill,
+.live-run-failed .live-run-bar-fill {
+  animation: none;
+  width: 100%;
+  background: var(--success);
+  opacity: 0.6;
+}
+.live-run-failed .live-run-bar-fill { background: var(--error); }
+.live-run-message {
+  margin-top: 0.65rem;
+  font-size: 0.86rem;
+}
+.live-run-status {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.74rem;
+}
+@keyframes live-run-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(265%); }
+}
+
 /* Loading overlay */
 .loading-overlay {
   position: fixed;

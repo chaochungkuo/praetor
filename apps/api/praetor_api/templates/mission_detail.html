@@ -57,6 +57,22 @@
     </div>
   </section>
 
+  <section class="panel live-run-panel" id="live-run-panel" data-mission-id="{{ mission.id }}" hidden>
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">{{ t("live_run_title") }}</span>
+        <h3 id="live-run-title">{{ t("live_run_running") }}</h3>
+      </div>
+      <span class="status live-run-status" id="live-run-status">running</span>
+    </div>
+    <div class="live-run-meta">
+      <span id="live-run-started" class="muted"></span>
+      <span id="live-run-elapsed" class="muted"></span>
+    </div>
+    <div class="live-run-bar"><div class="live-run-bar-fill"></div></div>
+    <div class="live-run-message muted" id="live-run-message" hidden></div>
+  </section>
+
   <section class="executive-grid">
     <section class="glass-panel decision-card">
       <span class="eyebrow">{{ t("next_decision") }}</span>
@@ -435,4 +451,99 @@
       </div>
     </details>
   </section>
+
+  <script>
+    (() => {
+      const panel = document.getElementById("live-run-panel");
+      if (!panel) return;
+      if (typeof EventSource === "undefined") return;
+      const missionId = panel.dataset.missionId;
+      const titleEl = document.getElementById("live-run-title");
+      const statusEl = document.getElementById("live-run-status");
+      const startedEl = document.getElementById("live-run-started");
+      const elapsedEl = document.getElementById("live-run-elapsed");
+      const messageEl = document.getElementById("live-run-message");
+
+      const labels = {
+        running: "{{ t('live_run_running') }}",
+        completed: "{{ t('live_run_completed') }}",
+        failed: "{{ t('live_run_failed') }}",
+      };
+      const startedPrefix = "{{ t('live_run_started_at') }}";
+      const elapsedSuffix = "{{ t('live_run_elapsed') }}";
+
+      let startTime = null;
+      let elapsedTimer = null;
+
+      function formatElapsed() {
+        if (!startTime) { elapsedEl.textContent = ""; return; }
+        const sec = Math.max(0, Math.round((Date.now() - startTime) / 1000));
+        if (sec < 60) { elapsedEl.textContent = `${sec}s ${elapsedSuffix}`; return; }
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        elapsedEl.textContent = `${m}m ${s.toString().padStart(2, "0")}s ${elapsedSuffix}`;
+      }
+
+      function setRunning(startedAt) {
+        panel.hidden = false;
+        panel.classList.remove("live-run-completed", "live-run-failed");
+        panel.classList.add("live-run-active");
+        titleEl.textContent = labels.running;
+        statusEl.textContent = "running";
+        startTime = startedAt ? new Date(startedAt).getTime() : Date.now();
+        if (Number.isNaN(startTime)) startTime = Date.now();
+        startedEl.textContent = `${startedPrefix} ${new Date(startTime).toLocaleTimeString()}`;
+        if (elapsedTimer) clearInterval(elapsedTimer);
+        elapsedTimer = setInterval(formatElapsed, 1000);
+        formatElapsed();
+        messageEl.hidden = true;
+      }
+
+      function setFinished(status, message, finishedAt) {
+        panel.hidden = false;
+        panel.classList.remove("live-run-active");
+        panel.classList.add(`live-run-${status}`);
+        titleEl.textContent = labels[status] || status;
+        statusEl.textContent = status;
+        if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+        if (finishedAt && startTime) {
+          const sec = Math.max(0, Math.round((new Date(finishedAt).getTime() - startTime) / 1000));
+          const m = Math.floor(sec / 60);
+          const s = sec % 60;
+          elapsedEl.textContent = m ? `${m}m ${s.toString().padStart(2, "0")}s ${elapsedSuffix}` : `${sec}s ${elapsedSuffix}`;
+        }
+        if (message) {
+          messageEl.textContent = message;
+          messageEl.hidden = false;
+        }
+        if (status === "completed") {
+          setTimeout(() => window.location.reload(), 1800);
+        }
+      }
+
+      const source = new EventSource(`/app/missions/${missionId}/events`);
+      source.addEventListener("message", (event) => {
+        let data;
+        try { data = JSON.parse(event.data); } catch (_) { return; }
+        if (data.type === "snapshot" || data.type === "started") {
+          if (data.status && data.status !== "running") {
+            setFinished(data.status, data.message, data.finished_at);
+            source.close();
+            return;
+          }
+          setRunning(data.started_at || data.timestamp);
+        } else if (data.type === "finished") {
+          setFinished(data.status, data.message, data.timestamp);
+          source.close();
+        } else if (data.type === "idle") {
+          panel.hidden = true;
+        }
+      });
+      source.addEventListener("close", () => source.close());
+      source.onerror = () => {
+        if (elapsedTimer) clearInterval(elapsedTimer);
+        source.close();
+      };
+    })();
+  </script>
 {% endblock %}

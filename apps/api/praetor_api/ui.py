@@ -4,9 +4,12 @@ from datetime import datetime
 from typing import Any
 from pathlib import Path
 from urllib.parse import quote
+import asyncio
+import json
+import threading
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
@@ -335,6 +338,15 @@ TRANSLATIONS = {
         "toggle_theme": "Toggle light/dark theme",
         "first_time_setup_link": "First time? Set up Praetor",
         "owner_login_subtitle": "Sign in to your AI command center.",
+        "mission_run_started": "Mission run started.",
+        "mission_already_running": "This mission is already running.",
+        "live_run_title": "Live run",
+        "live_run_running": "Running…",
+        "live_run_completed": "Run completed",
+        "live_run_failed": "Run failed",
+        "live_run_started_at": "Started",
+        "live_run_elapsed": "elapsed",
+        "live_run_view_progress": "View progress in the live panel below.",
         "review_item": "Review item",
         "agent_directory": "Agent Directory",
         "agent_directory_desc": "The AI organization: who exists, what each agent is working on, who manages whom, and what needs attention.",
@@ -640,6 +652,15 @@ TRANSLATIONS = {
         "toggle_theme": "切換明暗主題",
         "first_time_setup_link": "第一次使用？開始設定 Praetor",
         "owner_login_subtitle": "登入你的 AI 控制台。",
+        "mission_run_started": "任務已開始執行。",
+        "mission_already_running": "此任務已在執行中。",
+        "live_run_title": "即時執行",
+        "live_run_running": "執行中…",
+        "live_run_completed": "執行完成",
+        "live_run_failed": "執行失敗",
+        "live_run_started_at": "開始於",
+        "live_run_elapsed": "已用時",
+        "live_run_view_progress": "請在下方面板查看即時進度。",
         "runtime": "執行環境",
         "telegram": "Telegram",
         "telegram_settings": "Telegram CEO 入口",
@@ -2559,11 +2580,52 @@ async def run_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
-    try:
-        await run_in_threadpool(request.app.state.ctx.service.run_mission, mission_id)
-    except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
-    return _redirect(f"/app/missions/{mission_id}", t("mission_run_completed"), "success")
+    ctx = request.app.state.ctx
+    registry = ctx.run_registry
+    if registry.is_running(mission_id):
+        return _redirect(f"/app/missions/{mission_id}", t("mission_already_running"), "error")
+    run_id = f"run_{int(datetime.utcnow().timestamp() * 1000)}_{mission_id[:8]}"
+    registry.start(mission_id, run_id)
+
+    def _execute() -> None:
+        try:
+            ctx.service.run_mission(mission_id)
+            registry.finish(mission_id, "completed")
+        except Exception as exc:
+            registry.finish(mission_id, "failed", message=_friendly_runtime_error(exc, t))
+
+    threading.Thread(target=_execute, daemon=True, name=f"mission-run-{mission_id}").start()
+    return _redirect(f"/app/missions/{mission_id}", t("mission_run_started"), "success")
+
+
+@router.get("/app/missions/{mission_id}/events")
+async def mission_events_sse(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return JSONResponse({"error": "not_initialized"}, status_code=403)
+    registry = request.app.state.ctx.run_registry
+
+    async def stream():
+        try:
+            async for event in registry.subscribe(mission_id):
+                if await request.is_disconnected():
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") == "finished":
+                    break
+        except asyncio.CancelledError:
+            return
+        yield "event: close\ndata: {}\n\n"
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/app/missions/{mission_id}/pause")
