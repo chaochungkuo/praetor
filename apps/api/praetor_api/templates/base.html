@@ -100,10 +100,12 @@
         </header>
 
         {% if flash %}
-          <section class="flash flash-{{ flash_level }}" data-flash role="status">
-            <span class="flash-text">{{ flash }}</span>
-            <button type="button" class="flash-close" data-flash-close aria-label="{{ t('flash_dismiss') }}">×</button>
-          </section>
+          <noscript>
+            <section class="flash flash-{{ flash_level }}" role="status">
+              <span class="flash-text">{{ flash }}</span>
+            </section>
+          </noscript>
+          <template data-flash-seed data-flash-level="{{ flash_level }}">{{ flash }}</template>
         {% endif %}
 
         {% block content %}{% endblock %}
@@ -204,7 +206,67 @@
         <div class="spinner"></div>
       </div>
     {% endif %}
+    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
     <script>
+      (() => {
+        const stack = document.getElementById("toast-stack");
+        if (!stack) return;
+        const dismissLabel = "{{ t('flash_dismiss') }}";
+        let counter = 0;
+
+        function show(message, level = "info", options = {}) {
+          if (!message) return null;
+          counter += 1;
+          const id = `toast-${counter}`;
+          const toast = document.createElement("div");
+          toast.className = `toast toast-${level}`;
+          toast.id = id;
+          toast.setAttribute("role", level === "error" ? "alert" : "status");
+          const text = document.createElement("span");
+          text.className = "toast-text";
+          text.textContent = message;
+          const close = document.createElement("button");
+          close.type = "button";
+          close.className = "toast-close";
+          close.setAttribute("aria-label", dismissLabel);
+          close.textContent = "×";
+          toast.appendChild(text);
+          toast.appendChild(close);
+          stack.appendChild(toast);
+          requestAnimationFrame(() => toast.classList.add("toast-visible"));
+
+          const ttl = options.ttl ?? (level === "error" ? 9000 : 5000);
+          let dismissed = false;
+          let timer = null;
+          const dismiss = () => {
+            if (dismissed) return;
+            dismissed = true;
+            if (timer) clearTimeout(timer);
+            toast.classList.add("toast-leaving");
+            setTimeout(() => toast.remove(), 300);
+          };
+          const scheduleDismiss = () => {
+            if (ttl <= 0) return;
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(dismiss, ttl);
+          };
+          close.addEventListener("click", dismiss);
+          toast.addEventListener("mouseenter", () => { if (timer) clearTimeout(timer); });
+          toast.addEventListener("mouseleave", scheduleDismiss);
+          scheduleDismiss();
+          return { id, dismiss };
+        }
+
+        window.PraetorToast = { show };
+
+        document.querySelectorAll("[data-flash-seed]").forEach((seed) => {
+          const message = (seed.textContent || "").trim();
+          const level = seed.dataset.flashLevel || "info";
+          seed.remove();
+          if (message) show(message, level);
+        });
+      })();
+
       (() => {
         const loadingOverlay = document.getElementById("loading-overlay");
         let loadingTimer = null;
@@ -253,17 +315,6 @@
           try { localStorage.setItem("praetor_theme", next); } catch (_) {}
         });
 
-        const flash = document.querySelector("[data-flash]");
-        if (flash) {
-          const dismiss = () => {
-            flash.classList.add("flash-dismissed");
-            setTimeout(() => flash.remove(), 350);
-          };
-          flash.querySelector("[data-flash-close]")?.addEventListener("click", dismiss);
-          if (!flash.classList.contains("flash-error")) {
-            setTimeout(dismiss, 5000);
-          }
-        }
       })();
 
       {% if authenticated %}

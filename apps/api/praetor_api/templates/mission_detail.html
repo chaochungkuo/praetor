@@ -516,8 +516,15 @@
           messageEl.textContent = message;
           messageEl.hidden = false;
         }
+        if (window.PraetorToast) {
+          const toastLevel = status === "completed" ? "success" : "error";
+          const toastMessage = status === "completed"
+            ? labels.completed
+            : `${labels.failed}${message ? ": " + message : ""}`;
+          window.PraetorToast.show(toastMessage, toastLevel, { ttl: status === "completed" ? 6000 : 12000 });
+        }
         if (status === "completed") {
-          setTimeout(() => window.location.reload(), 1800);
+          setTimeout(() => window.location.reload(), 2400);
         }
       }
 

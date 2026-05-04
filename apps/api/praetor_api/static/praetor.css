@@ -534,6 +534,91 @@ kbd {
   display: block !important;
 }
 
+/* Toast stack */
+.toast-stack {
+  position: fixed;
+  bottom: 1.4rem;
+  right: 1.4rem;
+  z-index: 300;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.6rem;
+  pointer-events: none;
+  width: min(420px, 92vw);
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  background: rgba(18,19,23,0.95);
+  color: var(--text);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast-visible { opacity: 1; transform: translateY(0); }
+.toast-leaving { opacity: 0; transform: translateY(8px); }
+.toast-text { flex: 1; min-width: 0; line-height: 1.4; word-break: break-word; }
+.toast-close {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.toast-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.toast-success { border-color: rgba(47,143,101,0.55); }
+.toast-success .toast-text::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.55rem;
+  border-radius: 999px;
+  background: var(--success);
+  vertical-align: middle;
+}
+.toast-error { border-color: rgba(161,77,77,0.65); }
+.toast-error .toast-text::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.55rem;
+  border-radius: 999px;
+  background: var(--error);
+  vertical-align: middle;
+}
+.toast-info { border-color: rgba(213,179,106,0.4); }
+
+:root[data-theme="light"] .toast {
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.18);
+}
+:root[data-theme="light"] .toast-close:hover { background: rgba(0,0,0,0.06); }
+
+@media (max-width: 520px) {
+  .toast-stack {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+  }
+}
+
 /* Live run panel (SSE) */
 .live-run-panel {
   border-color: rgba(213,179,106,0.32);
