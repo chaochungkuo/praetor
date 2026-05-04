@@ -2146,39 +2146,47 @@ class AppStorage:
     def __init__(self, state_dir: Path) -> None:
         self.fs = FilesystemStore(state_dir)
         self.index = SQLiteIndex(state_dir / "index.sqlite3")
-        self._local = threading.local()
+        self._cache: dict[Any, Any] = {}
+        self._cache_lock = threading.RLock()
         self._run_migrations()
 
-    # --- Thread-local read cache ---
-
-    def _get_cache(self) -> dict[Any, Any]:
-        if not hasattr(self._local, "cache"):
-            self._local.cache = {}
-        return self._local.cache
+    # --- Process-wide read cache ---
+    # A single shared cache (with a lock) avoids the cross-thread staleness
+    # that a thread-local cache would suffer from: writes happen on FastAPI
+    # thread-pool workers while reads in async middleware happen on the
+    # event-loop thread, so per-thread invalidation could not see each
+    # other's changes.
 
     def cache_clear(self) -> None:
-        self._local.cache = {}
+        with self._cache_lock:
+            self._cache.clear()
 
     def compute_cached(self, key: Any, fn) -> Any:
-        """Cache a computed value (not storage data) in the current thread scope."""
+        """Cache a computed value (not storage data) in the shared scope."""
         return self._cached(key, fn)
 
     def _cached(self, key: Any, fn) -> Any:
-        cache = self._get_cache()
-        if key not in cache:
-            cache[key] = fn()
-        return cache[key]
+        with self._cache_lock:
+            if key in self._cache:
+                return self._cache[key]
+        value = fn()
+        with self._cache_lock:
+            self._cache.setdefault(key, value)
+            return self._cache[key]
 
     def _invalidate(self, *keys: Any) -> None:
-        cache = self._get_cache()
-        for k in keys:
-            cache.pop(k, None)
+        with self._cache_lock:
+            for k in keys:
+                self._cache.pop(k, None)
 
     def _invalidate_prefix(self, prefix: Any) -> None:
-        cache = self._get_cache()
-        to_delete = [k for k in cache if k == prefix or (isinstance(k, tuple) and k[0] == prefix)]
-        for k in to_delete:
-            del cache[k]
+        with self._cache_lock:
+            to_delete = [
+                k for k in self._cache
+                if k == prefix or (isinstance(k, tuple) and k[0] == prefix)
+            ]
+            for k in to_delete:
+                del self._cache[k]
 
     # --- Migration helpers ---
 
