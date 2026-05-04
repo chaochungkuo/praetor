@@ -303,13 +303,62 @@
           updateSummary();
         }
 
+        function showStepError(message) {
+          const current = steps[index];
+          if (!current) return;
+          let banner = current.querySelector(".step-error");
+          if (!banner) {
+            banner = document.createElement("div");
+            banner.className = "step-error flash flash-error";
+            current.insertBefore(banner, current.firstChild);
+          }
+          banner.textContent = message;
+          banner.hidden = false;
+        }
+
+        function clearStepError() {
+          const banner = steps[index]?.querySelector(".step-error");
+          if (banner) banner.hidden = true;
+        }
+
+        function validateStep() {
+          const current = steps[index];
+          if (!current) return true;
+          const required = current.querySelectorAll("input[required], select[required], textarea[required]");
+          for (const field of required) {
+            if (field.type === "radio") {
+              const group = current.querySelectorAll(`input[name='${field.name}']`);
+              if (!Array.from(group).some((r) => r.checked)) {
+                showStepError("{{ t('wizard_step_required') }}");
+                field.focus();
+                return false;
+              }
+            } else if (!String(field.value || "").trim()) {
+              showStepError("{{ t('wizard_step_required') }}");
+              field.focus();
+              return false;
+            }
+          }
+          const password = current.querySelector("input[name='owner_password']");
+          const confirm = current.querySelector("input[name='owner_password_confirm']");
+          if (password && confirm && password.value !== confirm.value) {
+            showStepError("{{ t('wizard_password_mismatch') }}");
+            confirm.focus();
+            return false;
+          }
+          clearStepError();
+          return true;
+        }
+
         back.addEventListener("click", () => {
+          clearStepError();
           if (index > 0) {
             index -= 1;
             render();
           }
         });
         next.addEventListener("click", () => {
+          if (!validateStep()) return;
           if (index < steps.length - 1) {
             index += 1;
             render();

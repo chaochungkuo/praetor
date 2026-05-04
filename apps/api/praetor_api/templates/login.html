@@ -1,20 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="panel hero">
+  <section class="panel hero login-hero">
+    <img class="login-mark" src="{{ url_for('static', path='/praetor-favicon.png') }}?v={{ static_asset_version }}" alt="" aria-hidden="true" />
     <h2>{{ t("owner_login") }}</h2>
-    <p>{{ t("owner_login_desc") }}</p>
+    <p>{{ t("owner_login_subtitle") }}</p>
   </section>
-  <form class="panel form-grid" method="post" action="/app/login">
+  <form class="panel form-grid login-form" method="post" action="/app/login">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <input type="hidden" name="next_path" value="{{ next_path }}" />
     <label class="full">
       <span>{{ t("password") }}</span>
-      <input type="password" name="password" required autofocus />
+      <input type="password" name="password" required autofocus autocomplete="current-password" />
     </label>
-    <div class="full actions">
-      <a class="small-button" href="/app/welcome">{{ t("back_to_welcome") }}</a>
-      <button type="submit">{{ t("login") }}</button>
+    <div class="full actions login-actions">
+      <a class="small-button text-button" href="/app/welcome">{{ t("back_to_welcome") }}</a>
+      <button type="submit" data-loading-label="…">{{ t("login") }}</button>
     </div>
+    {% if not settings_initialized %}
+      <p class="full muted login-hint">
+        <a href="/app/welcome">{{ t("first_time_setup_link") }} →</a>
+      </p>
+    {% endif %}
   </form>
 {% endblock %}

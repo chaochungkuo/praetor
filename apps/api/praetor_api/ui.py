@@ -4,11 +4,15 @@ from datetime import datetime
 from typing import Any
 from pathlib import Path
 from urllib.parse import quote
+import asyncio
+import json
+import threading
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from .config import (
     ANTHROPIC_STATE_SECRET,
@@ -43,6 +47,9 @@ WEB_DIST_DIR = BASE_DIR.parents[1] / "web" / "dist"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(include_in_schema=False)
+
+_css_path = STATIC_DIR / "praetor.css"
+_STATIC_ASSET_VERSION: int = int(_css_path.stat().st_mtime) if _css_path.exists() else 0
 
 UI_COOKIE_NAME = "praetor_ui_lang"
 SUPPORTED_LANGUAGES = {
@@ -296,6 +303,50 @@ TRANSLATIONS = {
         "runtime_watch": "Runtime watch",
         "all_clear": "All clear.",
         "open_mission": "Open mission",
+        "confirm_logout": "Sign out of Praetor?",
+        "confirm_reject": "Reject this approval?",
+        "confirm_stop_mission": "Stop this mission? In-flight work may be lost.",
+        "flash_dismiss": "Dismiss",
+        "view_all": "View all",
+        "more_pending": "more pending",
+        "tasks_empty_cta": "Use the CEO chat to describe your first mission.",
+        "open_ceo_chat": "Open CEO chat",
+        "configure_runtime": "Configure runtime",
+        "filter_all": "All",
+        "filter_search_placeholder": "Filter missions…",
+        "no_results": "No matches.",
+        "search_placeholder": "Search missions, agents, decisions…",
+        "search_hint": "Press Cmd/Ctrl+K to search · ? for shortcuts",
+        "search_open": "Open search",
+        "shortcuts_title": "Keyboard shortcuts",
+        "shortcuts_search": "Open search",
+        "shortcuts_help": "Show this help",
+        "shortcuts_close": "Close overlay",
+        "shortcuts_then": "then",
+        "shortcuts_nav": "Jump to",
+        "shortcuts_nav_praetor": "Praetor home",
+        "shortcuts_nav_inbox": "Inbox",
+        "shortcuts_nav_tasks": "Tasks",
+        "shortcuts_nav_agents": "Agents",
+        "shortcuts_nav_settings": "Settings",
+        "result_mission": "Mission",
+        "result_agent": "Agent",
+        "result_decision": "Decision",
+        "result_meeting": "Meeting",
+        "wizard_step_required": "Please fill the required fields before continuing.",
+        "wizard_password_mismatch": "Passwords do not match.",
+        "toggle_theme": "Toggle light/dark theme",
+        "first_time_setup_link": "First time? Set up Praetor",
+        "owner_login_subtitle": "Sign in to your AI command center.",
+        "mission_run_started": "Mission run started.",
+        "mission_already_running": "This mission is already running.",
+        "live_run_title": "Live run",
+        "live_run_running": "Running…",
+        "live_run_completed": "Run completed",
+        "live_run_failed": "Run failed",
+        "live_run_started_at": "Started",
+        "live_run_elapsed": "elapsed",
+        "live_run_view_progress": "View progress in the live panel below.",
         "review_item": "Review item",
         "agent_directory": "Agent Directory",
         "agent_directory_desc": "The AI organization: who exists, what each agent is working on, who manages whom, and what needs attention.",
@@ -566,6 +617,50 @@ TRANSLATIONS = {
         "no_pending_approvals": "目前沒有待核准事項。",
         "approve": "批准",
         "reject": "拒絕",
+        "confirm_logout": "確定要登出 Praetor 嗎？",
+        "confirm_reject": "確定拒絕這項核准？",
+        "confirm_stop_mission": "確定要停止這個任務？進行中的工作可能會遺失。",
+        "flash_dismiss": "關閉",
+        "view_all": "查看全部",
+        "more_pending": "項待處理",
+        "tasks_empty_cta": "用 CEO 對話描述你的第一個任務。",
+        "open_ceo_chat": "開啟 CEO 對話",
+        "configure_runtime": "設定執行環境",
+        "filter_all": "全部",
+        "filter_search_placeholder": "搜尋任務…",
+        "no_results": "沒有符合的結果。",
+        "search_placeholder": "搜尋任務、agent、決議…",
+        "search_hint": "按 Cmd/Ctrl+K 搜尋 · ? 看快捷鍵",
+        "search_open": "開啟搜尋",
+        "shortcuts_title": "鍵盤快捷鍵",
+        "shortcuts_search": "開啟搜尋",
+        "shortcuts_help": "顯示此說明",
+        "shortcuts_close": "關閉覆蓋層",
+        "shortcuts_then": "接著",
+        "shortcuts_nav": "跳到",
+        "shortcuts_nav_praetor": "Praetor 首頁",
+        "shortcuts_nav_inbox": "收件匣",
+        "shortcuts_nav_tasks": "任務",
+        "shortcuts_nav_agents": "Agent",
+        "shortcuts_nav_settings": "設定",
+        "result_mission": "任務",
+        "result_agent": "Agent",
+        "result_decision": "決議",
+        "result_meeting": "會議",
+        "wizard_step_required": "請先填完此步驟必填欄位。",
+        "wizard_password_mismatch": "兩次密碼不一致。",
+        "toggle_theme": "切換明暗主題",
+        "first_time_setup_link": "第一次使用？開始設定 Praetor",
+        "owner_login_subtitle": "登入你的 AI 控制台。",
+        "mission_run_started": "任務已開始執行。",
+        "mission_already_running": "此任務已在執行中。",
+        "live_run_title": "即時執行",
+        "live_run_running": "執行中…",
+        "live_run_completed": "執行完成",
+        "live_run_failed": "執行失敗",
+        "live_run_started_at": "開始於",
+        "live_run_elapsed": "已用時",
+        "live_run_view_progress": "請在下方面板查看即時進度。",
         "runtime": "執行環境",
         "telegram": "Telegram",
         "telegram_settings": "Telegram CEO 入口",
@@ -1475,7 +1570,9 @@ def _page_title(current_page: str, fallback: str, t) -> str:
 
 def _base_context(request: Request, current_page: str, page_title: str) -> dict:
     service = request.app.state.ctx.service
-    initialized_settings = service.get_settings()
+    if not hasattr(request.state, "ui_settings"):
+        request.state.ui_settings = service.get_settings()
+    initialized_settings = request.state.ui_settings
     ui_language = _ui_language(request, initialized_settings)
     t = _translator(ui_language)
     display_title = _page_title(current_page, page_title, t)
@@ -1518,7 +1615,7 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "session_owner": getattr(request.state, "session_owner", None),
         "csrf_token": csrf_token(request),
         "setup_token": request.query_params.get("setup_token", ""),
-        "static_asset_version": int((STATIC_DIR / "praetor.css").stat().st_mtime),
+        "static_asset_version": _STATIC_ASSET_VERSION,
     }
 
 
@@ -1706,12 +1803,8 @@ def _build_agent_directory(service) -> dict[str, Any]:
     for event in activity:
         activity_by_role.setdefault(event.actor.replace("_", " ").title(), []).append(event)
     work_sessions_by_mission: dict[str, list[Any]] = {}
-    for mission in missions:
-        try:
-            sessions = service.mission_work_sessions(mission.id)
-        except KeyError:
-            sessions = []
-        work_sessions_by_mission[mission.id] = sessions
+    for session in service.all_work_sessions():
+        work_sessions_by_mission.setdefault(session.mission_id, []).append(session)
     delegations_by_agent: dict[str, list[Any]] = {}
     delegations_by_role: dict[str, list[Any]] = {}
     for delegation in organization.delegations:
@@ -1812,7 +1905,9 @@ def _build_agent_directory(service) -> dict[str, Any]:
 
 
 def _require_initialized(request: Request):
-    settings = request.app.state.ctx.service.get_settings()
+    if not hasattr(request.state, "ui_settings"):
+        request.state.ui_settings = request.app.state.ctx.service.get_settings()
+    settings = request.state.ui_settings
     if settings is None:
         return None
     return settings
@@ -1822,7 +1917,7 @@ def _require_initialized(request: Request):
 def set_language(request: Request, language_code: str):
     if language_code not in SUPPORTED_LANGUAGES:
         language_code = "en"
-    next_path = request.query_params.get("next", "/app/welcome")
+    next_path = _safe_redirect_path(request.query_params.get("next"), "/app/welcome")
     response = RedirectResponse(url=next_path, status_code=303)
     response.set_cookie(
         UI_COOKIE_NAME,
@@ -1935,7 +2030,7 @@ async def run_governance_review_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
-    request.app.state.ctx.service.run_governance_review()
+    await run_in_threadpool(request.app.state.ctx.service.run_governance_review)
     return _redirect("/app/inbox", t("governance_review"), "success")
 
 
@@ -1964,12 +2059,13 @@ async def add_skill_source_submit(request: Request):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
     try:
-        source = request.app.state.ctx.service.add_skill_source(
-            url=str(form.get("url", "")).strip(),
-            name=str(form.get("name", "")).strip() or None,
-            branch=str(form.get("branch", "")).strip() or "main",
+        source = await run_in_threadpool(
+            request.app.state.ctx.service.add_skill_source,
+            str(form.get("url", "")).strip(),
+            str(form.get("name", "")).strip() or None,
+            str(form.get("branch", "")).strip() or "main",
         )
-        request.app.state.ctx.service.import_skill_source(source.id)
+        await run_in_threadpool(request.app.state.ctx.service.import_skill_source, source.id)
     except Exception as exc:
         return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect("/app/agents", t("skill_source_added"), "success")
@@ -1984,7 +2080,7 @@ async def import_skill_source_submit(request: Request, source_id: str):
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
     try:
-        request.app.state.ctx.service.import_skill_source(source_id)
+        await run_in_threadpool(request.app.state.ctx.service.import_skill_source, source_id)
     except Exception as exc:
         return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect("/app/agents", t("skill_source_added"), "success")
@@ -2019,14 +2115,75 @@ def tasks_page(request: Request):
         return _redirect("/app/praetor", "Complete onboarding first.", "error")
     service = request.app.state.ctx.service
     missions = service.list_missions()
+    status_filter = request.query_params.get("status", "").strip()
+    query = request.query_params.get("q", "").strip().lower()
+    status_counts: dict[str, int] = {}
+    for mission in missions:
+        status_counts[mission.status] = status_counts.get(mission.status, 0) + 1
+    filtered = list(missions)
+    if status_filter:
+        filtered = [m for m in filtered if m.status == status_filter]
+    if query:
+        filtered = [
+            m for m in filtered
+            if query in (m.title or "").lower()
+            or (m.summary and query in m.summary.lower())
+        ]
     return templates.TemplateResponse(
         request=request,
         name="tasks.html",
         context={
             **_base_context(request, "tasks", "Tasks"),
-            "missions": missions,
+            "missions": filtered,
+            "all_missions_count": len(missions),
+            "status_counts": status_counts,
+            "active_status": status_filter,
+            "active_query": request.query_params.get("q", ""),
         },
     )
+
+
+@router.get("/app/search.json")
+def search_json(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return JSONResponse({"results": []})
+    query = request.query_params.get("q", "").strip().lower()
+    if len(query) < 2:
+        return JSONResponse({"results": []})
+    service = request.app.state.ctx.service
+    results: list[dict] = []
+    try:
+        for mission in service.list_missions():
+            if len(results) >= 8:
+                break
+            haystack = f"{mission.title or ''} {mission.summary or ''}".lower()
+            if query in haystack:
+                results.append({
+                    "type": "mission",
+                    "title": mission.title or mission.id,
+                    "subtitle": (mission.summary or "")[:120],
+                    "url": f"/app/missions/{mission.id}",
+                })
+    except Exception:
+        pass
+    try:
+        organization = service.organization_snapshot()
+        for agent in (organization.agents or [])[:60]:
+            if len(results) >= 16:
+                break
+            name = getattr(agent, "name", "") or getattr(agent, "role_name", "")
+            role = getattr(agent, "role_name", "")
+            if query in str(name).lower() or query in str(role).lower():
+                results.append({
+                    "type": "agent",
+                    "title": str(name) or str(role),
+                    "subtitle": str(role),
+                    "url": "/app/agents",
+                })
+    except Exception:
+        pass
+    return JSONResponse({"results": results[:20]})
 
 
 @router.get("/app/activity", response_class=HTMLResponse)
@@ -2066,7 +2223,7 @@ def settings_page(request: Request):
                 "bot_token": bool(get_telegram_bot_token()),
                 "webhook_secret": bool(get_telegram_webhook_secret()),
             },
-            "telegram_pairing_code": request.query_params.get("telegram_pairing_code", ""),
+            "telegram_pairing_code": request.session.pop("telegram_pairing_code", ""),
             "telegram_webhook_url": str(request.url_for("telegram_webhook")),
         },
     )
@@ -2089,7 +2246,7 @@ async def update_runtime_submit(request: Request):
         base_url=str(form.get("runtime_base_url", "")).strip() or None,
     )
     try:
-        request.app.state.ctx.service.update_runtime(runtime)
+        await run_in_threadpool(request.app.state.ctx.service.update_runtime, runtime)
         if provider is not None:
             _save_provider_api_key(provider, str(form.get("api_key", "")))
     except Exception as exc:
@@ -2116,7 +2273,7 @@ async def test_runtime_submit(request: Request):
     )
     next_path = _safe_redirect_path(str(form.get("next_path", "/app/models")), "/app/models")
     try:
-        request.app.state.ctx.service.test_runtime_connection(runtime, str(form.get("api_key", "")))
+        await run_in_threadpool(request.app.state.ctx.service.test_runtime_connection, runtime, str(form.get("api_key", "")))
     except Exception as exc:
         return _redirect(next_path, f"{t('api_connection_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect(next_path, t("api_connection_ok"), "success")
@@ -2141,7 +2298,8 @@ async def update_telegram_submit(request: Request):
         allowed_user_id = int(allowed_raw) if allowed_raw else None
     except ValueError:
         return _redirect("/app/settings", "Telegram user ID must be a number.", "error")
-    request.app.state.ctx.service.update_telegram_settings(
+    await run_in_threadpool(
+        request.app.state.ctx.service.update_telegram_settings,
         settings.telegram.model_copy(
             update={
                 "enabled": bool(form.get("telegram_enabled")),
@@ -2151,7 +2309,7 @@ async def update_telegram_submit(request: Request):
                 "notify_approvals": bool(form.get("telegram_notify_approvals")),
                 "allow_low_risk_approval": bool(form.get("telegram_allow_low_risk_approval")),
             }
-        )
+        ),
     )
     return _redirect("/app/settings", t("telegram_settings_saved"), "success")
 
@@ -2164,8 +2322,9 @@ async def create_telegram_pairing_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
-    code = request.app.state.ctx.service.create_telegram_pairing_code()
-    return _redirect(f"/app/settings?telegram_pairing_code={quote(code)}", t("telegram_pairing_created"), "success")
+    code = await run_in_threadpool(request.app.state.ctx.service.create_telegram_pairing_code)
+    request.session["telegram_pairing_code"] = code
+    return _redirect("/app/settings", t("telegram_pairing_created"), "success")
 
 
 @router.post("/app/ceo/conversation")
@@ -2180,7 +2339,7 @@ async def create_ceo_conversation_submit(request: Request):
     if not body:
         return _redirect("/app/praetor", t("message_to_ceo_placeholder"), "error")
     try:
-        request.app.state.ctx.service.create_ceo_message(ConversationCreateRequest(body=body))
+        await run_in_threadpool(request.app.state.ctx.service.create_ceo_message, ConversationCreateRequest(body=body))
     except Exception as exc:
         return _redirect("/app/praetor", _friendly_runtime_error(exc, t), "error")
     return _redirect("/app/praetor?focus=ceo-chat", t("ceo_message_sent"), "success")
@@ -2347,7 +2506,7 @@ async def onboarding_submit(request: Request):
     if answers.owner_password != password_confirm:
         return _redirect("/app/praetor", "Password confirmation does not match.", "error")
     try:
-        settings = request.app.state.ctx.service.complete_onboarding(answers)
+        settings = await run_in_threadpool(request.app.state.ctx.service.complete_onboarding, answers)
         provider = answers.runtime.get("provider") if isinstance(answers.runtime, dict) else answers.runtime.provider
         if provider:
             _save_provider_api_key(str(provider), str(form.get("api_key", "")))
@@ -2364,11 +2523,11 @@ async def login_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     password = str(form.get("password", "")).strip()
-    next_path = str(form.get("next_path", "/app/praetor")).strip() or "/app/praetor"
+    next_path = _safe_redirect_path(str(form.get("next_path", "")).strip(), "/app/praetor")
     rate_key = request.client.host if request.client else "unknown"
     login_rate_limiter.check(rate_key)
     try:
-        settings = request.app.state.ctx.service.authenticate_owner(LoginRequest(password=password))
+        settings = await run_in_threadpool(request.app.state.ctx.service.authenticate_owner, LoginRequest(password=password))
     except Exception as exc:
         login_rate_limiter.record_failure(rate_key)
         return _redirect("/app/login", str(exc), "error")
@@ -2400,37 +2559,85 @@ async def create_mission_submit(request: Request):
         return _redirect("/app/praetor", "Mission title is required.", "error")
     requested_outputs_raw = str(form.get("requested_outputs", "")).strip()
     requested_outputs = [line.strip() for line in requested_outputs_raw.splitlines() if line.strip()]
-    mission = request.app.state.ctx.service.create_mission(
+    mission = await run_in_threadpool(
+        request.app.state.ctx.service.create_mission,
         MissionCreateRequest(
             title=title,
             summary=str(form.get("summary", "")).strip() or None,
             domains=[str(form.get("domain", "operations"))],
             priority=str(form.get("priority", "normal")),
             requested_outputs=requested_outputs,
-        )
+        ),
     )
     return _redirect(f"/app/missions/{mission.id}", "Mission created.", "success")
 
 
 @router.post("/app/missions/{mission_id}/run")
 async def run_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
-    try:
-        request.app.state.ctx.service.run_mission(mission_id)
-    except Exception as exc:
-        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
-    return _redirect(f"/app/missions/{mission_id}", t("mission_run_completed"), "success")
+    t = _translator(_ui_language(request, settings))
+    ctx = request.app.state.ctx
+    registry = ctx.run_registry
+    if registry.is_running(mission_id):
+        return _redirect(f"/app/missions/{mission_id}", t("mission_already_running"), "error")
+    run_id = f"run_{int(datetime.utcnow().timestamp() * 1000)}_{mission_id[:8]}"
+    registry.start(mission_id, run_id)
+
+    def _execute() -> None:
+        try:
+            ctx.service.run_mission(mission_id)
+            registry.finish(mission_id, "completed")
+        except Exception as exc:
+            registry.finish(mission_id, "failed", message=_friendly_runtime_error(exc, t))
+
+    threading.Thread(target=_execute, daemon=True, name=f"mission-run-{mission_id}").start()
+    return _redirect(f"/app/missions/{mission_id}", t("mission_run_started"), "success")
+
+
+@router.get("/app/missions/{mission_id}/events")
+async def mission_events_sse(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return JSONResponse({"error": "not_initialized"}, status_code=403)
+    registry = request.app.state.ctx.run_registry
+
+    async def stream():
+        try:
+            async for event in registry.subscribe(mission_id):
+                if await request.is_disconnected():
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") == "finished":
+                    break
+        except asyncio.CancelledError:
+            return
+        yield "event: close\ndata: {}\n\n"
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/app/missions/{mission_id}/pause")
 async def pause_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
-        request.app.state.ctx.service.pause_mission(mission_id, MissionPauseRequest())
+        await run_in_threadpool(request.app.state.ctx.service.pause_mission, mission_id, MissionPauseRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_paused"), "success")
@@ -2438,11 +2645,14 @@ async def pause_mission_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/continue")
 async def continue_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
-        request.app.state.ctx.service.continue_mission(mission_id, MissionContinueRequest())
+        await run_in_threadpool(request.app.state.ctx.service.continue_mission, mission_id, MissionContinueRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_resumed"), "success")
@@ -2450,11 +2660,14 @@ async def continue_mission_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/stop")
 async def stop_mission_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
-    t = _translator(_ui_language(request, request.app.state.ctx.service.get_settings()))
+    t = _translator(_ui_language(request, settings))
     try:
-        request.app.state.ctx.service.stop_mission(mission_id, MissionStopRequest())
+        await run_in_threadpool(request.app.state.ctx.service.stop_mission, mission_id, MissionStopRequest())
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_stopped"), "success")
@@ -2465,7 +2678,7 @@ async def create_meeting_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        meeting = request.app.state.ctx.service.create_review_meeting(mission_id)
+        meeting = await run_in_threadpool(request.app.state.ctx.service.create_review_meeting, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect("/app/meetings", f"Meeting created: {meeting.id}", "success")
@@ -2476,7 +2689,7 @@ async def create_memory_promotion_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        review = request.app.state.ctx.service.create_memory_promotion_review(mission_id)
+        review = await run_in_threadpool(request.app.state.ctx.service.create_memory_promotion_review, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Memory promotion review created: {review.id}", "success")
@@ -2487,7 +2700,7 @@ async def create_workspace_restructure_plan_submit(request: Request, mission_id:
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        plan = request.app.state.ctx.service.create_workspace_restructure_plan(mission_id=mission_id)
+        plan = await run_in_threadpool(lambda: request.app.state.ctx.service.create_workspace_restructure_plan(mission_id=mission_id))
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Workspace restructure plan created: {plan.id}", "success")
@@ -2498,7 +2711,7 @@ async def reconcile_workspace_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        report = request.app.state.ctx.service.reconcile_workspace(mission_id=mission_id)
+        report = await run_in_threadpool(lambda: request.app.state.ctx.service.reconcile_workspace(mission_id=mission_id))
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     issues = (
@@ -2516,7 +2729,7 @@ async def create_board_briefing_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        briefing = request.app.state.ctx.service.create_board_briefing(mission_id)
+        briefing = await run_in_threadpool(request.app.state.ctx.service.create_board_briefing, mission_id)
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
     return _redirect(f"/app/missions/{mission_id}", f"Board briefing ready: {briefing.id}", "success")
@@ -2527,12 +2740,13 @@ async def create_approval_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        request.app.state.ctx.service.create_approval(
+        await run_in_threadpool(
+            request.app.state.ctx.service.create_approval,
             ApprovalCreateRequest(
                 mission_id=mission_id,
                 category=str(form.get("category", "change_strategy")),
                 reason=str(form.get("reason", "Manual checkpoint requested by owner.")),
-            )
+            ),
         )
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", str(exc), "error")
@@ -2544,7 +2758,7 @@ async def resolve_approval_submit(request: Request, approval_id: str, status: st
     form = await request.form()
     _validate_form_csrf(request, form)
     try:
-        request.app.state.ctx.service.resolve_approval(approval_id, status)
+        await run_in_threadpool(request.app.state.ctx.service.resolve_approval, approval_id, status)
     except Exception as exc:
         return _redirect("/app/overview", str(exc), "error")
     return _redirect("/app/overview", f"Approval {status}.", "success")

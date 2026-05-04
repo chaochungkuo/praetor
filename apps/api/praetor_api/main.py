@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+import asyncio
+
 from . import __version__
 from .config import (
     get_require_login,
@@ -29,6 +31,7 @@ from .models import (
     MissionStopRequest,
     OnboardingAnswers,
 )
+from .run_registry import RunRegistry
 from .service import PraetorService
 from .security import csrf_token, login_rate_limiter, require_csrf, require_setup_token, validate_runtime_security
 from .storage import AppStorage
@@ -41,12 +44,15 @@ class AppState:
         self.state_dir = state_dir
         self.storage = AppStorage(state_dir)
         self.service = PraetorService(self.storage)
+        self.run_registry = RunRegistry()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_security()
-    app.state.ctx = AppState()
+    state = AppState()
+    state.run_registry.bind_loop(asyncio.get_running_loop())
+    app.state.ctx = state
     yield
 
 
