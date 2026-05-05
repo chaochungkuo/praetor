@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import re
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from .models import AgentSkillSpec, SkillSource, utc_now
@@ -27,7 +28,7 @@ class SkillsMixin:
 
         source.name = source_name
 
-        source.branch = branch or source.branch or "main"
+        source.branch = self._validate_branch(branch or source.branch or "main")
 
         source.status = "enabled"
 
@@ -53,7 +54,7 @@ class SkillsMixin:
 
         owner, repo = self._parse_github_repo_url(source.url)
 
-        branch = source.branch or "main"
+        branch = self._validate_branch(source.branch or "main")
 
         tree = self._fetch_github_tree(owner, repo, branch)
 
@@ -83,7 +84,7 @@ class SkillsMixin:
 
             text = self._fetch_text(
 
-                f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}",
+                self._raw_github_url(owner, repo, branch, path),
 
                 timeout=12,
 
@@ -147,9 +148,61 @@ class SkillsMixin:
 
 
 
+    def _validate_branch(self, branch: str) -> str:
+
+        normalized = branch.strip()
+
+        if not normalized:
+
+            return "main"
+
+        if len(normalized) > 120:
+
+            raise ValueError("GitHub branch name is too long.")
+
+        if normalized.startswith(("-", ".", "/")) or normalized.endswith((".", "/")):
+
+            raise ValueError("GitHub branch name is not supported.")
+
+        if ".." in normalized or "@{" in normalized or "\\" in normalized:
+
+            raise ValueError("GitHub branch name is not supported.")
+
+        if not re.fullmatch(r"[A-Za-z0-9._/-]+", normalized):
+
+            raise ValueError("GitHub branch name contains unsupported characters.")
+
+        return normalized
+
+
+
+
+
+    def _raw_github_url(self, owner: str, repo: str, branch: str, path: str) -> str:
+
+        safe_path = "/".join(quote(part, safe="") for part in path.split("/") if part)
+
+        return (
+
+            "https://raw.githubusercontent.com/"
+
+            f"{quote(owner, safe='')}/{quote(repo, safe='')}/{quote(branch, safe='')}/{safe_path}"
+
+        )
+
+
+
+
+
     def _fetch_github_tree(self, owner: str, repo: str, branch: str) -> list[dict[str, Any]] | None:
 
-        url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
+        url = (
+
+            "https://api.github.com/repos/"
+
+            f"{quote(owner, safe='')}/{quote(repo, safe='')}/git/trees/{quote(branch, safe='')}?recursive=1"
+
+        )
 
         try:
 
@@ -406,7 +459,6 @@ class SkillsMixin:
                 risks.append(risk)
 
         return risks
-
 
 
 

@@ -67,6 +67,7 @@ def onboarding_payload() -> dict:
 def main() -> int:
     global CSRF_TOKEN
     from praetor_api.security import validate_runtime_security
+    from praetor_api.service_skills import SkillsMixin
     from praetor_api.storage import FilesystemStore
 
     old_env = {key: os.environ.get(key) for key in ["PRAETOR_ENV", "PRAETOR_SESSION_SECRET", "PRAETOR_SETUP_TOKEN"]}
@@ -94,6 +95,17 @@ def main() -> int:
         raise AssertionError("unsafe mission_id was accepted")
     except ValueError:
         pass
+
+    skill_importer = SkillsMixin()
+    for branch in ["../main", "-main", "main@{1}", "main\\evil"]:
+        try:
+            skill_importer._validate_branch(branch)
+            raise AssertionError(f"unsafe branch was accepted: {branch}")
+        except ValueError:
+            pass
+    safe_raw_url = skill_importer._raw_github_url("owner", "repo", "feature/test", "skills/a b.md")
+    if "feature%2Ftest" not in safe_raw_url or "a%20b.md" not in safe_raw_url:
+        raise AssertionError("raw GitHub URL was not escaped safely")
 
     if STATE_DIR.exists():
         subprocess.run(["rm", "-rf", str(STATE_DIR)], check=True)
