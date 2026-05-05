@@ -441,7 +441,7 @@
           </div>
         {% endif %}
       </div>
-      <form class="ceo-chat-form chat-composer" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}" data-voice-listening="{{ t('voice_listening') }}" data-voice-start="{{ t('voice_start') }}" data-voice-stop="{{ t('voice_stop') }}" data-voice-unavailable="{{ t('voice_unavailable') }}">
+      <form class="ceo-chat-form chat-composer" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}" data-voice-listening="{{ t('voice_listening') }}" data-voice-start="{{ t('voice_start') }}" data-voice-stop="{{ t('voice_stop') }}" data-voice-unavailable="{{ t('voice_unavailable') }}" data-voice-error="{{ t('voice_error') }}" data-voice-permission="{{ t('voice_permission') }}" data-voice-no-speech="{{ t('voice_no_speech') }}" data-voice-no-microphone="{{ t('voice_no_microphone') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="composer-box">
           <textarea name="body" rows="1" placeholder="{{ t('message_to_ceo_placeholder') }}" aria-label="{{ t('message_to_ceo') }}" required autofocus></textarea>
@@ -545,40 +545,76 @@
             voiceButton.disabled = true;
             voiceButton.title = form.dataset.voiceUnavailable || "";
           }
+          if (voiceStatus) {
+            voiceStatus.textContent = form.dataset.voiceUnavailable || "";
+            voiceStatus.classList.add("error");
+          }
           return;
         }
         const recognition = new SpeechRecognition();
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = "{{ 'zh-TW' if ui_language == 'zh-TW' else 'en-US' }}";
         let baseText = "";
         let listening = false;
+        let lastVoiceError = "";
+
+        const setVoiceStatus = (message, state = "") => {
+          if (!voiceStatus) return;
+          voiceStatus.textContent = message || "";
+          voiceStatus.classList.toggle("error", state === "error");
+        };
 
         const setListening = (value) => {
           listening = value;
           voiceButton.classList.toggle("recording", value);
           voiceButton.setAttribute("aria-label", value ? (form.dataset.voiceStop || "") : (form.dataset.voiceStart || ""));
-          if (voiceStatus) voiceStatus.textContent = value ? (form.dataset.voiceListening || "") : "";
+          setVoiceStatus(value ? (form.dataset.voiceListening || "") : lastVoiceError, !value && lastVoiceError ? "error" : "");
         };
 
-        voiceButton.addEventListener("click", () => {
+        voiceButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           if (listening) {
             recognition.stop();
             return;
           }
           baseText = textarea.value.trim();
-          recognition.start();
+          lastVoiceError = "";
+          try {
+            recognition.start();
+          } catch (_error) {
+            lastVoiceError = form.dataset.voiceError || "";
+            setListening(false);
+            setVoiceStatus(lastVoiceError, "error");
+          }
         });
 
         recognition.addEventListener("start", () => setListening(true));
         recognition.addEventListener("end", () => setListening(false));
+        recognition.addEventListener("error", (event) => {
+          let message = form.dataset.voiceError || "";
+          if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+            message = form.dataset.voicePermission || message;
+          } else if (event.error === "no-speech") {
+            message = form.dataset.voiceNoSpeech || message;
+          } else if (event.error === "audio-capture") {
+            message = form.dataset.voiceNoMicrophone || message;
+          }
+          lastVoiceError = message;
+          setVoiceStatus(message, "error");
+        });
         recognition.addEventListener("result", (event) => {
           let transcript = "";
           for (let i = event.resultIndex; i < event.results.length; i += 1) {
             transcript += event.results[i][0].transcript;
           }
-          textarea.value = [baseText, transcript.trim()].filter(Boolean).join(baseText ? " " : "");
+          const cleanTranscript = transcript.trim();
+          if (!cleanTranscript) return;
+          lastVoiceError = "";
+          textarea.value = [baseText, cleanTranscript].filter(Boolean).join(baseText ? " " : "");
           resizeComposer();
+          textarea.focus();
         });
 
         resizeComposer();

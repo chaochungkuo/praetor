@@ -2234,6 +2234,10 @@ button.secondary,
 }
 
 .voice-status {
+  color: #7c6d5d;
+}
+
+.voice-status.error {
   color: #8f3f25;
 }
 
