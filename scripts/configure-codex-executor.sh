@@ -75,6 +75,7 @@ need_command docker
 need_command pixi
 need_command codex
 need_command curl
+need_command python3
 
 if ! codex login status 2>&1 | grep -qi "Logged in"; then
   fail "Codex is not logged in. Run 'codex login' first and choose Sign in with ChatGPT."
@@ -82,6 +83,8 @@ fi
 
 WORKSPACE_DIR="$(env_value PRAETOR_WORKSPACE_DIR)"
 [ -n "$WORKSPACE_DIR" ] || WORKSPACE_DIR="$HOME/praetor-workspace"
+DATA_DIR="$(env_value PRAETOR_DATA_DIR)"
+[ -n "$DATA_DIR" ] || DATA_DIR="$PRAETOR_HOME/data"
 CODEX_COMMAND="$(command -v codex)"
 BRIDGE_TOKEN="$(env_value PRAETOR_BRIDGE_TOKEN)"
 [ -n "$BRIDGE_TOKEN" ] || BRIDGE_TOKEN="$(random_secret)"
@@ -91,6 +94,35 @@ chmod 700 "$WORKSPACE_DIR" 2>/dev/null || true
 
 upsert_env PRAETOR_BRIDGE_BASE_URL "$BRIDGE_URL"
 upsert_env PRAETOR_BRIDGE_TOKEN "$BRIDGE_TOKEN"
+upsert_env PRAETOR_HOST_WORKSPACE_ROOT "$WORKSPACE_DIR"
+
+SETTINGS_FILE="$DATA_DIR/state/settings.json"
+if [ -f "$SETTINGS_FILE" ]; then
+  python3 - "$SETTINGS_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+settings = json.loads(path.read_text(encoding="utf-8"))
+workspace = settings.setdefault("workspace", {})
+workspace["root"] = "/app/workspace"
+workspace["permissions"] = {
+    "allow_read": ["/app/workspace"],
+    "allow_write": [
+        "/app/workspace/Projects",
+        "/app/workspace/Wiki",
+        "/app/workspace/Decisions",
+        "/app/workspace/Missions",
+    ],
+    "deny_write": [
+        "/app/workspace/Archive",
+        "/app/workspace/Finance/Locked",
+    ],
+}
+path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PY
+fi
 
 cat > "$BRIDGE_CONFIG" <<EOF
 server:

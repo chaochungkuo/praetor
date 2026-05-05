@@ -55,6 +55,7 @@ from .models import (
     OpenQuestionRecord,
     OwnerAuthRecord,
     PlannerAction,
+    PlannerPlan,
     PraetorBriefing,
     PromotionFinding,
     ReviewPolicy,
@@ -76,8 +77,8 @@ from .models import (
     WorkSessionTurn,
     utc_now,
 )
-from .planner import CEOPlanner, CEOPlannerContext, default_ceo_planner
-from .providers import test_provider_connection
+from .planner import CEOPlanner, CEOPlannerContext, LLMCEOPlanner, default_ceo_planner
+from .providers import parse_generation_payload, test_provider_connection
 from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
@@ -1670,21 +1671,13 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         text = request.body.strip()
         if not text:
             raise ValueError("Message body is required.")
-        planner = self.planner or default_ceo_planner(settings.runtime)
         safety_policy = build_prompt_safety_policy(
             settings=settings,
             standing_orders=self.storage.list_standing_orders(),
             role_name="CEO",
         ).text
-        plan = planner.plan(
-            CEOPlannerContext(
-                instruction=text,
-                related_mission_id=request.related_mission_id,
-                mission_count=len(self.storage.list_missions(Path(settings.workspace.root))),
-                pending_approvals=len([item for item in self.storage.list_approvals() if item.status == "pending"]),
-                safety_policy=safety_policy,
-            )
-        )
+        planner_context = self._ceo_planner_context(request, text, safety_policy)
+        plan = self._plan_ceo_response(settings, planner_context)
         created_mission: MissionDefinition | None = None
         created_approval: ApprovalRequest | None = None
         agent_messages: list[AgentMessage] = []
@@ -1737,6 +1730,83 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             actions=actions,
             intent=plan.intent,
         )
+
+    def _ceo_planner_context(self, request: ConversationCreateRequest, text: str, safety_policy: str) -> CEOPlannerContext:
+        settings = self._require_settings()
+        workspace_root = Path(settings.workspace.root)
+        missions = self.storage.list_missions(workspace_root)
+        approvals = self.storage.list_approvals()
+        recent_conversation = self.storage.list_conversation_messages(limit=10)
+        wiki_pages = self.storage.list_wiki_pages(workspace_root)
+        knowledge = self.knowledge_snapshot()
+        company_context = "\n".join(
+            [
+                f"Owner/chairman: {settings.owner.name}",
+                f"Preferred language: {settings.owner.preferred_language}",
+                f"Leadership style: {settings.company_dna.leadership_style}",
+                f"Decision style: {settings.company_dna.decision_style}",
+                f"Organization style: {settings.company_dna.organization_style}",
+                f"Autonomy mode: {settings.governance.autonomy_mode}",
+                f"Runtime mode: {settings.runtime.mode}",
+                f"Runtime executor/provider: {settings.runtime.executor or settings.runtime.provider or 'none'}",
+            ]
+        )
+        standing_orders = "\n".join(
+            f"- {item.scope}/{item.effect}: {item.instruction}" for item in self.storage.list_standing_orders()[:12]
+        )
+        active_missions = "\n".join(
+            f"- {mission.id}: {mission.title} [{mission.status}] {mission.summary or ''}"
+            for mission in missions[:10]
+        )
+        wiki_context = "\n\n".join(
+            f"## {page['name']}\n{page.get('preview', '')}"
+            for page in wiki_pages[:8]
+        )
+        knowledge_context = "\n".join(
+            [
+                f"Clients: {len(knowledge.clients)}",
+                f"Matters: {len(knowledge.matters)}",
+                f"Documents: {len(knowledge.documents)}",
+                f"Decisions: {len(knowledge.decisions)}",
+                f"Open questions: {len(knowledge.open_questions)}",
+                f"Knowledge updates: {len(knowledge.knowledge_updates)}",
+            ]
+        )
+        conversation_context = "\n".join(
+            f"- {message.role}: {message.body[:500]}"
+            for message in recent_conversation[-10:]
+        )
+        return CEOPlannerContext(
+            instruction=text,
+            related_mission_id=request.related_mission_id,
+            mission_count=len(missions),
+            pending_approvals=len([item for item in approvals if item.status == "pending"]),
+            safety_policy=safety_policy,
+            company_context=company_context,
+            wiki_context=wiki_context,
+            knowledge_context=knowledge_context,
+            recent_conversation=conversation_context,
+            standing_orders=standing_orders,
+            active_missions=active_missions,
+        )
+
+    def _plan_ceo_response(self, settings: AppSettings, context: CEOPlannerContext) -> PlannerPlan:
+        if self.planner is not None:
+            return self.planner.plan(context)
+        if settings.runtime.mode == "subscription_executor":
+            return self._plan_ceo_response_with_executor(settings, context)
+        return default_ceo_planner(settings.runtime).plan(context)
+
+    def _plan_ceo_response_with_executor(self, settings: AppSettings, context: CEOPlannerContext) -> PlannerPlan:
+        output = MissionRuntime().run_executor_prompt(
+            workspace_root=Path(settings.workspace.root),
+            runtime=settings.runtime,
+            title="CEO conversation planning",
+            instructions=LLMCEOPlanner._build_prompt(context),
+            timeout_seconds=240,
+        )
+        raw = parse_generation_payload(output)
+        return LLMCEOPlanner._sanitize_plan(PlannerPlan.model_validate(raw))
 
     def list_ceo_messages(self, limit: int = 50) -> list[ConversationMessage]:
         self._require_settings()

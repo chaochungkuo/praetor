@@ -8,6 +8,7 @@ DEFAULT_STATE_DIR_ENV = "PRAETOR_STATE_DIR"
 DEFAULT_APP_ROOT = Path("/tmp/praetor-app-state")
 BRIDGE_BASE_URL_ENV = "PRAETOR_BRIDGE_BASE_URL"
 BRIDGE_TOKEN_ENV = "PRAETOR_BRIDGE_TOKEN"
+HOST_WORKSPACE_ROOT_ENV = "PRAETOR_HOST_WORKSPACE_ROOT"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY"
 OPENAI_BASE_URL_ENV = "PRAETOR_OPENAI_BASE_URL"
@@ -83,6 +84,10 @@ def get_bridge_base_url() -> str | None:
 
 def get_bridge_token() -> str | None:
     return _get_env_or_file(BRIDGE_TOKEN_ENV)
+
+
+def get_host_workspace_root() -> str | None:
+    return os.getenv(HOST_WORKSPACE_ROOT_ENV)
 
 
 def get_openai_api_key() -> str | None:

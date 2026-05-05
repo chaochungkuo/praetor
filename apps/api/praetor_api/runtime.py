@@ -10,6 +10,7 @@ from .config import (
     get_anthropic_api_key,
     get_bridge_base_url,
     get_bridge_token,
+    get_host_workspace_root,
     get_openai_api_key,
 )
 from .models import MissionDefinition, RunRecord, RuntimeSelection, TaskDefinition, WorkspacePermissions, generate_id
@@ -120,6 +121,61 @@ class MissionRuntime:
             )
         raise RuntimeError(f"Unsupported runtime mode: {runtime.mode}")
 
+    def run_executor_prompt(
+        self,
+        *,
+        workspace_root: Path,
+        runtime: RuntimeSelection,
+        title: str,
+        instructions: str,
+        timeout_seconds: int = 180,
+    ) -> str:
+        if runtime.mode != "subscription_executor":
+            raise RuntimeError("Executor prompt requires subscription executor mode.")
+        if not (self.base_url and self.token):
+            raise RuntimeError("Bridge runtime is not configured.")
+
+        target_workdir = workspace_root / ".praetor" / "ceo-runtime"
+        target_workdir.mkdir(parents=True, exist_ok=True)
+        client = BridgeClient(base_url=self.base_url or "", token=self.token or "")
+        run_id = generate_id("ceo_run")
+        task_id = generate_id("task")
+        payload = {
+            "request_id": generate_id("req"),
+            "mission_id": "ceo_conversation",
+            "task_id": task_id,
+            "executor": runtime.executor or "codex",
+            "timeout_seconds": timeout_seconds,
+            "path_mapping": {
+                "container_workspace_root": "/app/workspace",
+                "host_workspace_root": self._host_workspace_root(workspace_root),
+                "target_workdir": self._container_target_workdir(target_workdir, workspace_root),
+            },
+            "task_spec": {
+                "title": title,
+                "instructions": instructions,
+                "input_files": [],
+                "expected_outputs": [],
+                "approval_policy": {
+                    "allow_destructive_write": False,
+                    "allow_shell": False,
+                },
+            },
+        }
+        created = client.create_run(payload)
+        final_run = client.wait_for_terminal(
+            created.get("run_id") or run_id,
+            poll_interval_seconds=1.0,
+            timeout_seconds=timeout_seconds,
+        )
+        normalized = final_run.get("normalized_status") or final_run.get("status")
+        if normalized != "completed":
+            raise RuntimeError(final_run.get("pause_reason") or f"Executor ended with status: {normalized}")
+        output = final_run.get("stdout_tail") or ""
+        if not output.strip():
+            raise RuntimeError("Executor returned no CEO response.")
+        return output
+
     def _run_subscription_executor(
         self,
         *,
@@ -152,7 +208,7 @@ class MissionRuntime:
             "timeout_seconds": mission.run_budget.max_time_minutes * 60,
             "path_mapping": {
                 "container_workspace_root": "/app/workspace",
-                "host_workspace_root": str(workspace_root),
+                "host_workspace_root": self._host_workspace_root(workspace_root),
                 "target_workdir": self._container_target_workdir(target_workdir, workspace_root),
             },
             "task_spec": {
@@ -250,6 +306,10 @@ class MissionRuntime:
         result.run_record.task_id = task.id
         task.status = "done" if result.run_record.normalized_status == "completed" else "failed"
         return MissionRuntimeResult(task=task, run_record=result.run_record)
+
+    @staticmethod
+    def _host_workspace_root(workspace_root: Path) -> str:
+        return get_host_workspace_root() or str(workspace_root)
 
     @staticmethod
     def _target_workdir(mission: MissionDefinition, workspace_root: Path) -> Path:

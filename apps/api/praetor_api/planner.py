@@ -22,6 +22,12 @@ class CEOPlannerContext:
     mission_count: int
     pending_approvals: int
     safety_policy: str = ""
+    company_context: str = ""
+    wiki_context: str = ""
+    knowledge_context: str = ""
+    recent_conversation: str = ""
+    standing_orders: str = ""
+    active_missions: str = ""
 
 
 class CEOPlanner(Protocol):
@@ -416,7 +422,31 @@ class LLMCEOPlanner:
                 f"Pending approvals: {context.pending_approvals}",
                 f"Related mission id: {context.related_mission_id or 'none'}",
                 "",
+                "Company context:",
+                context.company_context or "No company context supplied.",
+                "",
+                "Standing orders:",
+                context.standing_orders or "No standing orders supplied.",
+                "",
+                "Active or recent missions:",
+                context.active_missions or "No mission context supplied.",
+                "",
+                "Durable company wiki memory:",
+                context.wiki_context or "No wiki context available.",
+                "",
+                "Structured knowledge records:",
+                context.knowledge_context or "No structured knowledge records supplied.",
+                "",
+                "Recent chairman/CEO conversation:",
+                context.recent_conversation or "No recent conversation supplied.",
+                "",
                 context.safety_policy or "No additional safety policy supplied.",
+                "",
+                "CEO response rules:",
+                "- Speak naturally as the CEO to the chairman, not as a template or parser.",
+                "- If the chairman is casually checking in, answer like an executive: explain what you can do, what is currently configured, and propose a concrete next move.",
+                "- Do not mention internal action type names unless the chairman asks for implementation details.",
+                "- Keep the response concise but useful.",
                 "",
                 "Chairman instruction:",
                 context.instruction,
