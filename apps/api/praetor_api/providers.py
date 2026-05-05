@@ -123,6 +123,39 @@ def _openai_chat_completion(
     )
 
 
+def openai_audio_transcription(
+    audio: bytes,
+    *,
+    filename: str = "praetor-voice.webm",
+    content_type: str = "audio/webm",
+    model: str = "gpt-4o-mini-transcribe",
+    language: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> str:
+    api_key = api_key or get_openai_api_key()
+    if not api_key:
+        raise ApiProviderError("OPENAI_API_KEY is not configured.")
+    if not audio:
+        raise ApiProviderError("No audio was provided.")
+    data: dict[str, str] = {"model": model}
+    if language:
+        data["language"] = language
+    with httpx.Client(timeout=90.0) as client:
+        response = client.post(
+            f"{(base_url or get_openai_base_url()).rstrip('/')}/audio/transcriptions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            data=data,
+            files={"file": (filename, audio, content_type)},
+        )
+    response.raise_for_status()
+    payload = response.json()
+    text = str(payload.get("text", "")).strip()
+    if not text:
+        raise ApiProviderError("OpenAI returned an empty transcription.")
+    return text
+
+
 def _anthropic_messages(
     model: str,
     prompt: str,

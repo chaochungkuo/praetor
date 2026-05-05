@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
 from .config import (
     ANTHROPIC_STATE_SECRET,
@@ -37,6 +38,7 @@ from .models import (
     OnboardingAnswers,
     RuntimeSelection,
 )
+from .providers import openai_audio_transcription
 from .security import csrf_token, login_rate_limiter, require_csrf, require_setup_token
 
 
@@ -140,6 +142,11 @@ TRANSLATIONS = {
         "voice_permission": "Microphone permission was blocked.",
         "voice_no_speech": "No speech detected.",
         "voice_no_microphone": "No microphone was detected.",
+        "voice_uploading": "Transcribing with OpenAI...",
+        "voice_transcribed": "Transcription added.",
+        "voice_openai_key_missing": "OpenAI transcription needs an OpenAI API key.",
+        "voice_audio_too_large": "Audio is too large. Please record a shorter message.",
+        "voice_recording_hint": "Recording. Press again to stop.",
         "suggested_first_tasks": "Suggested first tasks",
         "create_starter_mission": "Create starter mission",
         "starter_create_project_title": "Create first project",
@@ -784,6 +791,11 @@ TRANSLATIONS = {
         "voice_permission": "麥克風權限被阻擋。",
         "voice_no_speech": "沒有偵測到語音。",
         "voice_no_microphone": "沒有偵測到麥克風。",
+        "voice_uploading": "正在使用 OpenAI 轉文字...",
+        "voice_transcribed": "已加入轉錄文字。",
+        "voice_openai_key_missing": "OpenAI transcription 需要 OpenAI API key。",
+        "voice_audio_too_large": "音訊太大，請錄短一點。",
+        "voice_recording_hint": "錄音中，再按一次停止。",
         "suggested_first_tasks": "建議的第一批任務",
         "create_starter_mission": "建立起始任務",
         "starter_create_project_title": "建立第一個專案",
@@ -1809,6 +1821,7 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "runtime_ready": bool(runtime_health and runtime_health.get("healthy")),
         "runtime_health": runtime_health,
         "bridge_base_url": get_bridge_base_url(),
+        "openai_transcription_ready": bool(get_openai_api_key()),
         "authenticated": authenticated,
         "session_owner": getattr(request.state, "session_owner", None),
         "csrf_token": csrf_token(request),
@@ -2572,6 +2585,36 @@ async def create_ceo_conversation_submit(request: Request):
     except Exception as exc:
         return _redirect("/app/praetor", _friendly_runtime_error(exc, t), "error")
     return _redirect("/app/praetor?focus=ceo-chat", t("ceo_message_sent"), "success")
+
+
+@router.post("/app/ceo/transcribe")
+async def transcribe_ceo_audio_submit(request: Request):
+    settings = _require_initialized(request)
+    if settings is None:
+        return JSONResponse({"error": "Complete onboarding first."}, status_code=400)
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    if not get_openai_api_key():
+        return JSONResponse({"error": t("voice_openai_key_missing")}, status_code=400)
+    upload = form.get("audio")
+    if not isinstance(upload, UploadFile):
+        return JSONResponse({"error": t("voice_error")}, status_code=400)
+    audio = await upload.read()
+    if len(audio) > 25 * 1024 * 1024:
+        return JSONResponse({"error": t("voice_audio_too_large")}, status_code=413)
+    language = "zh" if _ui_language(request, settings) == "zh-TW" else "en"
+    try:
+        text = await run_in_threadpool(
+            openai_audio_transcription,
+            audio,
+            filename=upload.filename or "praetor-voice.webm",
+            content_type=upload.content_type or "audio/webm",
+            language=language,
+        )
+    except Exception as exc:
+        return JSONResponse({"error": _friendly_runtime_error(exc, t)}, status_code=502)
+    return JSONResponse({"text": text})
 
 
 @router.get("/app/memory", response_class=HTMLResponse)

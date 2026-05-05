@@ -441,7 +441,7 @@
           </div>
         {% endif %}
       </div>
-      <form class="ceo-chat-form chat-composer" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}" data-voice-listening="{{ t('voice_listening') }}" data-voice-start="{{ t('voice_start') }}" data-voice-stop="{{ t('voice_stop') }}" data-voice-unavailable="{{ t('voice_unavailable') }}" data-voice-error="{{ t('voice_error') }}" data-voice-permission="{{ t('voice_permission') }}" data-voice-no-speech="{{ t('voice_no_speech') }}" data-voice-no-microphone="{{ t('voice_no_microphone') }}">
+      <form class="ceo-chat-form chat-composer" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}" data-voice-listening="{{ t('voice_listening') }}" data-voice-start="{{ t('voice_start') }}" data-voice-stop="{{ t('voice_stop') }}" data-voice-unavailable="{{ t('voice_unavailable') }}" data-voice-error="{{ t('voice_error') }}" data-voice-permission="{{ t('voice_permission') }}" data-voice-no-speech="{{ t('voice_no_speech') }}" data-voice-no-microphone="{{ t('voice_no_microphone') }}" data-voice-uploading="{{ t('voice_uploading') }}" data-voice-transcribed="{{ t('voice_transcribed') }}" data-voice-recording-hint="{{ t('voice_recording_hint') }}" data-openai-transcription="{{ 'true' if openai_transcription_ready else 'false' }}" data-transcribe-url="/app/ceo/transcribe">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="composer-box">
           <textarea name="body" rows="1" placeholder="{{ t('message_to_ceo_placeholder') }}" aria-label="{{ t('message_to_ceo') }}" required autofocus></textarea>
@@ -539,25 +539,14 @@
         });
         thread?.scrollTo({ top: thread.scrollHeight, behavior: "auto" });
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition || !voiceButton || !textarea) {
-          if (voiceButton) {
-            voiceButton.disabled = true;
-            voiceButton.title = form.dataset.voiceUnavailable || "";
-          }
-          if (voiceStatus) {
-            voiceStatus.textContent = form.dataset.voiceUnavailable || "";
-            voiceStatus.classList.add("error");
-          }
-          return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "{{ 'zh-TW' if ui_language == 'zh-TW' else 'en-US' }}";
+        if (!voiceButton || !textarea) return;
+
         let baseText = "";
         let listening = false;
         let lastVoiceError = "";
+        let mediaRecorder = null;
+        let mediaStream = null;
+        let audioChunks = [];
 
         const setVoiceStatus = (message, state = "") => {
           if (!voiceStatus) return;
@@ -565,24 +554,132 @@
           voiceStatus.classList.toggle("error", state === "error");
         };
 
-        const setListening = (value) => {
+        const setListening = (value, label = "") => {
           listening = value;
           voiceButton.classList.toggle("recording", value);
           voiceButton.setAttribute("aria-label", value ? (form.dataset.voiceStop || "") : (form.dataset.voiceStart || ""));
-          setVoiceStatus(value ? (form.dataset.voiceListening || "") : lastVoiceError, !value && lastVoiceError ? "error" : "");
+          setVoiceStatus(value ? (label || form.dataset.voiceListening || "") : lastVoiceError, !value && lastVoiceError ? "error" : "");
         };
+
+        const appendTranscript = (transcript) => {
+          const cleanTranscript = (transcript || "").trim();
+          if (!cleanTranscript) return;
+          lastVoiceError = "";
+          textarea.value = [baseText, cleanTranscript].filter(Boolean).join(baseText ? " " : "");
+          resizeComposer();
+          textarea.focus();
+        };
+
+        const hasOpenAITranscription = form.dataset.openaiTranscription === "true";
+        const canRecordAudio = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+        const selectAudioMimeType = () => {
+          const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", ""];
+          return candidates.find((candidate) => !candidate || MediaRecorder.isTypeSupported(candidate)) || "";
+        };
+
+        const stopMediaStream = () => {
+          if (!mediaStream) return;
+          mediaStream.getTracks().forEach((track) => track.stop());
+          mediaStream = null;
+        };
+
+        const uploadOpenAITranscription = async (blob) => {
+          const csrfInput = form.querySelector("input[name='csrf_token']");
+          const payload = new FormData();
+          payload.append("csrf_token", csrfInput?.value || "");
+          payload.append("audio", blob, "praetor-voice.webm");
+          voiceButton.disabled = true;
+          setVoiceStatus(form.dataset.voiceUploading || "");
+          try {
+            const response = await fetch(form.dataset.transcribeUrl || "/app/ceo/transcribe", {
+              method: "POST",
+              body: payload,
+              credentials: "same-origin",
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.text) {
+              throw new Error(result.error || form.dataset.voiceError || "");
+            }
+            appendTranscript(result.text);
+            setVoiceStatus(form.dataset.voiceTranscribed || "");
+          } finally {
+            voiceButton.disabled = false;
+          }
+        };
+
+        const startOpenAIRecording = async () => {
+          baseText = textarea.value.trim();
+          lastVoiceError = "";
+          audioChunks = [];
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = selectAudioMimeType();
+            mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+            mediaRecorder.addEventListener("dataavailable", (event) => {
+              if (event.data && event.data.size > 0) audioChunks.push(event.data);
+            });
+            mediaRecorder.addEventListener("stop", async () => {
+              const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || "audio/webm" });
+              stopMediaStream();
+              if (!blob.size) {
+                lastVoiceError = form.dataset.voiceNoSpeech || "";
+                setListening(false);
+                setVoiceStatus(lastVoiceError, "error");
+                return;
+              }
+              setListening(false);
+              try {
+                await uploadOpenAITranscription(blob);
+              } catch (error) {
+                lastVoiceError = error.message || form.dataset.voiceError || "";
+                setVoiceStatus(lastVoiceError, "error");
+              }
+            });
+            mediaRecorder.start();
+            setListening(true, form.dataset.voiceRecordingHint || "");
+          } catch (error) {
+            stopMediaStream();
+            lastVoiceError = error?.name === "NotAllowedError" ? (form.dataset.voicePermission || "") : (form.dataset.voiceNoMicrophone || form.dataset.voiceError || "");
+            setListening(false);
+            setVoiceStatus(lastVoiceError, "error");
+          }
+        };
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if ((!hasOpenAITranscription || !canRecordAudio) && !SpeechRecognition) {
+          if (voiceButton) {
+            voiceButton.disabled = true;
+            voiceButton.title = form.dataset.voiceUnavailable || "";
+          }
+          setVoiceStatus(form.dataset.voiceUnavailable || "", "error");
+          return;
+        }
+        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+        if (recognition) {
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = "{{ 'zh-TW' if ui_language == 'zh-TW' else 'en-US' }}";
+        }
 
         voiceButton.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
           if (listening) {
-            recognition.stop();
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+              mediaRecorder.stop();
+            } else {
+              recognition?.stop();
+            }
+            return;
+          }
+          if (hasOpenAITranscription && canRecordAudio) {
+            void startOpenAIRecording();
             return;
           }
           baseText = textarea.value.trim();
           lastVoiceError = "";
           try {
-            recognition.start();
+            recognition?.start();
           } catch (_error) {
             lastVoiceError = form.dataset.voiceError || "";
             setListening(false);
@@ -590,9 +687,9 @@
           }
         });
 
-        recognition.addEventListener("start", () => setListening(true));
-        recognition.addEventListener("end", () => setListening(false));
-        recognition.addEventListener("error", (event) => {
+        recognition?.addEventListener("start", () => setListening(true));
+        recognition?.addEventListener("end", () => setListening(false));
+        recognition?.addEventListener("error", (event) => {
           let message = form.dataset.voiceError || "";
           if (event.error === "not-allowed" || event.error === "service-not-allowed") {
             message = form.dataset.voicePermission || message;
@@ -604,17 +701,12 @@
           lastVoiceError = message;
           setVoiceStatus(message, "error");
         });
-        recognition.addEventListener("result", (event) => {
+        recognition?.addEventListener("result", (event) => {
           let transcript = "";
           for (let i = event.resultIndex; i < event.results.length; i += 1) {
             transcript += event.results[i][0].transcript;
           }
-          const cleanTranscript = transcript.trim();
-          if (!cleanTranscript) return;
-          lastVoiceError = "";
-          textarea.value = [baseText, cleanTranscript].filter(Boolean).join(baseText ? " " : "");
-          resizeComposer();
-          textarea.focus();
+          appendTranscript(transcript);
         });
 
         resizeComposer();
