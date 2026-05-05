@@ -29,6 +29,16 @@ Then open the setup URL printed in your terminal. The installer creates:
 
 On first launch, Praetor guides you through owner account creation, optional API key setup, workspace selection, and approval rules. If you do not have an API key ready, skip it and add it later from **Models & API**.
 
+## Optional: Use Local Codex Instead of an API Key
+
+If you already use Codex CLI with your ChatGPT subscription, connect it with:
+
+```bash
+~/.praetor/praetor/scripts/configure-codex-executor.sh
+```
+
+Then open **Models & API**, choose **Local subscription tool**, select **Codex CLI**, and click **Test connection**. This keeps ChatGPT authentication inside Codex CLI; Praetor only talks to a local `praetor-execd` bridge.
+
 ## Safer Manual Install
 
 If you prefer to inspect the installer before running it:

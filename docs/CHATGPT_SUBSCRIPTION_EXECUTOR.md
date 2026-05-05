@@ -10,6 +10,16 @@ This is different from API mode:
 
 ## Setup Flow
 
+For the one-line local installer, use the helper:
+
+```bash
+~/.praetor/praetor/scripts/configure-codex-executor.sh
+```
+
+It checks `codex login status`, creates the `praetor-execd` config, writes the bridge URL and token into `.env`, starts the bridge, and restarts the Docker app.
+
+Manual flow:
+
 1. Install the official Codex CLI on the host machine.
 2. Run:
 
