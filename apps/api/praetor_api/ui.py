@@ -121,16 +121,21 @@ TRANSLATIONS = {
         "praetor_briefing_title": "Praetor briefing",
         "praetor_briefing_desc": "Talk to the CEO first. Praetor can turn the conversation into missions, approvals, memory, or staffing plans when needed.",
         "ceo_chat": "Chat with CEO",
-        "ceo_chat_desc": "Use this as the chairman's instruction channel. For the full office view with mission telemetry and voice input, open the Chairman's Office.",
+        "ceo_chat_desc": "Use this as the chairman's direct line to the CEO.",
         "message_to_ceo": "Message to CEO",
-        "message_to_ceo_placeholder": "Tell the CEO what you want to understand, decide, remember, or turn into a mission.",
+        "message_to_ceo_placeholder": "Message the CEO...",
         "send_to_ceo": "Send to CEO",
         "sending_to_ceo": "Sending...",
         "open_chairman_office": "Open Chairman's Office",
         "recent_ceo_conversation": "Recent CEO conversation",
         "no_ceo_messages": "No CEO conversation yet.",
         "ceo_message_sent": "CEO replied.",
-        "ceo_chat_hint": "Praetor may create a mission draft, approval request, memory update, or staffing proposal from this message.",
+        "ceo_chat_hint": "Enter sends. Shift+Enter adds a new line.",
+        "voice_input": "Voice input",
+        "voice_start": "Start voice input",
+        "voice_stop": "Stop recording",
+        "voice_listening": "Listening...",
+        "voice_unavailable": "Voice input is not available in this browser.",
         "suggested_first_tasks": "Suggested first tasks",
         "create_starter_mission": "Create starter mission",
         "starter_create_project_title": "Create first project",
@@ -756,16 +761,21 @@ TRANSLATIONS = {
         "praetor_briefing_title": "Praetor 簡報",
         "praetor_briefing_desc": "先跟 CEO 對話。Praetor 會在需要時把對話轉成任務、批准請求、公司記憶或 AI 編組計畫。",
         "ceo_chat": "與 CEO 對話",
-        "ceo_chat_desc": "這裡是董事長的指令通道。若要看完整辦公室、任務遙測與語音輸入，請進入董事長辦公室。",
+        "ceo_chat_desc": "這裡是董事長直接和 CEO 溝通的通道。",
         "message_to_ceo": "給 CEO 的訊息",
-        "message_to_ceo_placeholder": "告訴 CEO 你想了解、決定、記住，或轉成任務的事情。",
+        "message_to_ceo_placeholder": "直接告訴 CEO...",
         "send_to_ceo": "送給 CEO",
         "sending_to_ceo": "傳送中...",
         "open_chairman_office": "進入董事長辦公室",
         "recent_ceo_conversation": "最近 CEO 對話",
         "no_ceo_messages": "目前尚無 CEO 對話。",
         "ceo_message_sent": "CEO 已回覆。",
-        "ceo_chat_hint": "Praetor 可能會從這段訊息建立任務草稿、核准請求、記憶更新或 AI 編組建議。",
+        "ceo_chat_hint": "Enter 送出，Shift+Enter 換行。",
+        "voice_input": "語音輸入",
+        "voice_start": "開始語音輸入",
+        "voice_stop": "停止錄音",
+        "voice_listening": "聆聽中...",
+        "voice_unavailable": "這個瀏覽器目前不支援語音輸入。",
         "suggested_first_tasks": "建議的第一批任務",
         "create_starter_mission": "建立起始任務",
         "starter_create_project_title": "建立第一個專案",
@@ -1694,6 +1704,26 @@ def _format_datetime(language: str):
     return format_value
 
 
+def _format_time_short(language: str):
+    def format_value(value: Any) -> str:
+        if value is None:
+            return ""
+        parsed = value
+        if isinstance(value, str):
+            raw = value.strip()
+            if raw.endswith("Z"):
+                raw = raw[:-1] + "+00:00"
+            try:
+                parsed = datetime.fromisoformat(raw)
+            except ValueError:
+                return value
+        if isinstance(parsed, datetime):
+            return parsed.strftime("%H:%M")
+        return str(value)
+
+    return format_value
+
+
 def _event_summary(language: str):
     t = _translator(language)
     phrase_label = _phrase_label(language)
@@ -1760,6 +1790,7 @@ def _base_context(request: Request, current_page: str, page_title: str) -> dict:
         "event_label": _event_label(ui_language),
         "event_summary": _event_summary(ui_language),
         "format_time": _format_datetime(ui_language),
+        "format_time_short": _format_time_short(ui_language),
         "language_options": SUPPORTED_LANGUAGES,
         "settings": settings,
         "settings_initialized": initialized_settings is not None,

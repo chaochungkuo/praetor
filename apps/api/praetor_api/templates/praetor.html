@@ -413,44 +413,60 @@
       <h2>{{ t("praetor_briefing_title") }}</h2>
       <p>{{ t("praetor_briefing_desc") }}</p>
     </section>
-    <section class="grid two">
-      <section class="panel ceo-chat-panel" id="ceo-chat">
-        <h3>{{ t("ceo_chat") }}</h3>
-        <p class="muted">{{ t("ceo_chat_desc") }}</p>
-        <form class="form-grid ceo-chat-form" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <label class="full">
-            <span>{{ t("message_to_ceo") }}</span>
-            <textarea name="body" rows="6" placeholder="{{ t('message_to_ceo_placeholder') }}" required autofocus></textarea>
-            <span class="muted">{{ t("ceo_chat_hint") }}</span>
-          </label>
-          <div class="full actions">
-            <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
-            <button type="submit" data-default-label="{{ t('send_to_ceo') }}" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("send_to_ceo") }}</button>
-          </div>
-          {% if not runtime_ready %}
-            <p class="full ai-disabled-note">{{ t("ai_action_disabled") }}</p>
-          {% endif %}
-        </form>
-      </section>
-      <section class="panel">
-        <h3>{{ t("recent_ceo_conversation") }}</h3>
+    <section class="panel ceo-console" id="ceo-chat">
+      <div class="ceo-console-header">
+        <div>
+          <h3>{{ t("ceo_chat") }}</h3>
+          <p class="muted">{{ t("ceo_chat_desc") }}</p>
+        </div>
+        <a class="small-button secondary" href="/office">{{ t("open_chairman_office") }}</a>
+      </div>
+      <div class="ceo-thread" aria-label="{{ t('recent_ceo_conversation') }}">
         {% if ceo_messages %}
-          <div class="list">
-            {% for message in ceo_messages[-6:] %}
-              <div class="list-row">
-                <div>
+          {% for message in ceo_messages[-10:] %}
+            <article class="chat-message {{ 'from-ceo' if message.role == 'ceo' else 'from-chairman' }}">
+              <div class="chat-avatar" aria-hidden="true">{{ "C" if message.role == "ceo" else (settings.owner.name[:1] or "O") }}</div>
+              <div class="chat-bubble">
+                <div class="chat-meta">
                   <strong>{{ "CEO" if message.role == "ceo" else settings.owner.name }}</strong>
-                  <div class="muted">{{ message.body }}</div>
+                  <time datetime="{{ message.created_at.isoformat() if message.created_at else '' }}" title="{{ format_time(message.created_at) }}">{{ format_time_short(message.created_at) }}</time>
                 </div>
-                <span class="status">{{ format_time(message.created_at) }}</span>
+                <p>{{ message.body }}</p>
               </div>
-            {% endfor %}
-          </div>
+            </article>
+          {% endfor %}
         {% else %}
-          <p class="muted">{{ t("no_ceo_messages") }}</p>
+          <div class="ceo-empty-state">
+            <p>{{ t("no_ceo_messages") }}</p>
+          </div>
         {% endif %}
-      </section>
+      </div>
+      <form class="ceo-chat-form chat-composer" method="post" action="/app/ceo/conversation" data-sending-label="{{ t('sending_to_ceo') }}" data-voice-listening="{{ t('voice_listening') }}" data-voice-start="{{ t('voice_start') }}" data-voice-stop="{{ t('voice_stop') }}" data-voice-unavailable="{{ t('voice_unavailable') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <div class="composer-box">
+          <textarea name="body" rows="1" placeholder="{{ t('message_to_ceo_placeholder') }}" aria-label="{{ t('message_to_ceo') }}" required autofocus></textarea>
+          <button type="button" class="icon-button voice-button" data-voice-button aria-label="{{ t('voice_start') }}" title="{{ t('voice_input') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+              <path d="M12 18v3"/>
+            </svg>
+          </button>
+          <button type="submit" class="send-button" data-default-label="{{ t('send_to_ceo') }}" aria-label="{{ t('send_to_ceo') }}" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="m22 2-7 20-4-9-9-4 20-7Z" stroke-linejoin="round"/>
+              <path d="M22 2 11 13"/>
+            </svg>
+          </button>
+        </div>
+        <div class="composer-footer">
+          <span class="composer-hint">{{ t("ceo_chat_hint") }}</span>
+          <span class="voice-status" data-voice-status aria-live="polite"></span>
+        </div>
+        {% if not runtime_ready %}
+          <p class="ai-disabled-note">{{ t("ai_action_disabled") }}</p>
+        {% endif %}
+      </form>
     </section>
     <section class="panel">
       <h3>{{ t("suggested_first_tasks") }}</h3>
@@ -497,12 +513,75 @@
       (() => {
         const form = document.querySelector(".ceo-chat-form");
         if (!form) return;
+        const textarea = form.querySelector("textarea[name='body']");
+        const voiceButton = form.querySelector("[data-voice-button]");
+        const voiceStatus = form.querySelector("[data-voice-status]");
+        const thread = document.querySelector(".ceo-thread");
+
+        const resizeComposer = () => {
+          if (!textarea) return;
+          textarea.style.height = "auto";
+          textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+        };
+
+        textarea?.addEventListener("input", resizeComposer);
+        textarea?.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+          event.preventDefault();
+          if (textarea.value.trim()) form.requestSubmit();
+        });
+
         form.addEventListener("submit", () => {
           const button = form.querySelector("button[type='submit']");
           if (!button) return;
           button.disabled = true;
-          button.textContent = form.dataset.sendingLabel || button.dataset.defaultLabel || button.textContent;
+          button.setAttribute("aria-label", form.dataset.sendingLabel || button.dataset.defaultLabel || button.getAttribute("aria-label") || "");
         });
+        thread?.scrollTo({ top: thread.scrollHeight, behavior: "auto" });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition || !voiceButton || !textarea) {
+          if (voiceButton) {
+            voiceButton.disabled = true;
+            voiceButton.title = form.dataset.voiceUnavailable || "";
+          }
+          return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = "{{ 'zh-TW' if ui_language == 'zh-TW' else 'en-US' }}";
+        let baseText = "";
+        let listening = false;
+
+        const setListening = (value) => {
+          listening = value;
+          voiceButton.classList.toggle("recording", value);
+          voiceButton.setAttribute("aria-label", value ? (form.dataset.voiceStop || "") : (form.dataset.voiceStart || ""));
+          if (voiceStatus) voiceStatus.textContent = value ? (form.dataset.voiceListening || "") : "";
+        };
+
+        voiceButton.addEventListener("click", () => {
+          if (listening) {
+            recognition.stop();
+            return;
+          }
+          baseText = textarea.value.trim();
+          recognition.start();
+        });
+
+        recognition.addEventListener("start", () => setListening(true));
+        recognition.addEventListener("end", () => setListening(false));
+        recognition.addEventListener("result", (event) => {
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            transcript += event.results[i][0].transcript;
+          }
+          textarea.value = [baseText, transcript.trim()].filter(Boolean).join(baseText ? " " : "");
+          resizeComposer();
+        });
+
+        resizeComposer();
         if (new URLSearchParams(window.location.search).get("focus") === "ceo-chat") {
           document.getElementById("ceo-chat")?.scrollIntoView({ block: "start" });
         }

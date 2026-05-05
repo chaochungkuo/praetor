@@ -135,7 +135,7 @@ def main() -> int:
                     "anon_redirects_to_login": "Owner login" in anon_text,
                     "praetor_has_briefing": "Praetor briefing" in praetor,
                     "praetor_has_ai_outage": "AI runtime is offline" in praetor,
-                    "praetor_has_ceo_hint": "mission draft, approval request, memory update" in praetor,
+                    "praetor_has_ceo_hint": "Enter sends" in praetor,
                     "praetor_has_starters": "Suggested first tasks" in praetor,
                     "inbox_has_chairman_inbox": "Chairman Inbox" in inbox,
                     "inbox_has_governance_review": "Governance review" in inbox,
