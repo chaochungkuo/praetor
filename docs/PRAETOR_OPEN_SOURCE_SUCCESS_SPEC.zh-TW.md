@@ -692,7 +692,7 @@ Requested outputs:
 
 1. 建立 `examples/praetor-release-workspace`
 2. 建立 demo mission template
-3. 加入 fake provider / deterministic demo mode
+3. 加入 fake provider / internal offline planner test mode
 4. 修改 README quickstart 指向 demo
 5. 錄製 3 分鐘 demo script
 

@@ -72,28 +72,21 @@ What they cover:
 - `app-fallback-smoke`: API failure fallback to subscription executor.
 - `stack-smoke`: split web/API/worker shape.
 - `office-smoke`: v2 Office APIs and React entrypoint.
-- `planner-smoke`: deterministic and LLM planner contract.
+- `planner-smoke`: internal offline planner and LLM planner contract.
 - `organization-smoke`: AI team, delegation, escalation, standing orders, completion contract.
 - `safety-policy-smoke`: prompt safety policy injection and sensitive memory blocking.
 
-## CEO Planner Modes
+## CEO Planner
 
-The app install default is automatic: an API runtime with a real provider key uses the LLM planner, while missing or unavailable AI falls back to the deterministic planner. For local development or CI, force deterministic mode when you do not want paid API access.
-
-```bash
-PRAETOR_CEO_PLANNER_MODE=deterministic
-```
-
-To try an LLM-backed planner:
+Praetor's product runtime does not use a deterministic CEO. CEO chat requires either an API runtime with a real provider key or a subscription executor. If AI is missing or unavailable, CEO chat fails visibly instead of generating a fake response.
 
 ```bash
-PRAETOR_CEO_PLANNER_MODE=llm
 PRAETOR_CEO_PLANNER_PROVIDER=openai
 PRAETOR_CEO_PLANNER_MODEL=gpt-4.1-mini
 OPENAI_API_KEY=...
 ```
 
-The planner emits explicit action types for mission creation, approvals, memory, briefings, staffing, agent creation, delegation, escalation, closeout, and standing orders. LLM output is parsed as JSON, validated, sanitized before side effects, and falls back to the deterministic planner if the provider is unavailable or returns invalid output.
+The planner emits explicit action types for mission creation, approvals, memory, briefings, staffing, agent creation, delegation, escalation, closeout, and standing orders. LLM output is parsed as JSON, validated, and sanitized before side effects. The internal offline planner exists only for smoke tests and schema checks.
 
 ## AI Organization Lifecycle
 

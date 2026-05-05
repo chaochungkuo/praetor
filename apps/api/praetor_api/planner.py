@@ -7,7 +7,6 @@ from typing import Protocol
 from .models import PlannerAction, PlannerPlan, RuntimeSelection
 from .config import (
     get_anthropic_api_key,
-    get_ceo_planner_mode,
     get_ceo_planner_model,
     get_ceo_planner_provider,
     get_openai_api_key,
@@ -35,7 +34,9 @@ class CEOPlanner(Protocol):
         ...
 
 
-class DeterministicCEOPlanner:
+class InternalTestCEOPlanner:
+    """Offline planner kept only for smoke tests and schema contract checks."""
+
     def plan(self, context: CEOPlannerContext) -> PlannerPlan:
         text = context.instruction.strip()
         lowered = text.lower()
@@ -345,30 +346,20 @@ class DeterministicCEOPlanner:
 
 
 class LLMCEOPlanner:
-    def __init__(self, *, provider: str, model: str, fallback: CEOPlanner | None = None) -> None:
+    def __init__(self, *, provider: str, model: str, base_url: str | None = None) -> None:
         self.provider = provider
         self.model = model
-        self.fallback = fallback or DeterministicCEOPlanner()
+        self.base_url = base_url
 
     def plan(self, context: CEOPlannerContext) -> PlannerPlan:
         prompt = self._build_prompt(context)
         try:
-            response_text, _ = generate_json_response(provider=self.provider, model=self.model, prompt=prompt)
+            response_text, _ = generate_json_response(provider=self.provider, model=self.model, prompt=prompt, base_url=self.base_url)
             raw = parse_generation_payload(response_text)
             plan = PlannerPlan.model_validate(raw)
             return self._sanitize_plan(plan)
         except (ApiProviderError, json.JSONDecodeError, ValueError, KeyError) as exc:
-            fallback = self.fallback.plan(context)
-            fallback.actions.append(
-                PlannerAction(
-                    type="briefing",
-                    status="applied",
-                    title="Planner fallback",
-                    body=f"LLM planner unavailable or invalid; deterministic planner used. Reason: {type(exc).__name__}",
-                    metadata={"provider": self.provider, "model": self.model},
-                )
-            )
-            return fallback
+            raise ApiProviderError(f"CEO planner unavailable or invalid: {type(exc).__name__}") from exc
 
     @staticmethod
     def _build_prompt(context: CEOPlannerContext) -> str:
@@ -541,14 +532,17 @@ class LLMCEOPlanner:
         return bool(path)
 
 
-def default_ceo_planner(runtime: RuntimeSelection | None = None) -> CEOPlanner:
-    mode = get_ceo_planner_mode()
-    if mode == "llm":
-        return LLMCEOPlanner(provider=get_ceo_planner_provider(), model=get_ceo_planner_model())
-    if mode == "auto" and runtime is not None and runtime.mode == "api":
-        provider = (runtime.provider or get_ceo_planner_provider()).lower()
-        model = runtime.model or get_ceo_planner_model()
-        api_key = get_openai_api_key() if provider == "openai" else get_anthropic_api_key()
-        if api_key and api_key != "fake-key":
-            return LLMCEOPlanner(provider=provider, model=model)
-    return DeterministicCEOPlanner()
+def configured_ceo_planner(runtime: RuntimeSelection | None = None) -> CEOPlanner:
+    if runtime is None or runtime.mode != "api":
+        raise ApiProviderError("CEO chat requires a configured AI runtime.")
+    provider = (runtime.provider or get_ceo_planner_provider()).lower()
+    model = runtime.model or get_ceo_planner_model()
+    if provider in {"openai", "openai_compatible"}:
+        api_key = get_openai_api_key()
+    elif provider == "anthropic":
+        api_key = get_anthropic_api_key()
+    else:
+        raise ApiProviderError(f"Unsupported CEO planner provider: {provider}")
+    if not api_key:
+        raise ApiProviderError(f"{provider} API key is not configured.")
+    return LLMCEOPlanner(provider=provider, model=model, base_url=runtime.base_url)

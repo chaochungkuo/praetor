@@ -12,7 +12,7 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from praetor_api.planner import CEOPlannerContext, DeterministicCEOPlanner  # noqa: E402
+from praetor_api.planner import CEOPlannerContext, InternalTestCEOPlanner  # noqa: E402
 
 
 STATE_DIR = pathlib.Path("/tmp/praetor-planner-smoke-state")
@@ -57,7 +57,6 @@ def start_fake_openai() -> subprocess.Popen[str]:
 def start_api() -> subprocess.Popen[str]:
     env = os.environ.copy()
     env["PRAETOR_STATE_DIR"] = str(STATE_DIR)
-    env["PRAETOR_CEO_PLANNER_MODE"] = "llm"
     env["PRAETOR_CEO_PLANNER_PROVIDER"] = "openai"
     env["PRAETOR_CEO_PLANNER_MODEL"] = "fake-gpt"
     env["PRAETOR_OPENAI_BASE_URL"] = FAKE_OPENAI_URL
@@ -92,8 +91,8 @@ def stop(proc: subprocess.Popen[str]) -> None:
             proc.wait(timeout=5)
 
 
-def assert_deterministic_planner_contract() -> list[str]:
-    plan = DeterministicCEOPlanner().plan(
+def assert_internal_test_planner_contract() -> list[str]:
+    plan = InternalTestCEOPlanner().plan(
         CEOPlannerContext(
             instruction="建立任務：改善 Office。請建立 approval checkpoint，記住這個原則，並讓團隊做規劃簡報。",
             related_mission_id="mission_existing",
@@ -105,7 +104,7 @@ def assert_deterministic_planner_contract() -> list[str]:
     expected = {"mission_draft", "approval_request", "memory_update", "board_briefing"}
     missing = sorted(expected.difference(action_types))
     if missing:
-        raise AssertionError(f"deterministic planner missing actions: {missing}")
+        raise AssertionError(f"internal test planner missing actions: {missing}")
     return action_types
 
 
@@ -167,12 +166,12 @@ def assert_llm_planner_api_contract() -> dict:
 
 
 def main() -> int:
-    deterministic_actions = assert_deterministic_planner_contract()
+    internal_test_actions = assert_internal_test_planner_contract()
     llm_result = assert_llm_planner_api_contract()
     print(
         json.dumps(
             {
-                "deterministic_actions": deterministic_actions,
+                "internal_test_actions": internal_test_actions,
                 "llm": llm_result,
             },
             ensure_ascii=True,

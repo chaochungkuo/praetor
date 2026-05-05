@@ -29,9 +29,9 @@ Current Office capabilities:
 - chairman instructions run through a replaceable CEO planner interface
 - planner actions support mission drafts, approval requests, memory updates, and briefings
 - organization actions support staffing proposals, agent creation, delegations, decision escalations, mission closeout, and standing orders
-- automatic CEO planner mode by default: API runtime plus a real provider key uses the LLM planner, otherwise it stays deterministic; force modes with `PRAETOR_CEO_PLANNER_MODE=llm|deterministic`
+- AI-first CEO planner: API runtime plus a real provider key uses the LLM planner; missing AI disables CEO chat instead of generating a fake response
 - mission room with timeline and AI internal conversation
 - AI organization panel with mission team, delegation, escalation, and standing order telemetry
 - OpenAI transcription for CEO voice input when an OpenAI API key is configured, with browser speech recognition as fallback
 
-The LLM planner uses the configured runtime provider/model in automatic mode, or `PRAETOR_CEO_PLANNER_PROVIDER` and `PRAETOR_CEO_PLANNER_MODEL` when forced with `PRAETOR_CEO_PLANNER_MODE=llm`. Invalid or unavailable LLM output falls back to the deterministic planner and records a briefing action.
+The LLM planner uses the configured runtime provider/model, with `PRAETOR_CEO_PLANNER_PROVIDER` and `PRAETOR_CEO_PLANNER_MODEL` as defaults. Invalid or unavailable LLM output fails visibly so Praetor never pretends a template is the CEO.

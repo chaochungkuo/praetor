@@ -77,7 +77,7 @@ from .models import (
     WorkSessionTurn,
     utc_now,
 )
-from .planner import CEOPlanner, CEOPlannerContext, LLMCEOPlanner, default_ceo_planner
+from .planner import CEOPlanner, CEOPlannerContext, LLMCEOPlanner, configured_ceo_planner
 from .providers import parse_generation_payload, test_provider_connection
 from .recommendations import assess_mission_complexity, preview_onboarding
 from .runtime import MissionRuntime
@@ -1795,7 +1795,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             return self.planner.plan(context)
         if settings.runtime.mode == "subscription_executor":
             return self._plan_ceo_response_with_executor(settings, context)
-        return default_ceo_planner(settings.runtime).plan(context)
+        return configured_ceo_planner(settings.runtime).plan(context)
 
     def _plan_ceo_response_with_executor(self, settings: AppSettings, context: CEOPlannerContext) -> PlannerPlan:
         output = MissionRuntime().run_executor_prompt(
