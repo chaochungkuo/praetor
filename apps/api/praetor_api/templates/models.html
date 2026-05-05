@@ -40,79 +40,8 @@
     <section class="panel">
       <h3>{{ t("runtime_settings") }}</h3>
       <p class="muted">{{ t("runtime_settings_desc") }}</p>
-      {% if settings.runtime.mode == 'subscription_executor' %}
-        <div class="message praetor-message">
-          <strong>{{ t("subscription_executor_setup") }}</strong>
-          <p>{{ t("subscription_executor_setup_desc") }}</p>
-          <p class="muted">{{ t("subscription_executor_how_it_works") }}</p>
-          <ul class="compact-list">
-            <li>{{ t("subscription_executor_step_1") }}</li>
-            <li>{{ t("subscription_executor_step_2") }}</li>
-            <li>{{ t("subscription_executor_step_3") }}</li>
-            <li>{{ t("subscription_executor_step_4") }}</li>
-          </ul>
-          <div class="terminal-command">
-            <span>{{ t("terminal_command") }}</span>
-            <code>codex login</code>
-          </div>
-          <div class="actions">
-            <a class="small-button secondary" href="https://help.openai.com/en/articles/11369540" target="_blank" rel="noopener noreferrer">{{ t("open_codex_login_guide") }}</a>
-          </div>
-        </div>
-      {% endif %}
-      <form class="form-grid" method="post" action="/app/settings/runtime">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <input type="hidden" name="next_path" value="/app/models" />
-        <label>
-          {{ t("runtime_mode") }}
-          <select name="runtime_mode">
-            <option value="api" {{ 'selected' if settings.runtime.mode == 'api' else '' }}>{{ label("api") }}</option>
-            <option value="subscription_executor" {{ 'selected' if settings.runtime.mode == 'subscription_executor' else '' }}>{{ label("subscription_executor") }}</option>
-            <option value="local_model" {{ 'selected' if settings.runtime.mode == 'local_model' else '' }}>{{ label("local_model") }}</option>
-          </select>
-        </label>
-        <label>
-          {{ t("executor") }}
-          <input type="text" name="runtime_executor" value="{{ settings.runtime.executor or 'codex' }}" />
-        </label>
-        {% if settings.runtime.mode == 'subscription_executor' %}
-          <input type="hidden" name="runtime_provider" value="" />
-          <input type="hidden" name="runtime_model" value="" />
-          <input type="hidden" name="runtime_base_url" value="" />
-          <p class="full muted">{{ t("subscription_executor_no_api_key") }}</p>
-        {% else %}
-          <label>
-            {{ t("provider") }}
-            <select name="runtime_provider">
-              <option value="openai" {{ 'selected' if settings.runtime.provider == 'openai' else '' }}>OpenAI</option>
-              <option value="anthropic" {{ 'selected' if settings.runtime.provider == 'anthropic' else '' }}>Anthropic</option>
-              <option value="openai_compatible" {{ 'selected' if settings.runtime.provider == 'openai_compatible' else '' }}>{{ t("opt_openai_compatible") }}</option>
-            </select>
-          </label>
-          <label>
-            {{ t("model") }}
-            <input type="text" name="runtime_model" value="{{ settings.runtime.model or 'gpt-4.1-mini' }}" />
-          </label>
-          <label>
-            {{ t("base_url") }}
-            <input type="url" name="runtime_base_url" value="{{ settings.runtime.base_url or '' }}" placeholder="https://api.openai.com/v1" />
-            <span class="muted">{{ t("base_url_help") }}</span>
-          </label>
-          <label class="full">
-            {{ t("api_key") }}
-            <input type="password" name="api_key" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
-            <span class="muted">{{ t("api_key_help") }}</span>
-          </label>
-          <div class="full compact-list">
-            <span>{{ t("provider_key") }} OpenAI: {{ t("configured") if provider_keys.openai else t("missing") }}</span>
-            <span>{{ t("provider_key") }} Anthropic: {{ t("configured") if provider_keys.anthropic else t("missing") }}</span>
-          </div>
-        {% endif %}
-        <div class="full actions">
-          <button type="submit" class="secondary" formaction="/app/settings/runtime/test" data-loading-label="{{ t('testing_connection') }}">{{ t("test_api_connection") }}</button>
-          <button type="submit">{{ t("save_runtime_settings") }}</button>
-        </div>
-      </form>
+      {% set runtime_next_path = "/app/models" %}
+      {% include "_runtime_connection_form.html" %}
     </section>
   </section>
   <section class="grid two">

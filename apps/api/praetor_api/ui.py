@@ -141,20 +141,31 @@ TRANSLATIONS = {
         "starter_review_inbox_summary": "Review the Inbox folder and prepare a concise summary.",
         "no_missions_create_from_ceo": "No missions yet. Ask the CEO what to start first.",
         "runtime_settings": "Runtime settings",
-        "runtime_settings_desc": "Choose the model runtime Praetor should use. API keys are stored locally as private secret files and are never displayed after saving.",
-        "subscription_executor_setup": "ChatGPT subscription executor",
-        "subscription_executor_setup_desc": "Use your existing ChatGPT plan through the official Codex CLI on your host machine. Praetor does not ask for an API key in this mode.",
-        "subscription_executor_how_it_works": "Praetor talks to a local host bridge. The bridge runs Codex after you sign in with ChatGPT in the Codex CLI.",
-        "subscription_executor_step_1": "1. Install the official Codex CLI on the host machine.",
-        "subscription_executor_step_2": "2. Run codex login in a terminal and choose Sign in with ChatGPT.",
+        "runtime_settings_desc": "Choose how Praetor connects to AI. API key mode is the stable default; local subscription tools are available for advanced owner-controlled setups.",
+        "ai_connection_method": "AI connection method",
+        "connection_api_title": "API key",
+        "connection_api_desc": "Recommended for most users. Works with OpenAI, Anthropic, and OpenAI-compatible gateways.",
+        "connection_api_explain": "Use this when you want the simplest, most reliable setup for Docker, servers, and non-technical users.",
+        "connection_subscription_title": "Local subscription tool",
+        "connection_subscription_desc": "Use an already-signed-in Codex CLI or Claude Code on this computer.",
+        "connection_subscription_explain": "This is for power users who want Praetor to delegate work to local tools that are already authenticated with ChatGPT or Claude.",
+        "recommended": "Recommended",
+        "advanced": "Advanced",
+        "stable_default": "Stable default",
+        "subscription_api_boundary": "ChatGPT and Claude subscriptions do not become API keys. If you choose API key mode, provider API billing applies separately.",
+        "subscription_executor_setup": "Local subscription executor",
+        "subscription_executor_setup_desc": "Use Codex CLI with ChatGPT, or Claude Code with Claude, through a local host bridge. Praetor does not ask for an API key in this mode.",
+        "subscription_executor_how_it_works": "Praetor talks to a local host bridge. The bridge runs the selected executor after you sign in inside that executor's own CLI.",
+        "subscription_executor_step_1": "1. Install Codex CLI or Claude Code on the host machine.",
+        "subscription_executor_step_2": "2. Sign in inside that CLI with your ChatGPT or Claude account.",
         "subscription_executor_step_3": "3. Start praetor-execd with the same workspace and bridge token.",
-        "subscription_executor_step_4": "4. Return to Praetor, select Subscription executor, set executor to codex, then test the connection.",
+        "subscription_executor_step_4": "4. Return to Praetor, select Local subscription tool, choose the executor, then test the connection.",
         "open_codex_login_guide": "Open Codex login guide",
         "bridge_status": "Bridge status",
         "configured_executors": "Configured executors",
         "login_state": "Login state",
         "binary_found": "Binary found",
-        "subscription_executor_no_api_key": "No API key is needed here. Authentication happens in Codex CLI with your ChatGPT account.",
+        "subscription_executor_no_api_key": "No API key is needed here. Authentication happens in Codex CLI or Claude Code on your computer.",
         "terminal_command": "Terminal command",
         "runtime_settings_saved": "Runtime settings saved.",
         "model_connection_center": "Model and API connection",
@@ -765,20 +776,31 @@ TRANSLATIONS = {
         "starter_review_inbox_summary": "檢查 Inbox 資料夾，並準備一份精簡摘要。",
         "no_missions_create_from_ceo": "目前還沒有任務。先問 CEO 應該從哪裡開始。",
         "runtime_settings": "執行環境設定",
-        "runtime_settings_desc": "選擇 Praetor 要使用的模型執行環境。API key 會以私密檔案保存在本機，不會在儲存後回顯。",
-        "subscription_executor_setup": "ChatGPT 訂閱執行器",
-        "subscription_executor_setup_desc": "透過宿主機上的官方 Codex CLI 使用你既有的 ChatGPT 方案。這個模式不需要在 Praetor 填 API key。",
-        "subscription_executor_how_it_works": "Praetor 會連到本機 host bridge；bridge 會在你已用 ChatGPT 登入的 Codex CLI 裡執行任務。",
-        "subscription_executor_step_1": "1. 在宿主機安裝官方 Codex CLI。",
-        "subscription_executor_step_2": "2. 在終端機執行 codex login，並選擇 Sign in with ChatGPT。",
+        "runtime_settings_desc": "選擇 Praetor 要如何連接 AI。API key 是最穩定的預設路線；本機訂閱工具則適合進階、由擁有者自己控制的環境。",
+        "ai_connection_method": "AI 連接方式",
+        "connection_api_title": "API key",
+        "connection_api_desc": "建議大多數使用者使用。支援 OpenAI、Anthropic 與 OpenAI-compatible gateway。",
+        "connection_api_explain": "如果你想要最簡單、最穩定，能在 Docker、server 和非技術使用者環境運作，請選這個。",
+        "connection_subscription_title": "本機訂閱工具",
+        "connection_subscription_desc": "使用這台電腦上已登入的 Codex CLI 或 Claude Code。",
+        "connection_subscription_explain": "這適合進階使用者：Praetor 會把工作委派給本機已用 ChatGPT 或 Claude 帳號登入的工具。",
+        "recommended": "推薦",
+        "advanced": "進階",
+        "stable_default": "穩定預設",
+        "subscription_api_boundary": "ChatGPT 和 Claude 訂閱不會變成 API key。若選 API key 模式，供應商 API 會另外計費。",
+        "subscription_executor_setup": "本機訂閱執行器",
+        "subscription_executor_setup_desc": "透過本機 host bridge 使用 Codex CLI 搭配 ChatGPT，或 Claude Code 搭配 Claude。這個模式不需要在 Praetor 填 API key。",
+        "subscription_executor_how_it_works": "Praetor 會連到本機 host bridge；bridge 會在你選擇且已登入的 executor CLI 裡執行任務。",
+        "subscription_executor_step_1": "1. 在宿主機安裝 Codex CLI 或 Claude Code。",
+        "subscription_executor_step_2": "2. 在該 CLI 裡用你的 ChatGPT 或 Claude 帳號登入。",
         "subscription_executor_step_3": "3. 啟動 praetor-execd，使用同一個 workspace 與 bridge token。",
-        "subscription_executor_step_4": "4. 回到 Praetor，選擇訂閱執行器，executor 設為 codex，然後測試連線。",
+        "subscription_executor_step_4": "4. 回到 Praetor，選擇本機訂閱工具，選擇 executor，然後測試連線。",
         "open_codex_login_guide": "打開 Codex 登入說明",
         "bridge_status": "Bridge 狀態",
         "configured_executors": "可用執行器",
         "login_state": "登入狀態",
         "binary_found": "執行檔狀態",
-        "subscription_executor_no_api_key": "這裡不需要 API key。認證是在 Codex CLI 裡用你的 ChatGPT 帳號完成。",
+        "subscription_executor_no_api_key": "這裡不需要 API key。認證是在你電腦上的 Codex CLI 或 Claude Code 裡完成。",
         "terminal_command": "終端機指令",
         "runtime_settings_saved": "執行環境設定已儲存。",
         "model_connection_center": "模型與 API 連接",
@@ -2397,13 +2419,16 @@ async def update_runtime_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
+    mode = str(form.get("runtime_mode", "api")).strip() or "api"
     provider = str(form.get("runtime_provider", "")).strip().lower() or None
+    if mode == "subscription_executor":
+        provider = None
     runtime = RuntimeSelection(
-        mode=str(form.get("runtime_mode", "api")).strip() or "api",
+        mode=mode,
         provider=provider,
-        model=str(form.get("runtime_model", "")).strip() or None,
+        model=None if mode == "subscription_executor" else str(form.get("runtime_model", "")).strip() or None,
         executor=str(form.get("runtime_executor", "")).strip() or None,
-        base_url=str(form.get("runtime_base_url", "")).strip() or None,
+        base_url=None if mode == "subscription_executor" else str(form.get("runtime_base_url", "")).strip() or None,
     )
     try:
         await run_in_threadpool(request.app.state.ctx.service.update_runtime, runtime)
@@ -2423,13 +2448,16 @@ async def test_runtime_submit(request: Request):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
+    mode = str(form.get("runtime_mode", settings.runtime.mode)).strip() or settings.runtime.mode
     provider = str(form.get("runtime_provider", "")).strip().lower() or None
+    if mode == "subscription_executor":
+        provider = None
     runtime = RuntimeSelection(
-        mode=str(form.get("runtime_mode", settings.runtime.mode)).strip() or settings.runtime.mode,
+        mode=mode,
         provider=provider,
-        model=str(form.get("runtime_model", "")).strip() or settings.runtime.model,
+        model=None if mode == "subscription_executor" else str(form.get("runtime_model", "")).strip() or settings.runtime.model,
         executor=str(form.get("runtime_executor", "")).strip() or settings.runtime.executor,
-        base_url=str(form.get("runtime_base_url", "")).strip() or None,
+        base_url=None if mode == "subscription_executor" else str(form.get("runtime_base_url", "")).strip() or None,
     )
     next_path = _safe_redirect_path(str(form.get("next_path", "/app/models")), "/app/models")
     try:

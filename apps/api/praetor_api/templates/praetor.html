@@ -135,47 +135,65 @@
             <div class="full">
               <h3>{{ t("connection_step_title") }}</h3>
             </div>
-            <label>
-              <span>{{ t("runtime_mode") }}</span>
-              <select name="runtime_mode">
-                <option value="api">{{ t("opt_api") }}</option>
-                <option value="subscription_executor">{{ t("opt_subscription_executor") }}</option>
-                <option value="local_model">{{ t("opt_local_model") }}</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t("provider") }}</span>
-              <select name="runtime_provider">
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="openai_compatible">{{ t("opt_openai_compatible") }}</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t("model") }}</span>
-              <input type="text" name="runtime_model" value="{{ onboarding_defaults.runtime_model }}" />
-            </label>
-            <label class="full">
-              <span>{{ t("api_key") }}</span>
-              <input type="password" name="api_key" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
-              <span class="muted">{{ t("skip_api_key") }}</span>
-            </label>
-            <details class="full advanced-settings">
-              <summary>{{ t("advanced_provider") }}</summary>
-              <label>
-                <span>{{ t("base_url") }}</span>
-                <input type="url" name="runtime_base_url" value="{{ onboarding_defaults.runtime_base_url }}" placeholder="https://api.openai.com/v1" />
-                <span class="muted">{{ t("base_url_help") }}</span>
+            <div class="full connection-choice-grid" role="radiogroup" aria-label="{{ t('ai_connection_method') }}">
+              <label class="connection-choice-card selected">
+                <input type="radio" name="runtime_mode" value="api" checked />
+                <span>
+                  <strong>{{ t("connection_api_title") }}</strong>
+                  <small>{{ t("connection_api_desc") }}</small>
+                </span>
+                <em>{{ t("recommended") }}</em>
               </label>
-              <p class="muted">{{ t("openai_compatible_notice") }}</p>
-            </details>
-            <label>
-              <span>{{ t("executor") }}</span>
-              <select name="runtime_executor">
-                <option value="codex">Codex</option>
-                <option value="claude_code">Claude Code</option>
-              </select>
-            </label>
+              <label class="connection-choice-card">
+                <input type="radio" name="runtime_mode" value="subscription_executor" />
+                <span>
+                  <strong>{{ t("connection_subscription_title") }}</strong>
+                  <small>{{ t("connection_subscription_desc") }}</small>
+                </span>
+                <em>{{ t("advanced") }}</em>
+              </label>
+            </div>
+            <div class="full runtime-panel" data-runtime-panel="api">
+              <div class="form-grid">
+                <label>
+                  <span>{{ t("provider") }}</span>
+                  <select name="runtime_provider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="openai_compatible">{{ t("opt_openai_compatible") }}</option>
+                  </select>
+                </label>
+                <label>
+                  <span>{{ t("model") }}</span>
+                  <input type="text" name="runtime_model" value="{{ onboarding_defaults.runtime_model }}" />
+                </label>
+                <label class="full">
+                  <span>{{ t("api_key") }}</span>
+                  <input type="password" name="api_key" placeholder="{{ t('api_key_placeholder') }}" autocomplete="off" />
+                  <span class="muted">{{ t("skip_api_key") }}</span>
+                </label>
+                <details class="full advanced-settings">
+                  <summary>{{ t("advanced_provider") }}</summary>
+                  <label>
+                    <span>{{ t("base_url") }}</span>
+                    <input type="url" name="runtime_base_url" value="{{ onboarding_defaults.runtime_base_url }}" placeholder="https://api.openai.com/v1" />
+                    <span class="muted">{{ t("base_url_help") }}</span>
+                  </label>
+                  <p class="muted">{{ t("openai_compatible_notice") }}</p>
+                </details>
+              </div>
+            </div>
+            <div class="full runtime-panel" data-runtime-panel="subscription_executor" hidden>
+              <label>
+                <span>{{ t("executor") }}</span>
+                <select name="runtime_executor" disabled>
+                  <option value="codex">Codex CLI</option>
+                  <option value="claude_code">Claude Code</option>
+                </select>
+              </label>
+              <p class="muted">{{ t("subscription_executor_setup_desc") }}</p>
+              <p class="muted">{{ t("subscription_executor_no_api_key") }}</p>
+            </div>
           </div>
         </section>
 
@@ -275,6 +293,21 @@
           });
         }
 
+        function syncRuntimeFields() {
+          const mode = wizard.querySelector('input[name="runtime_mode"]:checked')?.value || "api";
+          wizard.querySelectorAll(".connection-choice-card").forEach((card) => {
+            const input = card.querySelector('input[name="runtime_mode"]');
+            card.classList.toggle("selected", input?.value === mode);
+          });
+          wizard.querySelectorAll("[data-runtime-panel]").forEach((panel) => {
+            const active = panel.dataset.runtimePanel === mode;
+            panel.hidden = !active;
+            panel.querySelectorAll("input, select, textarea").forEach((field) => {
+              field.disabled = !active;
+            });
+          });
+        }
+
         function updatePlainSummary() {
           const target = wizard.querySelector("[data-summary-text]");
           if (!target) return;
@@ -286,6 +319,7 @@
 
         function updateSummary() {
           syncDerivedFields();
+          syncRuntimeFields();
           for (const key of summaryKeys) {
             const target = wizard.querySelector(`[data-summary="${key}"]`);
             const source = wizard.elements.namedItem(key);
@@ -370,6 +404,7 @@
           const selected = event.target.value;
           window.location.href = `/app/set-language/${selected}?next=%2Fapp%2Fpraetor`;
         });
+        syncRuntimeFields();
         render();
       })();
     </script>
