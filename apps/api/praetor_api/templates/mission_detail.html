@@ -27,12 +27,15 @@
     <div class="executive-actions">
       <form method="post" action="/app/missions/{{ mission.id }}/run">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <button type="submit">{{ t("run_mission") }}</button>
+        <button type="submit" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("run_mission") }}</button>
       </form>
       <form method="post" action="/app/missions/{{ mission.id }}/board-briefing">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <button type="submit" class="secondary">{{ t("create_board_briefing") }}</button>
+        <button type="submit" class="secondary" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("create_board_briefing") }}</button>
       </form>
+      {% if not runtime_ready %}
+        <p class="ai-disabled-note">{{ t("ai_action_disabled") }}</p>
+      {% endif %}
       <details class="action-menu">
         <summary>{{ t("more_actions") }}</summary>
         <div class="action-menu-list">

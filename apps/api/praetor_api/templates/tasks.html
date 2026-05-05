@@ -47,7 +47,7 @@
               <td class="table-actions">
                 <form method="post" action="/app/missions/{{ mission.id }}/run">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                  <button type="submit" data-loading-label="…">{{ t("run") }}</button>
+                  <button type="submit" data-loading-label="…" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("run") }}</button>
                 </form>
               </td>
             </tr>

@@ -391,8 +391,11 @@
           </label>
           <div class="full actions">
             <a class="small-button" href="/office">{{ t("open_chairman_office") }}</a>
-            <button type="submit" data-default-label="{{ t('send_to_ceo') }}">{{ t("send_to_ceo") }}</button>
+            <button type="submit" data-default-label="{{ t('send_to_ceo') }}" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("send_to_ceo") }}</button>
           </div>
+          {% if not runtime_ready %}
+            <p class="full ai-disabled-note">{{ t("ai_action_disabled") }}</p>
+          {% endif %}
         </form>
       </section>
       <section class="panel">
@@ -428,8 +431,11 @@
             <input type="hidden" name="priority" value="{{ starter.priority }}" />
             <input type="hidden" name="requested_outputs" value="{{ starter.requested_outputs }}" />
             <div class="actions">
-              <button type="submit" class="secondary">{{ t("create_starter_mission") }}</button>
+              <button type="submit" class="secondary" {% if not runtime_ready %}disabled title="{{ t('ai_action_disabled') }}"{% endif %}>{{ t("create_starter_mission") }}</button>
             </div>
+            {% if not runtime_ready %}
+              <p class="ai-disabled-note">{{ t("ai_action_disabled") }}</p>
+            {% endif %}
           </form>
         {% endfor %}
       </div>

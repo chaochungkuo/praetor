@@ -73,6 +73,12 @@ TRANSLATIONS = {
         "founder_command_center": "Founder command center",
         "runtime_ready": "Runtime ready",
         "runtime_not_configured": "Runtime not configured",
+        "ai_power_outage_title": "AI runtime is offline",
+        "ai_power_outage_body": "Praetor is in power-outage mode: settings, records, and navigation remain available, but CEO chat, mission creation, board briefings, and execution are paused until AI is healthy.",
+        "ai_power_outage_reason": "Current issue",
+        "fix_runtime_now": "Fix AI runtime",
+        "ai_action_disabled": "AI action disabled until the runtime is healthy.",
+        "ai_runtime_required": "AI runtime is offline. Fix the runtime before asking the CEO or running AI work.",
         "login": "Login",
         "logout": "Logout",
         "owner": "Owner",
@@ -647,6 +653,12 @@ TRANSLATIONS = {
         "founder_command_center": "創辦人控制台",
         "runtime_ready": "執行環境已就緒",
         "runtime_not_configured": "執行環境尚未設定",
+        "ai_power_outage_title": "AI 執行環境離線",
+        "ai_power_outage_body": "Praetor 目前進入停電模式：你仍然可以調整設定、查看紀錄與整理資料，但 CEO 對話、建立任務、董事會簡報與任務執行會暫停，直到 AI 恢復健康。",
+        "ai_power_outage_reason": "目前問題",
+        "fix_runtime_now": "修復 AI 執行環境",
+        "ai_action_disabled": "AI 執行環境恢復前，這個 AI 動作會暫停。",
+        "ai_runtime_required": "AI 執行環境目前離線。請先修復執行環境，再要求 CEO 或執行 AI 工作。",
         "login": "登入",
         "logout": "登出",
         "owner": "擁有者",
@@ -1536,6 +1548,17 @@ def _friendly_runtime_error(exc_or_message: Exception | str, t) -> str:
     if "timed out" in lowered or "timeout" in lowered:
         return t("runtime_network_error")
     return message
+
+
+def _runtime_unavailable_message(request: Request, t) -> str | None:
+    try:
+        health = request.app.state.ctx.service.runtime_health()
+    except Exception as exc:
+        return _friendly_runtime_error(exc, t)
+    if health.get("healthy"):
+        return None
+    reason = health.get("error") or health.get("status") or t("runtime_not_configured")
+    return f"{t('ai_runtime_required')} {t('ai_power_outage_reason')}: {reason}"
 
 
 def _save_provider_api_key(provider: str, api_key: str) -> None:
@@ -2475,6 +2498,8 @@ async def create_ceo_conversation_submit(request: Request):
     body = str(form.get("body", "")).strip()
     if not body:
         return _redirect("/app/praetor", t("message_to_ceo_placeholder"), "error")
+    if runtime_message := _runtime_unavailable_message(request, t):
+        return _redirect("/app/models", runtime_message, "error")
     try:
         await run_in_threadpool(request.app.state.ctx.service.create_ceo_message, ConversationCreateRequest(body=body))
     except Exception as exc:
@@ -2700,9 +2725,12 @@ async def create_mission_submit(request: Request):
         return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
     title = str(form.get("title", "")).strip()
     if not title:
         return _redirect("/app/praetor", "Mission title is required.", "error")
+    if runtime_message := _runtime_unavailable_message(request, t):
+        return _redirect("/app/models", runtime_message, "error")
     requested_outputs_raw = str(form.get("requested_outputs", "")).strip()
     requested_outputs = [line.strip() for line in requested_outputs_raw.splitlines() if line.strip()]
     mission = await run_in_threadpool(
@@ -2726,6 +2754,8 @@ async def run_mission_submit(request: Request, mission_id: str):
     form = await request.form()
     _validate_form_csrf(request, form)
     t = _translator(_ui_language(request, settings))
+    if runtime_message := _runtime_unavailable_message(request, t):
+        return _redirect("/app/models", runtime_message, "error")
     ctx = request.app.state.ctx
     registry = ctx.run_registry
     if registry.is_running(mission_id):
@@ -2893,8 +2923,14 @@ async def reconcile_workspace_submit(request: Request, mission_id: str):
 
 @router.post("/app/missions/{mission_id}/board-briefing")
 async def create_board_briefing_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
     form = await request.form()
     _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    if runtime_message := _runtime_unavailable_message(request, t):
+        return _redirect("/app/models", runtime_message, "error")
     try:
         briefing = await run_in_threadpool(request.app.state.ctx.service.create_board_briefing, mission_id)
     except Exception as exc:

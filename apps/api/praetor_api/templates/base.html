@@ -108,6 +108,28 @@
           <template data-flash-seed data-flash-level="{{ flash_level }}">{{ flash }}</template>
         {% endif %}
 
+        {% if settings and not runtime_ready %}
+          <section class="ai-outage-banner" role="alert" aria-live="polite">
+            <div class="ai-outage-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M13 2 5 14h6l-1 8 8-12h-6l1-8Z" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="ai-outage-copy">
+              <span class="eyebrow">{{ t("ai_power_outage_title") }}</span>
+              <h2>{{ t("ai_power_outage_title") }}</h2>
+              <p>{{ t("ai_power_outage_body") }}</p>
+              {% if runtime_health and runtime_health.error %}
+                <p class="muted"><strong>{{ t("ai_power_outage_reason") }}:</strong> {{ runtime_health.error }}</p>
+              {% endif %}
+            </div>
+            <div class="ai-outage-actions">
+              <a class="small-button" href="/app/models">{{ t("fix_runtime_now") }}</a>
+              <a class="small-button secondary" href="/app/settings#runtime">{{ t("configure_runtime") }}</a>
+            </div>
+          </section>
+        {% endif %}
+
         {% block content %}{% endblock %}
       </main>
       <aside class="rail">
