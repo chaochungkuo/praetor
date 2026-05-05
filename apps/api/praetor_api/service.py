@@ -147,6 +147,9 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         )
         self._ensure_default_agent_roles()
         self._ensure_default_standing_orders()
+        self._ensure_default_permission_profiles()
+        self._ensure_default_team_templates()
+        self._ensure_default_executive_cadences()
         self._audit(
             "onboarding_completed",
             {
@@ -411,8 +414,10 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             status="planned",
         )
         self.storage.save_mission(Path(settings.workspace.root), mission)
+        self._transition_mission_stage(mission, "intake", "Mission request captured and workspace initialization started.")
         self._ensure_mission_knowledge_workspace(mission)
         self.storage.save_mission(Path(settings.workspace.root), mission)
+        self._transition_mission_stage(mission, "staffing", "Knowledge workspace exists; Praetor is selecting the operating team.")
         if mission.pm_required:
             self.storage.append_pm_report(
                 Path(settings.workspace.root),
@@ -443,6 +448,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             )
         )
         self._ensure_mission_team(mission)
+        self._transition_mission_stage(mission, "planning", "Mission team is active and ready to plan execution.")
         self._register_requested_output_assets(mission)
         if mission.pm_required:
             self.storage.append_agent_message(
@@ -1311,6 +1317,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.status = "ready_for_ceo"
         mission.updated_at = utc_now()
         self.storage.save_mission(workspace_root, mission)
+        self._transition_mission_stage(mission, "owner_decision", "Board briefing is ready for chairman review.", "ceo")
         self.storage.append_agent_message(
             AgentMessage(
                 mission_id=mission.id,
@@ -1356,6 +1363,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.status = "paused"
         mission.updated_at = utc_now()
         self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
+        self._record_work_trace(mission.id, "system", "mission_paused", "Mission paused", "Chairman paused the mission.", "praetor", mission.status)
         self._audit("mission_paused", {"mission_id": mission.id, "status": mission.status})
         return mission
 
@@ -1364,6 +1372,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.status = "resumed"
         mission.updated_at = utc_now()
         self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
+        self._transition_mission_stage(mission, "execution", "Mission resumed and can continue execution.", "praetor")
         self._audit("mission_resumed", {"mission_id": mission.id, "status": mission.status})
         return mission
 
@@ -1372,6 +1381,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.status = "archived"
         mission.updated_at = utc_now()
         self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
+        self._transition_mission_stage(mission, "closeout", "Mission was stopped and archived.", "praetor")
         self._audit("mission_stopped", {"mission_id": mission.id, "status": mission.status})
         return mission
 
@@ -1422,6 +1432,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.updated_at = utc_now()
         workspace_root = Path(settings.workspace.root)
         self.storage.save_mission(workspace_root, mission)
+        self._transition_mission_stage(mission, "execution", "Mission run started with scoped executor controls.", "praetor")
         work_session = self._open_work_session(mission)
         self._append_work_session_turn(
             work_session,
@@ -1542,6 +1553,12 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         mission.status = self._mission_status_from_bridge(final_status)
         mission.updated_at = utc_now()
         self.storage.save_mission(workspace_root, mission)
+        if mission.status == "ready_for_ceo":
+            self._transition_mission_stage(mission, "review", "Executor finished; PM/reviewer must validate outputs before owner closeout.", "project_manager")
+        elif mission.status == "waiting_approval":
+            self._transition_mission_stage(mission, "owner_decision", "Executor requires approval before continuing.", "project_manager")
+        elif mission.status == "failed":
+            self._record_work_trace(mission.id, "executor", "run_failed", "Mission run failed", final_status, "executor", mission.status)
         self._record_manager_decision(work_session, mission.status, final_result.task.id, final_result.run_record)
         self.storage.append_report(
             workspace_root,
@@ -2276,6 +2293,7 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             mission.status = "completed"
             mission.updated_at = utc_now()
             self.storage.save_mission(Path(self._require_settings().workspace.root), mission)
+            self._transition_mission_stage(mission, "closeout", "Completion contract passed; mission is closed.", "ceo")
             return action.model_copy(update={"status": "applied", "mission_id": mission_id, "result_id": mission.id})
 
         if action.type == "board_briefing":

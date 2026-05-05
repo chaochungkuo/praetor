@@ -103,6 +103,20 @@ WorkSessionTurnType = Literal[
     "manager_decision",
     "escalation",
 ]
+MissionStage = Literal[
+    "intake",
+    "staffing",
+    "planning",
+    "execution",
+    "review",
+    "owner_decision",
+    "memory_promotion",
+    "closeout",
+]
+SkillReviewStatus = Literal["imported_requires_review", "approved", "active", "rejected", "deprecated"]
+PermissionProfileLevel = Literal["strict", "standard", "trusted", "risk_review"]
+WorkTraceLayer = Literal["chairman", "ceo", "manager", "executor", "review", "memory", "system"]
+ExecutorControlAction = Literal["request_summary", "pause", "resume", "escalate_manager", "escalate_ceo", "mark_blocked"]
 MatterStatus = Literal["open", "waiting_owner", "waiting_external", "review", "closed", "archived"]
 DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"]
 FileAssetSource = Literal["requested_output", "document_version", "runtime_output", "upload", "download", "manual"]
@@ -282,7 +296,22 @@ class AgentSkillSpec(BaseModel):
     output_contract: list[str] = Field(default_factory=list)
     risk_flags: list[str] = Field(default_factory=list)
     safety_notes: list[str] = Field(default_factory=list)
-    status: str = "imported_requires_review"
+    status: SkillReviewStatus = "imported_requires_review"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentPermissionProfile(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("permprof"))
+    name: str
+    level: PermissionProfileLevel = "standard"
+    description: str
+    allowed_tools: list[str] = Field(default_factory=list)
+    allowed_workspace_scopes: list[str] = Field(default_factory=list)
+    forbidden_actions: list[str] = Field(default_factory=list)
+    required_approvals: list[str] = Field(default_factory=list)
+    memory_access: list[str] = Field(default_factory=list)
+    max_autonomy: AutonomyMode = "hybrid"
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -298,6 +327,7 @@ class AgentInstance(BaseModel):
     charter: str
     skills: list[str] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
+    permission_profile: str | None = None
     memory_access: list[str] = Field(default_factory=list)
     decision_authority: list[str] = Field(default_factory=list)
     escalation_triggers: list[str] = Field(default_factory=list)
@@ -312,6 +342,38 @@ class MissionTeam(BaseModel):
     lead_agent_id: str | None = None
     member_agent_ids: list[str] = Field(default_factory=list)
     status: str = "forming"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentEmploymentContract(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("contract"))
+    agent_id: str
+    mission_id: str | None = None
+    role_name: str
+    title: str
+    charter: str
+    permission_profile: str
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    memory_access: list[str] = Field(default_factory=list)
+    decision_authority: list[str] = Field(default_factory=list)
+    escalation_triggers: list[str] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+    status: str = "active"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TeamTemplate(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("teamtpl"))
+    name: str
+    purpose: str
+    domains: list[str] = Field(default_factory=list)
+    roles: list[str] = Field(default_factory=list)
+    default_outputs: list[str] = Field(default_factory=list)
+    escalation_policy: list[str] = Field(default_factory=list)
+    status: str = "active"
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -449,6 +511,7 @@ class MissionDefinition(BaseModel):
     complexity_score: float = 0.0
     escalation_reason: str | None = None
     status: MissionStatus = "planned"
+    current_stage: MissionStage = "intake"
     priority: str = "normal"
     domains: list[str] = Field(default_factory=list)
     summary: str | None = None
@@ -456,6 +519,28 @@ class MissionDefinition(BaseModel):
     client_id: str | None = None
     matter_id: str | None = None
     run_budget: MissionRunBudget = Field(default_factory=MissionRunBudget)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MissionStageTransition(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("stage"))
+    mission_id: str
+    stage: MissionStage
+    actor: str = "praetor"
+    reason: str
+    status_snapshot: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ExecutiveCadence(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("cadence"))
+    name: str
+    cadence_type: str = "manual"
+    description: str
+    notification_threshold: NotificationThreshold = "approval_required"
+    silent_if_clear: bool = True
+    enabled: bool = True
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -547,6 +632,10 @@ class ConversationCreateResult(BaseModel):
 class OrganizationSnapshot(BaseModel):
     agent_roles: list[AgentRoleSpec] = Field(default_factory=list)
     agents: list[AgentInstance] = Field(default_factory=list)
+    permission_profiles: list[AgentPermissionProfile] = Field(default_factory=list)
+    agent_contracts: list[AgentEmploymentContract] = Field(default_factory=list)
+    team_templates: list[TeamTemplate] = Field(default_factory=list)
+    executive_cadences: list[ExecutiveCadence] = Field(default_factory=list)
     teams: list[MissionTeam] = Field(default_factory=list)
     delegations: list[DelegationRecord] = Field(default_factory=list)
     escalations: list[EscalationRecord] = Field(default_factory=list)
@@ -590,6 +679,31 @@ class WorkSession(BaseModel):
     turns: list[WorkSessionTurn] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class WorkTraceEvent(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("trace"))
+    mission_id: str | None = None
+    layer: WorkTraceLayer = "system"
+    event_type: str
+    title: str
+    body: str | None = None
+    actor: str = "praetor"
+    status: str = "recorded"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ExecutorControlRecord(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("execctl"))
+    mission_id: str
+    action: ExecutorControlAction
+    requested_by: str = "chairman"
+    target_session_id: str | None = None
+    reason: str | None = None
+    status: str = "requested"
+    created_at: datetime = Field(default_factory=utc_now)
+    resolved_at: datetime | None = None
 
 
 class ClientRecord(BaseModel):

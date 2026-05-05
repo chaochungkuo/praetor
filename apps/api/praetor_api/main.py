@@ -476,6 +476,18 @@ def import_skill_source(source_id: str):
         fail(404, "not_found", f"Skill source not found: {source_id}")
 
 
+@app.post("/api/organization/skills/{skill_id}/status")
+def update_agent_skill_status(skill_id: str, payload: dict[str, str]):
+    try:
+        return ok(get_ctx().service.set_agent_skill_status(skill_id, payload.get("status", "")))
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Skill not found: {skill_id}")
+    except ValueError as exc:
+        fail(400, "invalid_status", str(exc))
+
+
 @app.get("/api/knowledge")
 def api_knowledge_snapshot():
     try:
@@ -677,6 +689,41 @@ def mission_run_attempts(mission_id: str):
         fail(400, "not_initialized", str(exc))
     except KeyError:
         fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/missions/{mission_id}/work-trace")
+def mission_work_trace(mission_id: str):
+    try:
+        return ok(
+            {
+                "stages": get_ctx().service.mission_stage_transitions(mission_id),
+                "events": get_ctx().service.mission_work_trace(mission_id),
+                "contracts": get_ctx().service.mission_agent_contracts(mission_id),
+            }
+        )
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.post("/api/missions/{mission_id}/executor-control")
+def mission_executor_control(mission_id: str, payload: dict[str, str]):
+    try:
+        return ok(
+            get_ctx().service.request_executor_control(
+                mission_id,
+                payload.get("action", ""),
+                payload.get("reason") or None,
+                payload.get("target_session_id") or None,
+            )
+        )
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+    except ValueError as exc:
+        fail(400, "invalid_request", str(exc))
 
 
 @app.get("/debug/state")

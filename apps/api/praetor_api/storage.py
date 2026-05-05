@@ -13,6 +13,8 @@ from typing import Any, Iterator
 from .models import (
     AgentMessage,
     AgentInstance,
+    AgentEmploymentContract,
+    AgentPermissionProfile,
     AgentRoleSpec,
     AgentSkillSpec,
     AppSettings,
@@ -27,12 +29,15 @@ from .models import (
     FileAssetRecord,
     FileMoveRecord,
     WorkspaceReconciliationReport,
+    ExecutiveCadence,
+    ExecutorControlRecord,
     KnowledgeUpdate,
     MemoryPromotionReview,
     MatterDecisionRecord,
     MatterRecord,
     MeetingRecord,
     MissionDefinition,
+    MissionStageTransition,
     MissionTeam,
     OpenQuestionRecord,
     OwnerAuthRecord,
@@ -40,9 +45,11 @@ from .models import (
     StandingOrder,
     SkillSource,
     TaskDefinition,
+    TeamTemplate,
     WorkflowContract,
     WorkspaceRestructurePlan,
     WorkspaceScope,
+    WorkTraceEvent,
     WorkSession,
 )
 
@@ -367,6 +374,30 @@ class SQLiteIndex:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_agents_mission ON agents(mission_id)")
             conn.execute(
                 """
+                CREATE TABLE IF NOT EXISTS agent_permission_profiles (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_perm_profiles_name ON agent_permission_profiles(name)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_employment_contracts (
+                    id TEXT PRIMARY KEY,
+                    agent_id TEXT NOT NULL,
+                    mission_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_contracts_agent ON agent_employment_contracts(agent_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_contracts_mission ON agent_employment_contracts(mission_id)")
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS mission_teams (
                     id TEXT PRIMARY KEY,
                     mission_id TEXT NOT NULL,
@@ -376,6 +407,61 @@ class SQLiteIndex:
                 """
             )
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_mission_teams_mission ON mission_teams(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS team_templates (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_team_templates_name ON team_templates(name)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mission_stage_transitions (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_stage_transitions_mission ON mission_stage_transitions(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS work_trace_events (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_work_trace_mission ON work_trace_events(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS executor_controls (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_executor_controls_mission ON executor_controls(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS executive_cadences (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_executive_cadences_name ON executive_cadences(name)")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS delegations (
@@ -1237,6 +1323,65 @@ class SQLiteIndex:
                 ).fetchall()
         return [AgentInstance.model_validate_json(row["payload_json"]) for row in rows]
 
+    # --- Agent governance ---
+
+    def upsert_agent_permission_profile(self, profile: AgentPermissionProfile) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM agent_permission_profiles WHERE id != ? AND name = ?",
+                (profile.id, profile.name),
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_permission_profiles (id, name, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (profile.id, profile.name, profile.updated_at.isoformat(), profile.model_dump_json(indent=2)),
+            )
+
+    def list_agent_permission_profiles(self) -> list[AgentPermissionProfile]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM agent_permission_profiles ORDER BY name ASC"
+            ).fetchall()
+        return [AgentPermissionProfile.model_validate_json(row["payload_json"]) for row in rows]
+
+    def upsert_agent_contract(self, contract: AgentEmploymentContract) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM agent_employment_contracts WHERE id != ? AND agent_id = ?",
+                (contract.id, contract.agent_id),
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_employment_contracts (id, agent_id, mission_id, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    contract.id,
+                    contract.agent_id,
+                    contract.mission_id,
+                    contract.updated_at.isoformat(),
+                    contract.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_agent_contracts(self, mission_id: str | None = None) -> list[AgentEmploymentContract]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM agent_employment_contracts
+                    WHERE mission_id = ? ORDER BY updated_at DESC
+                    """,
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM agent_employment_contracts ORDER BY updated_at DESC"
+                ).fetchall()
+        return [AgentEmploymentContract.model_validate_json(row["payload_json"]) for row in rows]
+
     # --- MissionTeams ---
 
     def upsert_team(self, team: MissionTeam) -> None:
@@ -1264,6 +1409,125 @@ class SQLiteIndex:
                     "SELECT payload_json FROM mission_teams ORDER BY updated_at DESC"
                 ).fetchall()
         return [MissionTeam.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- Team templates and mission stage trace ---
+
+    def upsert_team_template(self, template: TeamTemplate) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM team_templates WHERE id != ? AND name = ?", (template.id, template.name))
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO team_templates (id, name, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (template.id, template.name, template.updated_at.isoformat(), template.model_dump_json(indent=2)),
+            )
+
+    def list_team_templates(self) -> list[TeamTemplate]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT payload_json FROM team_templates ORDER BY name ASC").fetchall()
+        return [TeamTemplate.model_validate_json(row["payload_json"]) for row in rows]
+
+    def upsert_mission_stage_transition(self, transition: MissionStageTransition) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO mission_stage_transitions (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    transition.id,
+                    transition.mission_id,
+                    transition.created_at.isoformat(),
+                    transition.model_dump_json(indent=2),
+                ),
+            )
+
+    def list_mission_stage_transitions(self, mission_id: str | None = None) -> list[MissionStageTransition]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM mission_stage_transitions
+                    WHERE mission_id = ? ORDER BY created_at ASC
+                    """,
+                    (mission_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM mission_stage_transitions ORDER BY created_at DESC"
+                ).fetchall()
+        return [MissionStageTransition.model_validate_json(row["payload_json"]) for row in rows]
+
+    def upsert_work_trace_event(self, event: WorkTraceEvent) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO work_trace_events (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (event.id, event.mission_id, event.created_at.isoformat(), event.model_dump_json(indent=2)),
+            )
+
+    def list_work_trace_events(self, mission_id: str | None = None, limit: int = 100) -> list[WorkTraceEvent]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM work_trace_events
+                    WHERE mission_id = ? ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM work_trace_events ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [WorkTraceEvent.model_validate_json(row["payload_json"]) for row in rows]
+
+    def upsert_executor_control(self, control: ExecutorControlRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO executor_controls (id, mission_id, created_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (control.id, control.mission_id, control.created_at.isoformat(), control.model_dump_json(indent=2)),
+            )
+
+    def list_executor_controls(self, mission_id: str | None = None, limit: int = 100) -> list[ExecutorControlRecord]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT payload_json FROM executor_controls
+                    WHERE mission_id = ? ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM executor_controls ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [ExecutorControlRecord.model_validate_json(row["payload_json"]) for row in rows]
+
+    def upsert_executive_cadence(self, cadence: ExecutiveCadence) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM executive_cadences WHERE id != ? AND name = ?", (cadence.id, cadence.name))
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO executive_cadences (id, name, updated_at, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (cadence.id, cadence.name, cadence.updated_at.isoformat(), cadence.model_dump_json(indent=2)),
+            )
+
+    def list_executive_cadences(self) -> list[ExecutiveCadence]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT payload_json FROM executive_cadences ORDER BY name ASC").fetchall()
+        return [ExecutiveCadence.model_validate_json(row["payload_json"]) for row in rows]
 
     # --- Delegations ---
 
@@ -2668,6 +2932,23 @@ class AppStorage:
         key = ("agents", mission_id)
         return self._cached(key, lambda: self.index.list_agents(mission_id=mission_id))
 
+    # --- Agent governance (SQLite-primary) ---
+
+    def save_agent_permission_profile(self, profile: AgentPermissionProfile) -> None:
+        self.index.upsert_agent_permission_profile(profile)
+        self._invalidate("agent_permission_profiles")
+
+    def list_agent_permission_profiles(self) -> list[AgentPermissionProfile]:
+        return self._cached("agent_permission_profiles", self.index.list_agent_permission_profiles)
+
+    def save_agent_contract(self, contract: AgentEmploymentContract) -> None:
+        self.index.upsert_agent_contract(contract)
+        self._invalidate_prefix("agent_contracts")
+
+    def list_agent_contracts(self, mission_id: str | None = None) -> list[AgentEmploymentContract]:
+        key = ("agent_contracts", mission_id)
+        return self._cached(key, lambda: self.index.list_agent_contracts(mission_id=mission_id))
+
     # --- MissionTeams (SQLite-primary) ---
 
     def save_team(self, team: MissionTeam) -> None:
@@ -2675,6 +2956,46 @@ class AppStorage:
 
     def list_teams(self, mission_id: str | None = None) -> list[MissionTeam]:
         return self.index.list_teams(mission_id=mission_id)
+
+    # --- Team templates and mission stage trace (SQLite-primary) ---
+
+    def save_team_template(self, template: TeamTemplate) -> None:
+        self.index.upsert_team_template(template)
+        self._invalidate("team_templates")
+
+    def list_team_templates(self) -> list[TeamTemplate]:
+        return self._cached("team_templates", self.index.list_team_templates)
+
+    def save_mission_stage_transition(self, transition: MissionStageTransition) -> None:
+        self.index.upsert_mission_stage_transition(transition)
+        self._invalidate_prefix("mission_stage_transitions")
+
+    def list_mission_stage_transitions(self, mission_id: str | None = None) -> list[MissionStageTransition]:
+        key = ("mission_stage_transitions", mission_id)
+        return self._cached(key, lambda: self.index.list_mission_stage_transitions(mission_id=mission_id))
+
+    def save_work_trace_event(self, event: WorkTraceEvent) -> None:
+        self.index.upsert_work_trace_event(event)
+        self._invalidate_prefix("work_trace_events")
+
+    def list_work_trace_events(self, mission_id: str | None = None, limit: int = 100) -> list[WorkTraceEvent]:
+        key = ("work_trace_events", mission_id, limit)
+        return self._cached(key, lambda: self.index.list_work_trace_events(mission_id=mission_id, limit=limit))
+
+    def save_executor_control(self, control: ExecutorControlRecord) -> None:
+        self.index.upsert_executor_control(control)
+        self._invalidate_prefix("executor_controls")
+
+    def list_executor_controls(self, mission_id: str | None = None, limit: int = 100) -> list[ExecutorControlRecord]:
+        key = ("executor_controls", mission_id, limit)
+        return self._cached(key, lambda: self.index.list_executor_controls(mission_id=mission_id, limit=limit))
+
+    def save_executive_cadence(self, cadence: ExecutiveCadence) -> None:
+        self.index.upsert_executive_cadence(cadence)
+        self._invalidate("executive_cadences")
+
+    def list_executive_cadences(self) -> list[ExecutiveCadence]:
+        return self._cached("executive_cadences", self.index.list_executive_cadences)
 
     # --- Delegations (SQLite-primary) ---
 

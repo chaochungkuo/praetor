@@ -57,6 +57,35 @@
     </div>
   </section>
 
+  <section class="glass-panel">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">{{ t("mission_stage") }}</span>
+        <h3>{{ label(mission.current_stage) }}</h3>
+        <p>{{ t("mission_stage_desc") }}</p>
+      </div>
+      <span class="status">{{ stage_transitions|length }} {{ t("recent_audit_events") }}</span>
+    </div>
+    <div class="health-strip">
+      {% for stage in mission_stages %}
+        <span class="{{ 'status' if stage == mission.current_stage else '' }}">{{ label(stage) }}</span>
+      {% endfor %}
+    </div>
+    {% if stage_transitions %}
+      <div class="list">
+        {% for transition in stage_transitions[-4:] %}
+          <div class="list-row soft-row">
+            <div>
+              <strong>{{ label(transition.stage) }}</strong>
+              <div class="muted">{{ transition.reason }}</div>
+            </div>
+            <span class="status">{{ format_time(transition.created_at) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
   <section class="panel live-run-panel" id="live-run-panel" data-mission-id="{{ mission.id }}" hidden>
     <div class="section-heading">
       <div>
@@ -377,6 +406,69 @@
               <p class="muted">{{ t("no_work_sessions") }}</p>
             {% endfor %}
           </div>
+        </section>
+        <div class="grid two">
+          <section>
+            <h4>{{ t("ai_work_trace") }}</h4>
+            <p class="muted">{{ t("ai_work_trace_desc") }}</p>
+            <div class="list">
+              {% for event in work_trace[:12] %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ event.title }}</strong>
+                    {% if event.body %}<div class="muted">{{ event.body }}</div>{% endif %}
+                    <div class="muted">{{ label(event.layer) }} · {{ label(event.event_type) }} · {{ event.actor }}</div>
+                  </div>
+                  <span class="status">{{ format_time(event.created_at) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("none") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+          <section>
+            <h4>{{ t("employment_contracts") }}</h4>
+            <div class="list">
+              {% for contract in agent_contracts %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ role_label(contract.role_name) }}</strong>
+                    <div class="muted">{{ t("permission_profile") }}: {{ contract.permission_profile }}</div>
+                    <div class="muted">{{ contract.completion_criteria[:2]|join(" · ") }}</div>
+                  </div>
+                  <span class="status">{{ label(contract.status) }}</span>
+                </div>
+              {% else %}
+                <p class="muted">{{ t("none") }}</p>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+        <section>
+          <h4>{{ t("executor_control") }}</h4>
+          <div class="mini-actions">
+            {% for action in ["request_summary", "escalate_manager", "escalate_ceo", "mark_blocked"] %}
+              <form method="post" action="/app/missions/{{ mission.id }}/executor-control">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="action" value="{{ action }}" />
+                <input type="hidden" name="reason" value="{{ t(action) }}" />
+                <button type="submit" class="secondary">{{ t(action) }}</button>
+              </form>
+            {% endfor %}
+          </div>
+          {% if executor_controls %}
+            <div class="list">
+              {% for control in executor_controls[:5] %}
+                <div class="list-row soft-row">
+                  <div>
+                    <strong>{{ t(control.action) }}</strong>
+                    {% if control.reason %}<div class="muted">{{ control.reason }}</div>{% endif %}
+                  </div>
+                  <span class="status">{{ label(control.status) }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </section>
       </div>
     </details>

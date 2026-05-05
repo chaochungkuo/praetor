@@ -386,6 +386,34 @@ TRANSLATIONS = {
         "skill_source_failed": "Skill source import failed.",
         "no_skill_sources": "No skill sources connected yet.",
         "no_imported_skills": "No imported skills yet.",
+        "review_skill": "Review skill",
+        "approve_skill": "Approve",
+        "reject_skill": "Reject",
+        "deprecate_skill": "Deprecate",
+        "skill_status_updated": "Skill review updated.",
+        "permission_profiles": "Permission profiles",
+        "permission_profiles_desc": "Reusable safety envelopes that define what each agent can read, write, run, and escalate.",
+        "employment_contracts": "Employment contracts",
+        "employment_contracts_desc": "Per-agent charters linking role, mission, skills, permissions, and closeout criteria.",
+        "team_templates": "Team templates",
+        "team_templates_desc": "Praetor uses these patterns to staff work like product launches, contract matters, and security reviews.",
+        "executive_cadence": "Executive cadence",
+        "executive_cadence_desc": "Formal notification policy: quiet by default, visible when approval, risk, or blocked work requires attention.",
+        "mission_stage": "Mission stage",
+        "mission_stage_desc": "The operating lifecycle from intake to closeout.",
+        "ai_work_trace": "AI work trace",
+        "ai_work_trace_desc": "A readable log of AI-to-AI coordination, staffing, execution control, and governance events.",
+        "executor_control": "Executor control",
+        "request_summary": "Request summary",
+        "escalate_manager": "Escalate to PM",
+        "escalate_ceo": "Escalate to CEO",
+        "mark_blocked": "Mark blocked",
+        "executor_control_requested": "Executor control request recorded.",
+        "completion_criteria": "Completion criteria",
+        "permission_profile": "Permission profile",
+        "forbidden_actions": "Forbidden actions",
+        "required_approvals": "Required approvals",
+        "allowed_tools": "Allowed tools",
         "open_agent_mission": "Open mission",
         "working_on_mission": "Working on mission",
         "waiting_for_assignment": "Waiting for assignment",
@@ -918,6 +946,34 @@ TRANSLATIONS = {
         "skill_source_failed": "Skill 來源匯入失敗。",
         "no_skill_sources": "尚未連接 skill 來源。",
         "no_imported_skills": "尚未匯入 skill。",
+        "review_skill": "審查 Skill",
+        "approve_skill": "核准",
+        "reject_skill": "拒絕",
+        "deprecate_skill": "停用",
+        "skill_status_updated": "Skill 審查狀態已更新。",
+        "permission_profiles": "權限設定檔",
+        "permission_profiles_desc": "可重複使用的安全邊界，定義每個 agent 能讀、能寫、能執行以及何時升級。",
+        "employment_contracts": "Agent 聘用合約",
+        "employment_contracts_desc": "每個 agent 的角色、任務、skill、權限與完成標準都會寫在合約裡。",
+        "team_templates": "團隊模板",
+        "team_templates_desc": "Praetor 會用這些模式來編組產品、合約、資安等正式工作。",
+        "executive_cadence": "董事長節奏",
+        "executive_cadence_desc": "正式通知策略：預設安靜，只有核准、風險或卡住的工作才提醒。",
+        "mission_stage": "任務階段",
+        "mission_stage_desc": "從受理、編組、規劃、執行、審查到結案的營運生命週期。",
+        "ai_work_trace": "AI 工作軌跡",
+        "ai_work_trace_desc": "用可讀方式記錄 AI 對 AI 的協作、編組、執行控制與治理事件。",
+        "executor_control": "Executor 控制",
+        "request_summary": "要求摘要",
+        "escalate_manager": "升級給 PM",
+        "escalate_ceo": "升級給 CEO",
+        "mark_blocked": "標記卡住",
+        "executor_control_requested": "Executor 控制要求已記錄。",
+        "completion_criteria": "完成標準",
+        "permission_profile": "權限設定檔",
+        "forbidden_actions": "禁止動作",
+        "required_approvals": "需要核准",
+        "allowed_tools": "允許工具",
         "open_agent_mission": "打開任務",
         "working_on_mission": "正在處理任務",
         "waiting_for_assignment": "等待指派",
@@ -1176,6 +1232,21 @@ VALUE_LABELS = {
         "avoid_acting_without_approval": "avoid acting without approval",
         "true": "yes",
         "false": "no",
+        "intake": "intake",
+        "staffing": "staffing",
+        "planning": "planning",
+        "execution": "execution",
+        "review": "review",
+        "owner_decision": "owner decision",
+        "memory_promotion": "memory promotion",
+        "closeout": "closeout",
+        "manager": "manager",
+        "executor": "executor",
+        "system": "system",
+        "approval_required": "approval required",
+        "digest": "digest",
+        "event": "event",
+        "manual": "manual",
     },
     "zh-TW": {
         "planned": "已規劃",
@@ -1229,6 +1300,21 @@ VALUE_LABELS = {
         "avoid_acting_without_approval": "避免未經批准就行動",
         "true": "是",
         "false": "否",
+        "intake": "受理",
+        "staffing": "編組",
+        "planning": "規劃",
+        "execution": "執行",
+        "review": "審查",
+        "owner_decision": "董事長裁示",
+        "memory_promotion": "記憶整理",
+        "closeout": "結案",
+        "manager": "管理層",
+        "executor": "執行層",
+        "system": "系統",
+        "approval_required": "需要批准",
+        "digest": "摘要",
+        "event": "事件",
+        "manual": "手動",
     },
 }
 
@@ -1805,6 +1891,7 @@ def _build_agent_directory(service) -> dict[str, Any]:
     work_sessions_by_mission: dict[str, list[Any]] = {}
     for session in service.all_work_sessions():
         work_sessions_by_mission.setdefault(session.mission_id, []).append(session)
+    contracts_by_agent = {contract.agent_id: contract for contract in organization.agent_contracts}
     delegations_by_agent: dict[str, list[Any]] = {}
     delegations_by_role: dict[str, list[Any]] = {}
     for delegation in organization.delegations:
@@ -1870,6 +1957,7 @@ def _build_agent_directory(service) -> dict[str, Any]:
                 "next_step": next_step,
                 "reports_to": agent.supervisor_role or "ceo",
                 "last_activity": last_activity,
+                "contract": contracts_by_agent.get(agent.id),
                 "href": f"/app/missions/{agent.mission_id}" if agent.mission_id else "/app/agents",
             }
         )
@@ -1900,6 +1988,8 @@ def _build_agent_directory(service) -> dict[str, Any]:
             "active_teams": len(organization.teams),
             "open_work_sessions": open_work_session_count,
             "blocked_agents": blocked_count,
+            "contracts": len(organization.agent_contracts),
+            "permission_profiles": len(organization.permission_profiles),
         },
     }
 
@@ -2084,6 +2174,25 @@ async def import_skill_source_submit(request: Request, source_id: str):
     except Exception as exc:
         return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
     return _redirect("/app/agents", t("skill_source_added"), "success")
+
+
+@router.post("/app/agents/skills/{skill_id}/status")
+async def update_skill_status_submit(request: Request, skill_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    try:
+        await run_in_threadpool(
+            request.app.state.ctx.service.set_agent_skill_status,
+            skill_id,
+            str(form.get("status", "")).strip(),
+        )
+    except Exception as exc:
+        return _redirect("/app/agents", f"{t('skill_source_failed')} {_friendly_runtime_error(exc, t)}", "error")
+    return _redirect("/app/agents", t("skill_status_updated"), "success")
 
 
 @router.get("/app/overview", response_class=HTMLResponse)
@@ -2455,6 +2564,10 @@ def mission_detail_page(request: Request, mission_id: str):
     run_attempts = service.list_run_attempts(mission_id)
     workspace_scope = service.mission_workspace_scope(mission_id)
     workflow_contract = service.workflow_contract()
+    stage_transitions = service.mission_stage_transitions(mission_id)
+    work_trace = service.mission_work_trace(mission_id)
+    agent_contracts = service.mission_agent_contracts(mission_id)
+    executor_controls = service.storage.list_executor_controls(mission_id=mission_id)
     return templates.TemplateResponse(
         request=request,
         name="mission_detail.html",
@@ -2472,6 +2585,11 @@ def mission_detail_page(request: Request, mission_id: str):
             "run_attempts": run_attempts,
             "workspace_scope": workspace_scope,
             "workflow_contract": workflow_contract,
+            "stage_transitions": stage_transitions,
+            "work_trace": work_trace,
+            "agent_contracts": agent_contracts,
+            "executor_controls": executor_controls,
+            "mission_stages": ["intake", "staffing", "planning", "execution", "review", "owner_decision", "memory_promotion", "closeout"],
         },
     )
 
@@ -2671,6 +2789,27 @@ async def stop_mission_submit(request: Request, mission_id: str):
     except Exception as exc:
         return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
     return _redirect(f"/app/missions/{mission_id}", t("mission_stopped"), "success")
+
+
+@router.post("/app/missions/{mission_id}/executor-control")
+async def mission_executor_control_submit(request: Request, mission_id: str):
+    settings = _require_initialized(request)
+    if settings is None:
+        return _redirect("/app/praetor", "Complete onboarding first.", "error")
+    form = await request.form()
+    _validate_form_csrf(request, form)
+    t = _translator(_ui_language(request, settings))
+    try:
+        await run_in_threadpool(
+            request.app.state.ctx.service.request_executor_control,
+            mission_id,
+            str(form.get("action", "")).strip(),
+            str(form.get("reason", "")).strip() or None,
+            str(form.get("target_session_id", "")).strip() or None,
+        )
+    except Exception as exc:
+        return _redirect(f"/app/missions/{mission_id}", _friendly_runtime_error(exc, t), "error")
+    return _redirect(f"/app/missions/{mission_id}", t("executor_control_requested"), "success")
 
 
 @router.post("/app/missions/{mission_id}/meeting")

@@ -53,6 +53,10 @@
             </div>
             <dl class="agent-work-meta">
               <div>
+                <dt>{{ t("permission_profile") }}</dt>
+                <dd>{{ card.contract.permission_profile if card.contract else card.agent.permission_profile or t("not_available") }}</dd>
+              </div>
+              <div>
                 <dt>{{ t("current_work") }}</dt>
                 <dd>{{ phrase_label(card.current_work) }}</dd>
               </div>
@@ -178,6 +182,23 @@
                   <span class="skill-chip">{{ t("all_clear") }}</span>
                 {% endfor %}
               </div>
+              <div class="actions">
+                <form method="post" action="/app/agents/skills/{{ skill.id }}/status">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <input type="hidden" name="status" value="approved" />
+                  <button class="small" type="submit">{{ t("approve_skill") }}</button>
+                </form>
+                <form method="post" action="/app/agents/skills/{{ skill.id }}/status">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <input type="hidden" name="status" value="rejected" />
+                  <button class="small secondary" type="submit">{{ t("reject_skill") }}</button>
+                </form>
+                <form method="post" action="/app/agents/skills/{{ skill.id }}/status">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <input type="hidden" name="status" value="deprecated" />
+                  <button class="small secondary" type="submit">{{ t("deprecate_skill") }}</button>
+                </form>
+              </div>
             </details>
           {% endfor %}
         </div>
@@ -257,6 +278,134 @@
       {% else %}
         <p class="muted">{{ t("no_agent_activity") }}</p>
       {% endif %}
+    </section>
+  </section>
+
+  <section class="grid two">
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("permission_profiles") }}</h3>
+          <p>{{ t("permission_profiles_desc") }}</p>
+        </div>
+        <span class="status">{{ organization.permission_profiles|length }}</span>
+      </div>
+      <div class="agent-role-grid">
+        {% for profile in organization.permission_profiles %}
+          <details class="agent-card role-detail">
+            <summary>
+              <span>
+                <span class="eyebrow">{{ label(profile.level) }}</span>
+                <strong>{{ profile.name }}</strong>
+              </span>
+              <span class="status">{{ label(profile.max_autonomy) }}</span>
+            </summary>
+            <p>{{ profile.description }}</p>
+            <dl class="agent-meta">
+              <div>
+                <dt>{{ t("allowed_tools") }}</dt>
+                <dd>{{ profile.allowed_tools|join(", ") or t("not_available") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("required_approvals") }}</dt>
+                <dd>{{ profile.required_approvals|join(", ") or t("not_available") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("forbidden_actions") }}</dt>
+                <dd>{{ profile.forbidden_actions|join(", ") or t("not_available") }}</dd>
+              </div>
+            </dl>
+          </details>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("team_templates") }}</h3>
+          <p>{{ t("team_templates_desc") }}</p>
+        </div>
+        <span class="status">{{ organization.team_templates|length }}</span>
+      </div>
+      <div class="command-list">
+        {% for template in organization.team_templates %}
+          <div class="team-card">
+            <div class="team-card-main">
+              <span class="eyebrow">{{ template.domains|join(", ") }}</span>
+              <strong>{{ template.name }}</strong>
+              <p>{{ template.purpose }}</p>
+            </div>
+            <dl class="agent-work-meta compact">
+              <div>
+                <dt>{{ t("team_members") }}</dt>
+                <dd>{{ template.roles|join(", ") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("completion_criteria") }}</dt>
+                <dd>{{ template.default_outputs|join(", ") }}</dd>
+              </div>
+            </dl>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  </section>
+
+  <section class="grid two">
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("employment_contracts") }}</h3>
+          <p>{{ t("employment_contracts_desc") }}</p>
+        </div>
+        <span class="status">{{ organization.agent_contracts|length }}</span>
+      </div>
+      <div class="command-list">
+        {% for contract in organization.agent_contracts[:10] %}
+          <a class="team-card" href="{{ '/app/missions/' ~ contract.mission_id if contract.mission_id else '/app/agents' }}">
+            <div class="team-card-main">
+              <span class="eyebrow">{{ role_label(contract.role_name) }}</span>
+              <strong>{{ contract.title }}</strong>
+              <p>{{ contract.permission_profile }} · {{ contract.status }}</p>
+            </div>
+            <dl class="agent-work-meta compact">
+              <div>
+                <dt>{{ t("skills") }}</dt>
+                <dd>{{ contract.skills[:4]|join(", ") or t("not_available") }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("completion_criteria") }}</dt>
+                <dd>{{ contract.completion_criteria[:2]|join(" · ") }}</dd>
+              </div>
+            </dl>
+          </a>
+        {% else %}
+          <p class="muted">{{ t("no_active_agents") }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel command-panel">
+      <div class="section-heading">
+        <div>
+          <h3>{{ t("executive_cadence") }}</h3>
+          <p>{{ t("executive_cadence_desc") }}</p>
+        </div>
+        <span class="status">{{ organization.executive_cadences|length }}</span>
+      </div>
+      <div class="command-list">
+        {% for cadence in organization.executive_cadences %}
+          <div class="team-card">
+            <div class="team-card-main">
+              <span class="eyebrow">{{ label(cadence.cadence_type) }}</span>
+              <strong>{{ cadence.name }}</strong>
+              <p>{{ cadence.description }}</p>
+            </div>
+            <span class="status">{{ label(cadence.notification_threshold) }}</span>
+          </div>
+        {% endfor %}
+      </div>
     </section>
   </section>
 
