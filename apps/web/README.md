@@ -32,6 +32,6 @@ Current Office capabilities:
 - automatic CEO planner mode by default: API runtime plus a real provider key uses the LLM planner, otherwise it stays deterministic; force modes with `PRAETOR_CEO_PLANNER_MODE=llm|deterministic`
 - mission room with timeline and AI internal conversation
 - AI organization panel with mission team, delegation, escalation, and standing order telemetry
-- browser speech recognition as the first voice input path
+- OpenAI transcription for CEO voice input when an OpenAI API key is configured, with browser speech recognition as fallback
 
 The LLM planner uses the configured runtime provider/model in automatic mode, or `PRAETOR_CEO_PLANNER_PROVIDER` and `PRAETOR_CEO_PLANNER_MODEL` when forced with `PRAETOR_CEO_PLANNER_MODE=llm`. Invalid or unavailable LLM output falls back to the deterministic planner and records a briefing action.

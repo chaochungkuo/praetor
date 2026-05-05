@@ -78,7 +78,7 @@ What they cover:
 
 ## CEO Planner Modes
 
-The default is deterministic so local development and CI do not require paid API access.
+The app install default is automatic: an API runtime with a real provider key uses the LLM planner, while missing or unavailable AI falls back to the deterministic planner. For local development or CI, force deterministic mode when you do not want paid API access.
 
 ```bash
 PRAETOR_CEO_PLANNER_MODE=deterministic
