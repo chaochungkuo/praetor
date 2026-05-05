@@ -166,6 +166,7 @@ def main() -> int:
                     "models_has_connection": "Model and API connection" in models,
                     "models_has_test_connection": "Test connection" in models,
                     "models_has_usage": "Usage by executor" in models,
+                    "models_has_subscription_executor_setup": "ChatGPT subscription executor" in models,
                     "meetings_has_title": "Structured meetings" in meetings,
                     "mobile_has_briefing": "Mobile briefing" in mobile or "行動簡報" in mobile,
                     "settings_has_owner": "Owner" in settings,

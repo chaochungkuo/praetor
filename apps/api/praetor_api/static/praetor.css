@@ -73,6 +73,29 @@ pre {
   color: #e7e0d4;
 }
 
+.terminal-command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.terminal-command span {
+  color: var(--muted);
+}
+
+.terminal-command code {
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .shell {
   min-height: 100vh;
   display: grid;
