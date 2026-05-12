@@ -1,8 +1,10 @@
 # Praetor Roadmap
 
-This file is the current execution roadmap for finishing Praetor.
+Status: 2026-05-12 refreshed after foundation cleanup.
 
-It is the single working checklist we should follow from now on.
+This file is the current execution roadmap. It is the single working checklist
+for getting Praetor to a real v1 release. Anything that changes scope or order
+should be reflected here, not in scattered specs.
 
 ## Product Goal
 
@@ -18,202 +20,207 @@ Praetor should become a deployable, founder-facing AI company command center:
 
 - Prefer a usable vertical slice over broad unfinished surface area.
 - Keep the MVP opinionated.
-- Protect trust: auditability, writable scope boundaries, pause/resume, and approvals are core product features.
-- Do not expand agent customization before the CEO / role / governance model feels solid.
+- Protect trust: auditability, writable scope boundaries, pause/resume,
+  and approvals are core product features.
+- Do not expand agent customization before the CEO / role / governance
+  model feels solid.
+- **Refactor before features.** When a layer is being used by tests but
+  not by users, demote it before adding the next thing on top.
 - Use this roadmap as the source of truth for execution order.
 
-## Current Status
-
-### Foundation
-
-- [x] Product brief written
-- [x] System spec written
-- [x] UI spec written
-- [x] Web / Mobile / Telegram surfaces spec written
-- [x] Deployment and security spec written
-- [x] Executor bridge spec written
-- [x] Brand spec written
-- [x] Repo-local Pixi environment established as the official dev baseline
-
-### Runtime / Bridge
-
-- [x] `praetor-execd` OpenAPI and JSON schemas created
-- [x] `praetor-execd` FastAPI bridge skeleton implemented
-- [x] Worker-side `bridge_client` implemented
-- [x] Mock executor end-to-end flow working
-- [x] Native `codex` executor path working
-- [x] Native `claude_code` executor path working
-- [x] Host-side executor model confirmed without reinstalling tools inside Docker
-
-### Product Architecture
-
-- [x] Company memory direction fixed: company memory yes, agent personal memory no for MVP
-- [x] Role-first architecture fixed
-- [x] Hidden PM architecture fixed
-- [x] Web as canonical control plane fixed
-- [x] `subscription_executor` deployment boundary fixed
-
-### Still Missing
-
-- [x] Praetor app backend
-- [x] Onboarding backend and persistence
-- [x] Browser UI implementation
-- [x] Mission runtime above the bridge layer
-- [x] API mode implementation
-- [x] Workspace management implementation
-- [x] Audit log UI
-- [ ] Docker app stack implementation
+---
 
 ## MVP Definition
 
-Praetor MVP is complete when a user can:
+Praetor MVP ships when a chairman can:
 
 - install it with a documented local deployment path
 - open a browser UI
 - onboard through Praetor
 - define company DNA and approval boundaries
 - create and run at least one mission inside a controlled workspace
-- review mission progress, pauses, and outputs
+- review mission progress, pauses, and outputs through a real-time
+  background worker (not blocked by the API request thread)
 - use company memory and task logging
 - run with API mode or at least one subscription executor mode
+- recover gracefully from API restart (in-flight missions get marked
+  `interrupted` rather than silently disappearing)
 
-## Phase 1: Contracts And Core Models
+---
 
-- [x] Finalize product positioning
-- [x] Finalize deployment model split:
-  `Quick Start` vs `Bring Your Own Subscription`
-- [x] Finalize company memory model
-- [x] Finalize role / governance / mission concepts
-- [x] Write product, system, UI, surfaces, deployment, and bridge specs
-- [x] Create real config schema files for app-level Praetor runtime
-- [x] Create app-level company DNA schema
-- [x] Create app-level role schema
-- [x] Create app-level mission schema
-- [x] Create app-level approval schema
-- [x] Create app-level meeting schema
+## Current Track Summary (2026-05-12)
 
-## Phase 2: Workspace And Runtime Core
+Three independent tracks are in flight:
 
-- [x] Implement workspace bootstrap logic
-- [x] Implement filesystem-backed company memory structure
-- [x] Implement mission folder model as canonical source of truth
-- [x] Implement SQLite index/cache layer around missions
-- [x] Implement runtime mode config:
-  API / local / subscription executor
-- [x] Implement writable scope enforcement in app runtime
-- [x] Implement mission pause / resume contract in app runtime
-- [x] Implement audit log persistence in app runtime
+| Track | Owner | Status |
+|---|---|---|
+| **Foundation cleanup** | landed in `claude/crazy-taussig-d75255` (6 commits) | Done. See "Foundation cleanup" section. |
+| **UI rebuild** | Codex, following [UI_REBUILD_PLAYBOOK](docs/UI_REBUILD_PLAYBOOK.zh-TW.md) | Not started. 9 commits planned. |
+| **Docker app stack** | unassigned | Open. compose.yaml exists; production hardening + install script are partial. |
 
-## Phase 3: Onboarding And Founder Control
+Phase 1–10 historical milestones are preserved at the bottom for context, but
+they no longer drive day-to-day execution.
 
-- [x] Implement owner account bootstrap
-- [x] Implement conversational onboarding flow
-- [x] Implement company language selection
-- [x] Implement company DNA generation
-- [x] Implement governance and approval policy setup
-- [x] Implement workspace selection / initialization
-- [x] Implement runtime selection during onboarding
-- [x] Implement first-task handoff at the end of onboarding
+---
 
-## Phase 4: Web MVP
+## Foundation cleanup (DONE, May 2026)
 
-- [x] Implement `Praetor` page
-- [x] Implement `Overview` page
-- [x] Implement `Tasks` page
-- [x] Implement `Settings` page
-- [x] Implement right-side approval / checkpoint rail
-- [x] Implement mission detail view
-- [x] Implement pause / continue / stop controls
-- [x] Implement degraded / empty / loading / error states
+Six commits on `claude/crazy-taussig-d75255` that cleared the path for the UI
+rebuild:
 
-## Phase 5: Execution Layers
+- [x] **Cut workspace-steward layer** — removed `file_assets`, `file_moves`,
+      `workspace_reconciliation_reports`, `workspace_restructure_plans` tables
+      and ~1,600 LoC of code that was wired into every mission create but never
+      read from a user-facing flow. Design preserved as
+      [Phase-2 deferred](docs/PRAETOR_WORKSPACE_STEWARD.md).
+- [x] **Mission worker queue + crash recovery** — added a `mission_jobs`
+      SQLite table and a `MissionWorker` daemon thread. Mission execution moved
+      off the API request thread. Jobs left in `running` after an API restart
+      get marked `interrupted` instead of silently disappearing.
+      New endpoints: `POST /api/missions/{id}/enqueue`,
+      `GET /api/missions/{id}/jobs`, `GET /api/mission-jobs/{id}`.
+- [x] **Retrieval-windowed CEO planner context** — CEO chat no longer dumps
+      every mission / wiki page / standing order into every prompt. Keyword
+      overlap ranks candidates, pinned `related_mission_id` always included,
+      fixed budget (3 missions, 3 wiki pages, 5 orders, 6 conversation turns).
+      Token cost stops scaling with workspace size.
+- [x] **Extract FilesystemStore** — `storage.py` went from 2,796 → 2,069
+      lines. The workspace-Markdown / legacy JSON migration shim is in
+      `_filesystem_store.py`. Domain seam between SQL index and filesystem
+      writes is now visible.
+- [x] **Extract Jinja translations** — `ui.py` went from 3,030 → 1,552 lines.
+      `_translations.py` is now a single source the React rebuild can consume
+      via build-time export.
+- [x] **UI rebuild playbook written** — [docs/UI_REBUILD_PLAYBOOK.zh-TW.md](docs/UI_REBUILD_PLAYBOOK.zh-TW.md)
+      is the self-contained brief for Codex to execute the React SPA rebuild.
 
-- [x] Implement app-level executor abstraction
-- [x] Integrate `praetor-execd` into Praetor worker runtime
-- [x] Implement API mode
-- [x] Implement model selection / runtime selection logic
-- [x] Implement executor health UI
-- [x] Implement fallback / retry policy between runtime modes
-- [x] Implement usage capture pipeline for models and executors
+Total: −1,197 net lines, 4 SQLite tables removed, 1 background worker added.
 
-## Phase 6: Memory, Auditability, And Trust
+---
 
-- [x] Implement Wiki memory UI
-- [x] Implement Decisions view
-- [x] Implement retrieval preview
-- [x] Implement audit log UI
-- [x] Implement changed-files / mission-output inspection
-- [x] Implement checkpoint approval UX
-- [x] Implement run budget and stop-reason UX
+## UI rebuild (NEXT)
 
-## Phase 7: Management Layer
+Driven by [docs/UI_REBUILD_PLAYBOOK.zh-TW.md](docs/UI_REBUILD_PLAYBOOK.zh-TW.md).
+Codex should execute commits in the order listed there. Acceptance checklist
+must pass before each next commit.
 
-- [x] Implement hidden PM creation rules
-- [x] Implement mission complexity / context load scoring
-- [x] Implement PM-scoped mission context
-- [x] Implement escalation flow from PM to Praetor
-- [x] Implement structured meeting mode
-- [x] Implement meeting summary persistence
+- [ ] **Commit 1** — Wipe legacy SPA + install foundation (Tailwind, tokens,
+      Inter + Noto Sans TC fonts)
+- [ ] **Commit 2** — App shell + routing + theme (5 empty pages, ⌘K shell,
+      dark mode toggle)
+- [ ] **Commit 3** — `/office` lands (Good morning header, CEO chat, mission
+      portfolio, Needs Decision rail)
+- [ ] **Commit 4** — `/missions` and `/missions/:id` land; delete the matching
+      Jinja routes and templates
+- [ ] **Commit 5** — `/memory` lands (wiki + decisions + open questions merged);
+      delete Jinja `/app/memory`, `/app/decisions`, `/app/meetings`,
+      `/app/inbox`
+- [ ] **Commit 6** — `/runtime` lands (health hero + tabs); delete Jinja
+      `/app/models`; add the one new backend endpoint `POST /api/settings/runtime`
+- [ ] **Commit 7** — `/settings` lands; delete Jinja `/app/agents`
+- [ ] **Commit 8** — Onboarding and login pages get the sky-gradient visual
+      refresh (these stay as Jinja, but updated to match brand v0.2)
+- [ ] **Commit 9** — i18n unified via build-time extract from
+      `_translations.py`
 
-## Phase 8: Mobile And Telegram
+Definition of done:
+- `apps/web/frontend/src/main.tsx` < 100 lines
+- `apps/api/praetor_api/ui.py` < 600 lines (only onboarding + login + mobile briefing left)
+- backend routes total < 90 (was 102)
+- bundle size < 700 KB gzipped
+- all pixi smokes pass
 
-- [x] Implement mobile executive dashboard
-- [x] Implement mobile approvals flow
-- [x] Implement mobile briefing flow
-- [ ] Implement Telegram notification channel
-- [ ] Implement Telegram quick status commands
-- [ ] Implement Telegram approval deep-link flow back to web
+---
 
-## Phase 9: Deployment And Operations
+## Docker app stack (OPEN)
 
-- [x] Implement app `compose.yaml` services for web / api / worker
-- [x] Implement production compose variant
-- [x] Implement secrets handling for production deployment
-- [x] Implement health checks for app services
-- [x] Implement backup / restore scripts or documented procedures
-- [x] Implement deployment docs for local-only mode
-- [x] Implement deployment docs for remote private mode
+- [x] `compose.yaml` for web / api / worker exists
+- [x] Production compose variant exists
+- [x] Healthchecks defined
+- [x] Local + remote private deploy docs written
+- [x] Backup / restore documented
+- [ ] One-line install script tested against fresh macOS / Linux / WSL2
+- [ ] Production secrets rotation documented
+- [ ] Subscription-executor bridge install path documented end-to-end
 
-## Phase 10: Post-MVP
+---
 
-- [x] Implement `Memory` page
-- [x] Implement `Models` page
-- [x] Implement `Meetings` page
-- [x] Implement richer activity / expert mode
-- [ ] Implement skill tuning
-- [ ] Implement GitHub skill import
-- [ ] Implement richer executor ecosystem
-- [ ] Implement advanced role tuning
+## Phase 8 leftovers (Telegram)
 
-## Immediate Next Milestones
+- [x] Mobile executive dashboard
+- [x] Mobile approvals flow
+- [x] Mobile briefing flow
+- [x] Telegram notification channel (webhook receiver, pairing code,
+      approve / reject buttons)
+- [ ] Telegram quick status commands (`/status`, `/missions`)
+- [ ] Telegram approval deep-link flow back to web
 
-These are the next practical build targets.
+Telegram notifications and pairing have shipped; the remaining items are
+power-user commands. Not blocking MVP.
 
-- [x] Create app-level config / schema package
-- [x] Implement workspace + mission persistence layer
-- [x] Build onboarding backend
-- [x] Build the first web page set:
-  `Praetor`, `Overview`, `Tasks`, `Settings`
-- [x] Connect the app worker runtime to `praetor-execd`
-- [x] Ship the first vertical slice:
-  onboard -> create mission -> run mission -> inspect result
+---
 
-## Done Means
+## Post-MVP (deferred)
 
-An item should only be checked when:
+- [ ] Skill tuning (replaces the deleted `agent_skills` workflow with a
+      simpler in-app editor)
+- [ ] GitHub skill import (Phase-3 idea from the product brief)
+- [ ] Richer executor ecosystem (beyond codex / claude_code)
+- [ ] Advanced role tuning (per-role permission profiles editable in UI)
+- [ ] **Workspace steward layer (Phase-2)** — see
+      [PRAETOR_WORKSPACE_STEWARD.md](docs/PRAETOR_WORKSPACE_STEWARD.md)
+      for the deferred design. Only resume when a real user pain motivates it.
+
+---
+
+## Done means
+
+An item is only checked when:
 
 - code exists in the repo
 - the path is wired into the actual runtime or workflow
-- the behavior is verified locally
+- the behavior is verified locally (smoke or manual)
 - the user-facing docs are updated if needed
+
+Items that are checked but later become wrong should be unchecked, not deleted —
+the history matters for "we tried this and learned".
+
+---
 
 ## Reference Specs
 
-- [README.md](/Users/jovesus/glasrocks/praetor/README.md)
-- [PRAETOR_PRODUCT_BRIEF.zh-TW.md](/Users/jovesus/glasrocks/praetor/PRAETOR_PRODUCT_BRIEF.zh-TW.md)
-- [PRAETOR_SYSTEM_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_SYSTEM_SPEC.zh-TW.md)
-- [PRAETOR_UI_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_UI_SPEC.zh-TW.md)
-- [PRAETOR_SURFACES_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_SURFACES_SPEC.zh-TW.md)
-- [PRAETOR_REPO_ARCHITECTURE.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_REPO_ARCHITECTURE.zh-TW.md)
-- [DEPLOYMENT_SECURITY_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md)
-- [PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](/Users/jovesus/glasrocks/praetor/docs/PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md)
+Active source of truth:
+
+- [docs/UI_REBUILD_PLAYBOOK.zh-TW.md](docs/UI_REBUILD_PLAYBOOK.zh-TW.md) ← UI work track
+- [docs/PRAETOR_UI_SPEC.zh-TW.md](docs/PRAETOR_UI_SPEC.zh-TW.md) ← durable UI principles
+- [docs/PRAETOR_BRAND_SPEC.zh-TW.md](docs/PRAETOR_BRAND_SPEC.zh-TW.md) ← visual baseline
+- [docs/PRAETOR_SURFACES_SPEC.zh-TW.md](docs/PRAETOR_SURFACES_SPEC.zh-TW.md) ← Web / Mobile / Telegram boundaries
+- [docs/PRAETOR_SYSTEM_SPEC.zh-TW.md](docs/PRAETOR_SYSTEM_SPEC.zh-TW.md) ← backend architecture
+- [docs/PRAETOR_REPO_ARCHITECTURE.zh-TW.md](docs/PRAETOR_REPO_ARCHITECTURE.zh-TW.md) ← repo layout
+- [docs/PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](docs/PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md) ← bridge contract
+- [docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md](docs/DEPLOYMENT_SECURITY_SPEC.zh-TW.md) ← deployment / security
+- [PRAETOR_PRODUCT_BRIEF.zh-TW.md](PRAETOR_PRODUCT_BRIEF.zh-TW.md) ← product north star
+
+Historical / deferred:
+
+- [docs/PRAETOR_WORKSPACE_STEWARD.md](docs/PRAETOR_WORKSPACE_STEWARD.md) ← Phase-2 design
+- [PRODUCT_INTAKE.md](PRODUCT_INTAKE.md) ← raw discussion material, not curated
+
+---
+
+## Historical Phase 1–10 (preserved for context, no longer drives execution)
+
+The original 10-phase plan is preserved below because some Phase items are
+still useful as reference (e.g. "what was the original scope of meeting mode")
+but the actual current execution is tracked in the three tracks above.
+
+### Phase 1: Contracts And Core Models — done
+### Phase 2: Workspace And Runtime Core — done
+### Phase 3: Onboarding And Founder Control — done
+### Phase 4: Web MVP — done in v0; **being rebuilt as React SPA**
+### Phase 5: Execution Layers — done
+### Phase 6: Memory, Auditability, And Trust — done
+### Phase 7: Management Layer — done
+### Phase 8: Mobile And Telegram — mobile done, Telegram partial (see active section above)
+### Phase 9: Deployment And Operations — mostly done (see Docker app stack section)
+### Phase 10: Post-MVP — partial; remaining items moved to Post-MVP section above
