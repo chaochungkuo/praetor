@@ -31,6 +31,7 @@ from .models import (
     MissionStopRequest,
     OnboardingAnswers,
 )
+from .mission_worker import MissionWorker
 from .run_registry import RunRegistry
 from .service import PraetorService
 from .security import csrf_token, login_rate_limiter, require_csrf, require_setup_token, validate_runtime_security
@@ -45,6 +46,7 @@ class AppState:
         self.storage = AppStorage(state_dir)
         self.service = PraetorService(self.storage)
         self.run_registry = RunRegistry()
+        self.mission_worker = MissionWorker(self.service)
 
 
 @asynccontextmanager
@@ -52,8 +54,18 @@ async def lifespan(app: FastAPI):
     validate_runtime_security()
     state = AppState()
     state.run_registry.bind_loop(asyncio.get_running_loop())
+    recovered = state.service.recover_interrupted_mission_jobs()
+    if recovered:
+        # Surface in audit log so a restart-during-run is investigable later.
+        state.storage.append_audit_event(
+            {"event": "mission_jobs_recovered_after_restart", "count": recovered}
+        )
+    state.mission_worker.start()
     app.state.ctx = state
-    yield
+    try:
+        yield
+    finally:
+        state.mission_worker.stop()
 
 
 app = FastAPI(title="praetor-api", version=__version__, lifespan=lifespan)
@@ -635,6 +647,34 @@ def mission_run_attempts(mission_id: str):
         fail(400, "not_initialized", str(exc))
     except KeyError:
         fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/missions/{mission_id}/jobs")
+def mission_jobs(mission_id: str):
+    try:
+        return ok({"jobs": get_ctx().storage.list_mission_jobs(mission_id=mission_id)})
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.post("/api/missions/{mission_id}/enqueue")
+def enqueue_mission(mission_id: str):
+    """Enqueue a mission run without waiting for completion."""
+    try:
+        job = get_ctx().service.enqueue_mission_job(mission_id)
+        return ok(job)
+    except RuntimeError as exc:
+        fail(400, "not_initialized", str(exc))
+    except KeyError:
+        fail(404, "not_found", f"Mission not found: {mission_id}")
+
+
+@app.get("/api/mission-jobs/{job_id}")
+def get_mission_job(job_id: str):
+    job = get_ctx().storage.get_mission_job(job_id)
+    if job is None:
+        fail(404, "not_found", f"Mission job not found: {job_id}")
+    return ok(job)
 
 
 @app.get("/api/missions/{mission_id}/work-trace")

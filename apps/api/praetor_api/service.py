@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -43,6 +44,7 @@ from .models import (
     MissionContinueRequest,
     MissionCreateRequest,
     MissionDefinition,
+    MissionJob,
     MissionTeam,
     MissionTimelineEvent,
     OfficeSnapshot,
@@ -1391,7 +1393,66 @@ class PraetorService(AgentsMixin, SkillsMixin):
             recent_missions=missions[:5],
         )
 
-    def run_mission(self, mission_id: str) -> dict:
+    def run_mission(self, mission_id: str, *, wait_timeout: float = 900.0) -> dict:
+        """Enqueue a mission run and wait for the background worker to finish.
+
+        Keeps the synchronous API contract (callers get the final result dict)
+        while routing actual execution through the persistent mission_jobs
+        queue, so a process restart no longer silently drops in-flight work.
+        """
+        # Confirm the mission exists before enqueueing so callers see KeyError
+        # the same way they used to.
+        self.get_mission(mission_id)
+        job = self.enqueue_mission_job(mission_id)
+        deadline = time.monotonic() + wait_timeout
+        while time.monotonic() < deadline:
+            current = self.storage.get_mission_job(job.id)
+            if current is None:
+                raise RuntimeError(f"Mission job vanished: {job.id}")
+            if current.status == "completed":
+                return current.result or {}
+            if current.status in {"failed", "interrupted", "cancelled"}:
+                raise RuntimeError(current.error or f"Mission job ended: {current.status}")
+            time.sleep(0.1)
+        raise RuntimeError(f"Mission job timed out: {job.id}")
+
+    def enqueue_mission_job(self, mission_id: str) -> MissionJob:
+        self.get_mission(mission_id)
+        job = MissionJob(mission_id=mission_id)
+        self.storage.save_mission_job(job)
+        return job
+
+    def claim_next_mission_job(self) -> MissionJob | None:
+        return self.storage.claim_next_queued_mission_job()
+
+    def execute_mission_job(self, job_id: str) -> dict:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            raise KeyError(f"Mission job not found: {job_id}")
+        return self._execute_mission(job.mission_id)
+
+    def complete_mission_job(self, job_id: str, result: dict) -> None:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            return
+        job.status = "completed"
+        job.result = result
+        job.finished_at = utc_now()
+        self.storage.save_mission_job(job)
+
+    def fail_mission_job(self, job_id: str, error: str) -> None:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            return
+        job.status = "failed"
+        job.error = error
+        job.finished_at = utc_now()
+        self.storage.save_mission_job(job)
+
+    def recover_interrupted_mission_jobs(self) -> int:
+        return self.storage.reset_running_mission_jobs()
+
+    def _execute_mission(self, mission_id: str) -> dict:
         settings = self._require_settings()
         self._ensure_default_standing_orders()
         mission = self.get_mission(mission_id)

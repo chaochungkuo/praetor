@@ -34,6 +34,7 @@ from .models import (
     MatterRecord,
     MeetingRecord,
     MissionDefinition,
+    MissionJob,
     MissionStageTransition,
     MissionTeam,
     OpenQuestionRecord,
@@ -164,6 +165,20 @@ class SQLiteIndex:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_run_attempts_mission ON run_attempts(mission_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mission_jobs (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    enqueued_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_jobs_mission ON mission_jobs(mission_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_jobs_status ON mission_jobs(status, enqueued_at)")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS clients (
@@ -733,6 +748,98 @@ class SQLiteIndex:
                     (limit,),
                 ).fetchall()
         return [RunAttempt.model_validate_json(row["payload_json"]) for row in rows]
+
+    # --- MissionJobs ---
+
+    def upsert_mission_job(self, job: MissionJob) -> None:
+        updated_at = (job.finished_at or job.started_at or job.enqueued_at).isoformat()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO mission_jobs (id, mission_id, status, enqueued_at, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    job.id,
+                    job.mission_id,
+                    job.status,
+                    job.enqueued_at.isoformat(),
+                    updated_at,
+                    job.model_dump_json(indent=2),
+                ),
+            )
+
+    def get_mission_job(self, job_id: str) -> MissionJob | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM mission_jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return MissionJob.model_validate_json(row["payload_json"])
+
+    def list_mission_jobs(self, mission_id: str | None = None, limit: int = 20) -> list[MissionJob]:
+        with self.connect() as conn:
+            if mission_id is not None:
+                rows = conn.execute(
+                    "SELECT payload_json FROM mission_jobs WHERE mission_id = ? ORDER BY enqueued_at DESC LIMIT ?",
+                    (mission_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT payload_json FROM mission_jobs ORDER BY enqueued_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [MissionJob.model_validate_json(row["payload_json"]) for row in rows]
+
+    def claim_next_queued_mission_job(self) -> MissionJob | None:
+        """Atomically transition the oldest queued job to running."""
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT payload_json FROM mission_jobs
+                WHERE status = 'queued'
+                ORDER BY enqueued_at ASC
+                LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                return None
+            job = MissionJob.model_validate_json(row["payload_json"])
+            now = datetime.utcnow()
+            job.status = "running"
+            job.started_at = now.replace(tzinfo=job.enqueued_at.tzinfo)
+            updated = job.model_dump_json(indent=2)
+            cursor = conn.execute(
+                """
+                UPDATE mission_jobs
+                   SET status = 'running', updated_at = ?, payload_json = ?
+                 WHERE id = ? AND status = 'queued'
+                """,
+                (job.started_at.isoformat(), updated, job.id),
+            )
+            if cursor.rowcount == 0:
+                return None
+        return job
+
+    def reset_running_mission_jobs(self) -> int:
+        """Mark any jobs still 'running' as 'interrupted' (called on app startup)."""
+        count = 0
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, payload_json FROM mission_jobs WHERE status = 'running'"
+            ).fetchall()
+            for row in rows:
+                job = MissionJob.model_validate_json(row["payload_json"])
+                job.status = "interrupted"
+                job.error = job.error or "API restarted while job was running."
+                job.finished_at = datetime.utcnow().replace(tzinfo=job.enqueued_at.tzinfo)
+                conn.execute(
+                    "UPDATE mission_jobs SET status = 'interrupted', updated_at = ?, payload_json = ? WHERE id = ?",
+                    (job.finished_at.isoformat(), job.model_dump_json(indent=2), job.id),
+                )
+                count += 1
+        return count
 
     # --- Clients ---
 
@@ -2413,6 +2520,23 @@ class AppStorage:
 
     def list_run_attempts(self, mission_id: str | None = None, limit: int = 50) -> list[RunAttempt]:
         return self.index.list_run_attempts(mission_id=mission_id, limit=limit)
+
+    # --- MissionJobs (SQLite-primary) ---
+
+    def save_mission_job(self, job: MissionJob) -> None:
+        self.index.upsert_mission_job(job)
+
+    def get_mission_job(self, job_id: str) -> MissionJob | None:
+        return self.index.get_mission_job(job_id)
+
+    def list_mission_jobs(self, mission_id: str | None = None, limit: int = 20) -> list[MissionJob]:
+        return self.index.list_mission_jobs(mission_id=mission_id, limit=limit)
+
+    def claim_next_queued_mission_job(self) -> MissionJob | None:
+        return self.index.claim_next_queued_mission_job()
+
+    def reset_running_mission_jobs(self) -> int:
+        return self.index.reset_running_mission_jobs()
 
     # --- Clients (SQLite-primary + workspace files) ---
 

@@ -128,6 +128,14 @@ ReviewCadence = Literal["on_open", "daily", "weekly", "manual"]
 NotificationThreshold = Literal["never", "approval_required", "high_only", "digest"]
 InboxSeverity = Literal["low", "medium", "high"]
 InboxStatus = Literal["open", "acknowledged", "resolved", "dismissed"]
+MissionJobStatus = Literal[
+    "queued",
+    "running",
+    "completed",
+    "failed",
+    "interrupted",
+    "cancelled",
+]
 RunAttemptStatus = Literal[
     "preparing_workspace",
     "building_prompt",
@@ -471,6 +479,17 @@ class RunAttempt(BaseModel):
     turn_count: int = 0
     started_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+    finished_at: datetime | None = None
+
+
+class MissionJob(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("job"))
+    mission_id: str
+    status: MissionJobStatus = "queued"
+    error: str | None = None
+    result: dict | None = None
+    enqueued_at: datetime = Field(default_factory=utc_now)
+    started_at: datetime | None = None
     finished_at: datetime | None = None
 
 
