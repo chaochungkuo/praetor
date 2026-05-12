@@ -1782,14 +1782,48 @@ class PraetorService(AgentsMixin, SkillsMixin):
             intent=plan.intent,
         )
 
+    # Token-aware retrieval windowing for the CEO planner.
+    #
+    # The previous version stuffed the prompt with up to 10 missions, 8 wiki
+    # pages, 12 standing orders, and 10 conversation turns regardless of what
+    # the chairman just said. That breaks the brief's principle that the CEO
+    # should split context to mission-scoped PMs (PRODUCT_BRIEF section 13).
+    #
+    # Now we rank candidates by keyword overlap with the chairman's instruction
+    # and only keep the top ones. The pinned related_mission_id is always
+    # included, even if its keywords don't overlap, so explicit mission
+    # references survive the filter.
+    _CONTEXT_BUDGET = {
+        "missions": 3,
+        "wiki_pages": 3,
+        "standing_orders": 5,
+        "conversation_turns": 6,
+    }
+
+    @staticmethod
+    def _instruction_keywords(text: str) -> set[str]:
+        tokens = re.findall(r"[\w一-鿿]+", text.lower())
+        # Drop very short stop-words; keep CJK single characters since they
+        # often carry meaning.
+        return {token for token in tokens if len(token) > 2 or any(ord(c) > 127 for c in token)}
+
+    @classmethod
+    def _score_against_keywords(cls, candidate: str, keywords: set[str]) -> int:
+        if not keywords:
+            return 0
+        haystack = candidate.lower()
+        return sum(1 for word in keywords if word in haystack)
+
     def _ceo_planner_context(self, request: ConversationCreateRequest, text: str, safety_policy: str) -> CEOPlannerContext:
         settings = self._require_settings()
         workspace_root = Path(settings.workspace.root)
         missions = self.storage.list_missions(workspace_root)
         approvals = self.storage.list_approvals()
-        recent_conversation = self.storage.list_conversation_messages(limit=10)
+        recent_conversation = self.storage.list_conversation_messages(limit=20)
         wiki_pages = self.storage.list_wiki_pages(workspace_root)
         knowledge = self.knowledge_snapshot()
+        keywords = self._instruction_keywords(text)
+
         company_context = "\n".join(
             [
                 f"Owner/chairman: {settings.owner.name}",
@@ -1802,17 +1836,53 @@ class PraetorService(AgentsMixin, SkillsMixin):
                 f"Runtime executor/provider: {settings.runtime.executor or settings.runtime.provider or 'none'}",
             ]
         )
+
+        # Standing orders: rank by overlap with instruction, fall back to recent.
+        orders = self.storage.list_standing_orders()
+        ranked_orders = sorted(
+            orders,
+            key=lambda item: (
+                -self._score_against_keywords(f"{item.scope} {item.effect} {item.instruction}", keywords),
+                -item.updated_at.timestamp(),
+            ),
+        )[: self._CONTEXT_BUDGET["standing_orders"]]
         standing_orders = "\n".join(
-            f"- {item.scope}/{item.effect}: {item.instruction}" for item in self.storage.list_standing_orders()[:12]
+            f"- {item.scope}/{item.effect}: {item.instruction}" for item in ranked_orders
         )
+
+        # Missions: always include the pinned mission, then top-ranked others.
+        pinned: list[MissionDefinition] = []
+        candidates: list[MissionDefinition] = []
+        for mission in missions:
+            if mission.id == request.related_mission_id:
+                pinned.append(mission)
+            else:
+                candidates.append(mission)
+        ranked_missions = sorted(
+            candidates,
+            key=lambda item: (
+                -self._score_against_keywords(f"{item.title} {item.summary or ''} {' '.join(item.domains)}", keywords),
+                -item.updated_at.timestamp(),
+            ),
+        )
+        keep = self._CONTEXT_BUDGET["missions"] - len(pinned)
+        chosen_missions = pinned + ranked_missions[: max(0, keep)]
         active_missions = "\n".join(
             f"- {mission.id}: {mission.title} [{mission.status}] {mission.summary or ''}"
-            for mission in missions[:10]
+            for mission in chosen_missions
         )
+
+        # Wiki pages: rank by overlap on name + preview.
+        ranked_pages = sorted(
+            wiki_pages,
+            key=lambda page: -self._score_against_keywords(
+                f"{page.get('name', '')} {page.get('preview', '')}", keywords
+            ),
+        )[: self._CONTEXT_BUDGET["wiki_pages"]]
         wiki_context = "\n\n".join(
-            f"## {page['name']}\n{page.get('preview', '')}"
-            for page in wiki_pages[:8]
+            f"## {page['name']}\n{page.get('preview', '')}" for page in ranked_pages
         )
+
         knowledge_context = "\n".join(
             [
                 f"Clients: {len(knowledge.clients)}",
@@ -1823,10 +1893,14 @@ class PraetorService(AgentsMixin, SkillsMixin):
                 f"Knowledge updates: {len(knowledge.knowledge_updates)}",
             ]
         )
+
+        # Conversation: always keep the most recent turns - they are the
+        # immediate continuation context. No ranking here, just trim.
         conversation_context = "\n".join(
             f"- {message.role}: {message.body[:500]}"
-            for message in recent_conversation[-10:]
+            for message in recent_conversation[-self._CONTEXT_BUDGET["conversation_turns"]:]
         )
+
         return CEOPlannerContext(
             instruction=text,
             related_mission_id=request.related_mission_id,
