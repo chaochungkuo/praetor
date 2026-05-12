@@ -1,9 +1,35 @@
-# Praetor Workspace Steward
+# Praetor Workspace Steward (Phase-2 design, not in v1)
+
+> **Status: deferred.** The first implementation of this layer (`file_assets`,
+> `file_moves`, `workspace_reconciliation_reports`, `workspace_restructure_plans`,
+> the `WorkspaceMixin` in `service_workspace.py`, and 6 API routes under
+> `/api/workspace/*`) was removed from the codebase in May 2026 because it was
+> wired into every mission creation but never used through any owner-facing
+> flow. Keeping ~1,600 LoC and 4 SQLite tables to seed placeholder records was
+> inflating the data model and slowing down the rest of the refactor.
+>
+> The **design** below survives intact — it is still the direction we want to go
+> in Phase 2, once the v1 CEO / role / governance loop is solid and there is a
+> real user signal demanding a stable-identity file registry.
+>
+> When this work resumes, the right path is:
+>
+> 1. Start from a real user pain (e.g. "I reorganised my workspace and now the
+>    Wiki has dead links"), not from a speculative schema.
+> 2. Reuse the `mission_jobs` worker queue rather than a new background loop.
+> 3. Build the read-only reconciliation report first (lowest blast radius),
+>    only add restructure plans once the report has been validated against a
+>    real workspace.
+> 4. Treat the file registry as a derivable index over the workspace, not a
+>    source of truth — the workspace itself is the source of truth (see
+>    PRAETOR_PRODUCT_BRIEF §8.1).
+
+---
+
+## Principle
 
 The chairman should not need to design folders, rename files, or keep document
 links synchronized by hand. Praetor should do that as company operations work.
-
-## Principle
 
 Filesystem paths are locations, not identity.
 
@@ -18,7 +44,7 @@ Durable references should point to stable records:
 This allows Praetor to reorganize folders while preserving Wiki links, document
 registry records, and agent references.
 
-## File Intake
+## File intake
 
 Every file source should enter the same stewardship flow:
 
@@ -29,7 +55,7 @@ Every file source should enter the same stewardship flow:
 5. Requested mission output
 6. Manually discovered workspace file
 
-Praetor registers each as `FileAssetRecord` with:
+Praetor would register each as `FileAssetRecord` with:
 
 - current path
 - previous paths
@@ -40,14 +66,14 @@ Praetor registers each as `FileAssetRecord` with:
 - document / version links when relevant
 - steward notes
 
-The workspace also receives `.praetor/file_manifest.json` as a machine-readable
-index.
+The workspace would also receive `.praetor/file_manifest.json` as a
+machine-readable index.
 
-## Restructure Plan
+## Restructure plan
 
 Praetor should not silently perform risky folder moves.
 
-`WorkspaceRestructurePlan` records:
+`WorkspaceRestructurePlan` would record:
 
 - proposed moves
 - why the moves are useful
@@ -64,7 +90,7 @@ delivery, credential, or high-volume restructuring should require review.
 Praetor must assume that users and external tools can modify the workspace
 without going through the CEO.
 
-Workspace reconciliation compares the registry with the filesystem and Git:
+Workspace reconciliation would compare a registry with the filesystem and Git:
 
 - tracked file still exists
 - tracked file is missing
@@ -73,11 +99,11 @@ Workspace reconciliation compares the registry with the filesystem and Git:
 - filesystem file is untracked
 - Git reports modified, deleted, renamed, or untracked files
 
-Reconciliation is conservative. It creates a report and updates asset
-fingerprints, but it does not overwrite user changes or silently move sensitive
+Reconciliation must be conservative. It should create a report and update asset
+fingerprints, but it must not overwrite user changes or silently move sensitive
 files.
 
-Each registered file can store:
+Each registered file would store:
 
 - size
 - modified time
@@ -86,25 +112,28 @@ Each registered file can store:
 - existence state
 - sync status
 
-If a missing asset has the same hash at a new path, Praetor treats it as a moved
-candidate and asks for registry confirmation.
+If a missing asset has the same hash at a new path, Praetor would treat it as a
+moved candidate and ask for registry confirmation.
 
-## Current Implementation
+## What was tried in v1
 
-The first implementation registers:
+The first pass registered three intake sources:
 
 - mission requested outputs
 - planned document versions
 - runtime changed files
 
-It also exposes:
+and exposed read endpoints (`/api/workspace/steward`,
+`/api/missions/{id}/workspace-steward`), reconciliation endpoints
+(`/api/workspace/reconcile`, `/api/missions/{id}/workspace-reconcile`), and
+restructure-plan endpoints (`/api/workspace/restructure-plan`,
+`/api/missions/{id}/workspace-restructure-plan`).
 
-- workspace steward snapshot
-- mission-scoped steward snapshot
-- workspace reconciliation report generation
-- mission-scoped reconciliation report generation
-- mission-scoped restructure plan generation
-- global restructure plan generation
+It seeded placeholder records on every mission creation, which made the
+mission-create path slower and the schema fatter without delivering any
+chairman-visible value. None of the read endpoints were called from a
+production user flow. Removing the layer cut ~1,600 lines and freed up four
+SQLite tables.
 
-This is intentionally a foundation. Upload, download, and full move execution
-should connect to the same registry instead of inventing separate file logic.
+When this resumes, the bar is: **no schema row gets written unless a
+chairman-visible affordance reads from it.**
