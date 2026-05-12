@@ -32,8 +32,6 @@ from .models import (
     DocumentRecord,
     DocumentVersion,
     EscalationRecord,
-    FileAssetRecord,
-    FileMoveRecord,
     GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
@@ -68,11 +66,7 @@ from .models import (
     TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
-    WorkspaceReconciliationIssue,
-    WorkspaceReconciliationReport,
-    WorkspaceRestructurePlan,
     WorkspaceScope,
-    WorkspaceStewardSnapshot,
     WorkSession,
     WorkSessionTurn,
     utc_now,
@@ -84,7 +78,6 @@ from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
 from .service_agents import AgentsMixin
 from .service_skills import SkillsMixin
-from .service_workspace import WorkspaceMixin
 from .storage import AppStorage
 from .telegram import generate_pairing_code, new_pairing_settings, process_update, send_approval_notification
 from .workspace import DEFAULT_WORKFLOW_CONTRACT, bootstrap_workspace
@@ -97,7 +90,7 @@ def parse_datetime(value: str | None) -> datetime:
 
 
 @dataclass
-class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
+class PraetorService(AgentsMixin, SkillsMixin):
     storage: AppStorage
     planner: CEOPlanner | None = None
 
@@ -450,7 +443,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         )
         self._ensure_mission_team(mission)
         self._transition_mission_stage(mission, "planning", "Mission team is active and ready to plan execution.")
-        self._register_requested_output_assets(mission)
         if mission.pm_required:
             self.storage.append_agent_message(
                 AgentMessage(
@@ -594,7 +586,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         )
         for document in self._planned_documents_for_mission(mission, client, matter):
             self.storage.save_document(document)
-            self._register_document_assets(document)
 
     def _planned_documents_for_mission(
         self,
@@ -1573,7 +1564,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
                 ]
             ),
         )
-        self._register_runtime_output_assets(mission, final_result.run_record.changed_files)
         if mission.pm_required:
             self.storage.append_pm_report(
                 workspace_root,

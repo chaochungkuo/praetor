@@ -147,7 +147,6 @@ def main() -> int:
                     "mission_detail_has_executor_control": "Executor control" in mission_detail,
                     "mission_detail_has_knowledge_workspace": "Knowledge workspace" in mission_detail,
                     "mission_detail_has_workspace_scope": "Workspace scope" in mission_detail,
-                    "mission_detail_has_workspace_steward": "Workspace Steward" in mission_detail,
                     "mission_detail_has_run_attempts": "Run attempts" in mission_detail,
                     "mission_detail_has_board_briefing": "Board briefing" in mission_detail,
                     "mission_detail_has_ai_disabled": "AI action disabled" in mission_detail,

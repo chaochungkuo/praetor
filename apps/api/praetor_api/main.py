@@ -552,60 +552,6 @@ def api_mission_workspace_scope(mission_id: str):
         fail(404, "not_found", f"Mission not found: {mission_id}")
 
 
-@app.get("/api/workspace/steward")
-def api_workspace_steward():
-    try:
-        return ok(get_ctx().service.workspace_steward_snapshot())
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-
-
-@app.post("/api/workspace/reconcile")
-def api_reconcile_workspace():
-    try:
-        return ok(get_ctx().service.reconcile_workspace())
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-
-
-@app.get("/api/missions/{mission_id}/workspace-steward")
-def api_mission_workspace_steward(mission_id: str):
-    try:
-        return ok(get_ctx().service.workspace_steward_snapshot(mission_id=mission_id))
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-    except KeyError:
-        fail(404, "not_found", f"Mission not found: {mission_id}")
-
-
-@app.post("/api/missions/{mission_id}/workspace-reconcile")
-def api_reconcile_mission_workspace(mission_id: str):
-    try:
-        return ok(get_ctx().service.reconcile_workspace(mission_id=mission_id))
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-    except KeyError:
-        fail(404, "not_found", f"Mission not found: {mission_id}")
-
-
-@app.post("/api/workspace/restructure-plan")
-def api_create_workspace_restructure_plan():
-    try:
-        return ok(get_ctx().service.create_workspace_restructure_plan())
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-
-
-@app.post("/api/missions/{mission_id}/workspace-restructure-plan")
-def api_create_mission_workspace_restructure_plan(mission_id: str):
-    try:
-        return ok(get_ctx().service.create_workspace_restructure_plan(mission_id=mission_id))
-    except RuntimeError as exc:
-        fail(400, "not_initialized", str(exc))
-    except KeyError:
-        fail(404, "not_found", f"Mission not found: {mission_id}")
-
-
 @app.get("/api/missions/{mission_id}/completion-contract")
 def mission_completion_contract(mission_id: str):
     try:

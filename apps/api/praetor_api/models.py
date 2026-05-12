@@ -119,18 +119,6 @@ WorkTraceLayer = Literal["chairman", "ceo", "manager", "executor", "review", "me
 ExecutorControlAction = Literal["request_summary", "pause", "resume", "escalate_manager", "escalate_ceo", "mark_blocked"]
 MatterStatus = Literal["open", "waiting_owner", "waiting_external", "review", "closed", "archived"]
 DocumentStatus = Literal["draft", "under_review", "approved", "sent", "obsolete"]
-FileAssetSource = Literal["requested_output", "document_version", "runtime_output", "upload", "download", "manual"]
-FileAssetSensitivity = Literal["low", "internal", "confidential", "restricted"]
-FileSyncStatus = Literal["tracked", "missing", "changed", "moved_candidate", "untracked", "external_git_change"]
-FileMoveStatus = Literal["proposed", "applied", "skipped", "failed"]
-WorkspaceRestructureStatus = Literal["draft", "ready_for_review", "applied", "rejected"]
-WorkspaceReconciliationIssueType = Literal[
-    "missing_asset",
-    "changed_asset",
-    "moved_candidate",
-    "untracked_file",
-    "git_change",
-]
 DecisionStatus = Literal["proposed", "confirmed", "replaced", "rejected"]
 OpenQuestionStatus = Literal["open", "waiting_owner", "waiting_external", "answered", "closed"]
 KnowledgeUpdateStatus = Literal["proposed", "approved", "applied", "rejected"]
@@ -754,101 +742,6 @@ class DocumentRecord(BaseModel):
     versions: list[DocumentVersion] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
-class FileAssetRecord(BaseModel):
-    id: str = Field(default_factory=lambda: generate_id("fileasset"))
-    current_path: str
-    previous_paths: list[str] = Field(default_factory=list)
-    source: FileAssetSource = "manual"
-    sensitivity: FileAssetSensitivity = "internal"
-    title: str | None = None
-    purpose: str | None = None
-    client_id: str | None = None
-    matter_id: str | None = None
-    mission_id: str | None = None
-    document_id: str | None = None
-    document_version_id: str | None = None
-    related_decision_ids: list[str] = Field(default_factory=list)
-    related_question_ids: list[str] = Field(default_factory=list)
-    created_by: str = "workspace_steward"
-    steward_notes: str | None = None
-    size_bytes: int | None = None
-    modified_at: datetime | None = None
-    sha256: str | None = None
-    last_seen_at: datetime | None = None
-    exists: bool = True
-    sync_status: FileSyncStatus = "tracked"
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class FileMoveRecord(BaseModel):
-    id: str = Field(default_factory=lambda: generate_id("filemove"))
-    asset_id: str
-    from_path: str
-    to_path: str
-    reason: str
-    status: FileMoveStatus = "proposed"
-    requires_approval: bool = False
-    created_at: datetime = Field(default_factory=utc_now)
-    applied_at: datetime | None = None
-
-
-class WorkspaceRestructurePlan(BaseModel):
-    id: str = Field(default_factory=lambda: generate_id("restructure"))
-    status: WorkspaceRestructureStatus = "ready_for_review"
-    mission_id: str | None = None
-    matter_id: str | None = None
-    client_id: str | None = None
-    summary: str
-    rationale: str
-    moves: list[FileMoveRecord] = Field(default_factory=list)
-    wiki_updates: list[str] = Field(default_factory=list)
-    registry_updates: list[str] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-    requires_approval: bool = False
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class GitChangeRecord(BaseModel):
-    repo_path: str
-    path: str
-    status: str
-
-
-class WorkspaceReconciliationIssue(BaseModel):
-    id: str = Field(default_factory=lambda: generate_id("reconcileissue"))
-    type: WorkspaceReconciliationIssueType
-    summary: str
-    path: str | None = None
-    asset_id: str | None = None
-    candidate_path: str | None = None
-    recommended_action: str
-    requires_approval: bool = False
-
-
-class WorkspaceReconciliationReport(BaseModel):
-    id: str = Field(default_factory=lambda: generate_id("reconcile"))
-    mission_id: str | None = None
-    status: str = "completed"
-    scanned_files: int = 0
-    tracked_assets: int = 0
-    missing_assets: list[WorkspaceReconciliationIssue] = Field(default_factory=list)
-    changed_assets: list[WorkspaceReconciliationIssue] = Field(default_factory=list)
-    moved_candidates: list[WorkspaceReconciliationIssue] = Field(default_factory=list)
-    untracked_files: list[WorkspaceReconciliationIssue] = Field(default_factory=list)
-    git_changes: list[GitChangeRecord] = Field(default_factory=list)
-    suggested_actions: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=utc_now)
-
-
-class WorkspaceStewardSnapshot(BaseModel):
-    assets: list[FileAssetRecord] = Field(default_factory=list)
-    restructure_plans: list[WorkspaceRestructurePlan] = Field(default_factory=list)
-    reconciliation_reports: list[WorkspaceReconciliationReport] = Field(default_factory=list)
-    recent_moves: list[FileMoveRecord] = Field(default_factory=list)
 
 
 class MatterDecisionRecord(BaseModel):

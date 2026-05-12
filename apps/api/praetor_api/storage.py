@@ -26,9 +26,6 @@ from .models import (
     DelegationRecord,
     DocumentRecord,
     EscalationRecord,
-    FileAssetRecord,
-    FileMoveRecord,
-    WorkspaceReconciliationReport,
     ExecutiveCadence,
     ExecutorControlRecord,
     KnowledgeUpdate,
@@ -47,7 +44,6 @@ from .models import (
     TaskDefinition,
     TeamTemplate,
     WorkflowContract,
-    WorkspaceRestructurePlan,
     WorkspaceScope,
     WorkTraceEvent,
     WorkSession,
@@ -205,62 +201,6 @@ class SQLiteIndex:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_matter ON documents(matter_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_mission ON documents(mission_id)")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS file_assets (
-                    id TEXT PRIMARY KEY,
-                    mission_id TEXT,
-                    matter_id TEXT,
-                    document_id TEXT,
-                    document_version_id TEXT,
-                    current_path TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    payload_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_mission ON file_assets(mission_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_matter ON file_assets(matter_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_document ON file_assets(document_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_path ON file_assets(current_path)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_assets_docver ON file_assets(document_version_id)")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS file_moves (
-                    id TEXT PRIMARY KEY,
-                    asset_id TEXT,
-                    created_at TEXT NOT NULL,
-                    payload_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_moves_asset ON file_moves(asset_id)")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS workspace_reconciliation_reports (
-                    id TEXT PRIMARY KEY,
-                    mission_id TEXT,
-                    created_at TEXT NOT NULL,
-                    payload_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_recon_reports_mission ON workspace_reconciliation_reports(mission_id)"
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS workspace_restructure_plans (
-                    id TEXT PRIMARY KEY,
-                    mission_id TEXT,
-                    updated_at TEXT NOT NULL,
-                    payload_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_restructure_plans_mission ON workspace_restructure_plans(mission_id)"
-            )
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS matter_decisions (
@@ -893,159 +833,6 @@ class SQLiteIndex:
             rows = conn.execute(sql, params).fetchall()
         return [DocumentRecord.model_validate_json(row["payload_json"]) for row in rows]
 
-    # --- FileAssets ---
-
-    def upsert_file_asset(self, asset: FileAssetRecord) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                "DELETE FROM file_assets WHERE id != ? AND current_path = ?",
-                (asset.id, asset.current_path),
-            )
-            if asset.document_version_id is not None:
-                conn.execute(
-                    "DELETE FROM file_assets WHERE id != ? AND document_version_id = ?",
-                    (asset.id, asset.document_version_id),
-                )
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO file_assets
-                    (id, mission_id, matter_id, document_id, document_version_id, current_path, updated_at, payload_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    asset.id,
-                    asset.mission_id,
-                    asset.matter_id,
-                    asset.document_id,
-                    asset.document_version_id,
-                    asset.current_path,
-                    asset.updated_at.isoformat(),
-                    asset.model_dump_json(indent=2),
-                ),
-            )
-
-    def list_file_assets(
-        self,
-        mission_id: str | None = None,
-        matter_id: str | None = None,
-        document_id: str | None = None,
-        limit: int = 50,
-    ) -> list[FileAssetRecord]:
-        with self.connect() as conn:
-            sql = "SELECT payload_json FROM file_assets WHERE 1=1"
-            params: list = []
-            if mission_id is not None:
-                sql += " AND mission_id = ?"
-                params.append(mission_id)
-            if matter_id is not None:
-                sql += " AND matter_id = ?"
-                params.append(matter_id)
-            if document_id is not None:
-                sql += " AND document_id = ?"
-                params.append(document_id)
-            sql += " ORDER BY updated_at DESC LIMIT ?"
-            params.append(limit)
-            rows = conn.execute(sql, params).fetchall()
-        return [FileAssetRecord.model_validate_json(row["payload_json"]) for row in rows]
-
-    # --- FileMoves ---
-
-    def upsert_file_move(self, move: FileMoveRecord) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO file_moves (id, asset_id, created_at, payload_json)
-                VALUES (?, ?, ?, ?)
-                """,
-                (move.id, move.asset_id, move.created_at.isoformat(), move.model_dump_json(indent=2)),
-            )
-
-    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
-        with self.connect() as conn:
-            if asset_id is not None:
-                rows = conn.execute(
-                    "SELECT payload_json FROM file_moves WHERE asset_id = ? ORDER BY created_at DESC LIMIT ?",
-                    (asset_id, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT payload_json FROM file_moves ORDER BY created_at DESC LIMIT ?", (limit,)
-                ).fetchall()
-        return [FileMoveRecord.model_validate_json(row["payload_json"]) for row in rows]
-
-    # --- WorkspaceReconciliationReports ---
-
-    def upsert_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO workspace_reconciliation_reports (id, mission_id, created_at, payload_json)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    report.id,
-                    report.mission_id,
-                    report.created_at.isoformat(),
-                    report.model_dump_json(indent=2),
-                ),
-            )
-
-    def list_workspace_reconciliation_reports(
-        self, mission_id: str | None = None, limit: int = 20
-    ) -> list[WorkspaceReconciliationReport]:
-        with self.connect() as conn:
-            if mission_id is not None:
-                rows = conn.execute(
-                    """
-                    SELECT payload_json FROM workspace_reconciliation_reports
-                    WHERE mission_id = ? ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (mission_id, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT payload_json FROM workspace_reconciliation_reports
-                    ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-        return [WorkspaceReconciliationReport.model_validate_json(row["payload_json"]) for row in rows]
-
-    # --- WorkspaceRestructurePlans ---
-
-    def upsert_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO workspace_restructure_plans (id, mission_id, updated_at, payload_json)
-                VALUES (?, ?, ?, ?)
-                """,
-                (plan.id, plan.mission_id, plan.updated_at.isoformat(), plan.model_dump_json(indent=2)),
-            )
-
-    def list_workspace_restructure_plans(
-        self, mission_id: str | None = None, limit: int = 20
-    ) -> list[WorkspaceRestructurePlan]:
-        with self.connect() as conn:
-            if mission_id is not None:
-                rows = conn.execute(
-                    """
-                    SELECT payload_json FROM workspace_restructure_plans
-                    WHERE mission_id = ? ORDER BY updated_at DESC LIMIT ?
-                    """,
-                    (mission_id, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT payload_json FROM workspace_restructure_plans
-                    ORDER BY updated_at DESC LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-        return [WorkspaceRestructurePlan.model_validate_json(row["payload_json"]) for row in rows]
-
     # --- MatterDecisions ---
 
     def upsert_matter_decision(self, decision: MatterDecisionRecord) -> None:
@@ -1629,10 +1416,6 @@ class FilesystemStore:
         self.clients_path = self.state_dir / "clients.json"
         self.matters_path = self.state_dir / "matters.json"
         self.documents_path = self.state_dir / "documents.json"
-        self.file_assets_path = self.state_dir / "file_assets.json"
-        self.file_moves_path = self.state_dir / "file_moves.json"
-        self.workspace_reconciliation_reports_path = self.state_dir / "workspace_reconciliation_reports.json"
-        self.workspace_restructure_plans_path = self.state_dir / "workspace_restructure_plans.json"
         self.matter_decisions_path = self.state_dir / "matter_decisions.json"
         self.open_questions_path = self.state_dir / "open_questions.json"
         self.knowledge_updates_path = self.state_dir / "knowledge_updates.json"
@@ -2098,93 +1881,6 @@ class FilesystemStore:
             documents = [item for item in documents if item.mission_id == mission_id]
         return documents
 
-    def save_file_asset(self, asset: FileAssetRecord) -> None:
-        assets = self.list_file_assets(limit=100_000)
-        assets = [
-            item
-            for item in assets
-            if item.id != asset.id
-            and item.current_path != asset.current_path
-            and not (
-                asset.document_version_id is not None
-                and item.document_version_id == asset.document_version_id
-            )
-        ] + [asset]
-        assets.sort(key=lambda item: item.updated_at, reverse=True)
-        self._write_model_list(self.file_assets_path, assets)
-
-    def list_file_assets(
-        self,
-        mission_id: str | None = None,
-        matter_id: str | None = None,
-        document_id: str | None = None,
-        limit: int = 50,
-    ) -> list[FileAssetRecord]:
-        assets = self._read_model_list(self.file_assets_path, FileAssetRecord)
-        if mission_id is not None:
-            assets = [item for item in assets if item.mission_id == mission_id]
-        if matter_id is not None:
-            assets = [item for item in assets if item.matter_id == matter_id]
-        if document_id is not None:
-            assets = [item for item in assets if item.document_id == document_id]
-        assets.sort(key=lambda item: item.updated_at, reverse=True)
-        return assets[:limit]
-
-    def save_file_move(self, move: FileMoveRecord) -> None:
-        moves = self.list_file_moves(limit=100_000)
-        moves = [item for item in moves if item.id != move.id] + [move]
-        moves.sort(key=lambda item: item.created_at, reverse=True)
-        self._write_model_list(self.file_moves_path, moves)
-
-    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
-        moves = self._read_model_list(self.file_moves_path, FileMoveRecord)
-        if asset_id is not None:
-            moves = [item for item in moves if item.asset_id == asset_id]
-        moves.sort(key=lambda item: item.created_at, reverse=True)
-        return moves[:limit]
-
-    def save_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
-        reports = self.list_workspace_reconciliation_reports(limit=100)
-        reports = [item for item in reports if item.id != report.id] + [report]
-        reports.sort(key=lambda item: item.created_at, reverse=True)
-        self._write_model_list(self.workspace_reconciliation_reports_path, reports)
-
-    def list_workspace_reconciliation_reports(
-        self,
-        mission_id: str | None = None,
-        limit: int = 20,
-    ) -> list[WorkspaceReconciliationReport]:
-        reports = self._read_model_list(self.workspace_reconciliation_reports_path, WorkspaceReconciliationReport)
-        if mission_id is not None:
-            reports = [item for item in reports if item.mission_id == mission_id]
-        reports.sort(key=lambda item: item.created_at, reverse=True)
-        return reports[:limit]
-
-    def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
-        plans = self.list_workspace_restructure_plans(limit=100_000)
-        plans = [item for item in plans if item.id != plan.id] + [plan]
-        plans.sort(key=lambda item: item.updated_at, reverse=True)
-        self._write_model_list(self.workspace_restructure_plans_path, plans)
-
-    def list_workspace_restructure_plans(
-        self,
-        mission_id: str | None = None,
-        limit: int = 20,
-    ) -> list[WorkspaceRestructurePlan]:
-        plans = self._read_model_list(self.workspace_restructure_plans_path, WorkspaceRestructurePlan)
-        if mission_id is not None:
-            plans = [item for item in plans if item.mission_id == mission_id]
-        plans.sort(key=lambda item: item.updated_at, reverse=True)
-        return plans[:limit]
-
-    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
-        path = workspace_root / ".praetor" / "file_manifest.json"
-        _write_workspace_text(
-            path,
-            json.dumps([item.model_dump(mode="json") for item in assets], indent=2, ensure_ascii=True),
-        )
-        return path
-
     def save_matter_decision(self, workspace_root: Path, decision: MatterDecisionRecord) -> None:
         decisions = self.list_matter_decisions()
         decisions = [item for item in decisions if item.id != decision.id] + [decision]
@@ -2485,26 +2181,6 @@ class AppStorage:
             "clients": (self.fs.clients_path, self.fs.list_clients, self.index.upsert_client),
             "matters": (self.fs.matters_path, self.fs.list_matters, self.index.upsert_matter),
             "documents": (self.fs.documents_path, self.fs.list_documents, self.index.upsert_document),
-            "file_assets": (
-                self.fs.file_assets_path,
-                lambda: self.fs.list_file_assets(limit=100_000),
-                self.index.upsert_file_asset,
-            ),
-            "file_moves": (
-                self.fs.file_moves_path,
-                lambda: self.fs.list_file_moves(limit=100_000),
-                self.index.upsert_file_move,
-            ),
-            "workspace_reconciliation_reports": (
-                self.fs.workspace_reconciliation_reports_path,
-                lambda: self.fs.list_workspace_reconciliation_reports(limit=100_000),
-                self.index.upsert_workspace_reconciliation_report,
-            ),
-            "workspace_restructure_plans": (
-                self.fs.workspace_restructure_plans_path,
-                lambda: self.fs.list_workspace_restructure_plans(limit=100_000),
-                self.index.upsert_workspace_restructure_plan,
-            ),
             "matter_decisions": (
                 self.fs.matter_decisions_path,
                 self.fs.list_matter_decisions,
@@ -2681,9 +2357,6 @@ class AppStorage:
     def load_workflow_contract(self, workspace_root: Path) -> WorkflowContract:
         return self.fs.load_workflow_contract(workspace_root)
 
-    def write_workspace_manifest(self, workspace_root: Path, assets: list[FileAssetRecord]) -> Path:
-        return self.fs.write_workspace_manifest(workspace_root, assets)
-
     # --- Audit log (filesystem-only, append log) ---
 
     def append_audit_event(self, payload: dict) -> None:
@@ -2769,56 +2442,6 @@ class AppStorage:
 
     def list_documents(self, matter_id: str | None = None, mission_id: str | None = None) -> list[DocumentRecord]:
         return self.index.list_documents(matter_id=matter_id, mission_id=mission_id)
-
-    # --- FileAssets (SQLite-primary) ---
-
-    def save_file_asset(self, asset: FileAssetRecord) -> None:
-        self.index.upsert_file_asset(asset)
-        self._invalidate_prefix("file_assets")
-
-    def list_file_assets(
-        self,
-        mission_id: str | None = None,
-        matter_id: str | None = None,
-        document_id: str | None = None,
-        limit: int = 50,
-    ) -> list[FileAssetRecord]:
-        key = ("file_assets", mission_id, matter_id, document_id, limit)
-        return self._cached(key, lambda: self.index.list_file_assets(
-            mission_id=mission_id, matter_id=matter_id, document_id=document_id, limit=limit
-        ))
-
-    # --- FileMoves (SQLite-primary) ---
-
-    def save_file_move(self, move: FileMoveRecord) -> None:
-        self.index.upsert_file_move(move)
-
-    def list_file_moves(self, asset_id: str | None = None, limit: int = 50) -> list[FileMoveRecord]:
-        return self.index.list_file_moves(asset_id=asset_id, limit=limit)
-
-    # --- WorkspaceReconciliationReports (SQLite-primary) ---
-
-    def save_workspace_reconciliation_report(self, report: WorkspaceReconciliationReport) -> None:
-        self.index.upsert_workspace_reconciliation_report(report)
-
-    def list_workspace_reconciliation_reports(
-        self,
-        mission_id: str | None = None,
-        limit: int = 20,
-    ) -> list[WorkspaceReconciliationReport]:
-        return self.index.list_workspace_reconciliation_reports(mission_id=mission_id, limit=limit)
-
-    # --- WorkspaceRestructurePlans (SQLite-primary) ---
-
-    def save_workspace_restructure_plan(self, plan: WorkspaceRestructurePlan) -> None:
-        self.index.upsert_workspace_restructure_plan(plan)
-
-    def list_workspace_restructure_plans(
-        self,
-        mission_id: str | None = None,
-        limit: int = 20,
-    ) -> list[WorkspaceRestructurePlan]:
-        return self.index.list_workspace_restructure_plans(mission_id=mission_id, limit=limit)
 
     # --- MatterDecisions (SQLite-primary + workspace files) ---
 
