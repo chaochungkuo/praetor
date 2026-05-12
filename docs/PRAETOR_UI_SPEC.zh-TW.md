@@ -1,841 +1,288 @@
-# Praetor UI / UX 規格 v0.1
+# Praetor UI 原則 v0.2
 
-狀態：設計稿
+Status: 2026-05 重寫，從 v0.1 的 841 行頁面規格瘦身為「原則文件」。
 
-這份文件定義 Praetor 的整體 UI、資訊架構、主要頁面、互動模型、信任建立設計，以及如何在「掌控感」與「不被細節淹沒」之間取得平衡。
+這份文件定義 Praetor UI 的**長期有效原則**——不會因為某一輪 UI 重建而過時。
+具體的頁面 layout、配色 token、互動細節、commit 計畫，請看：
 
-## 1. 核心 UX 目標
+- **執行層**：[UI_REBUILD_PLAYBOOK.zh-TW.md](UI_REBUILD_PLAYBOOK.zh-TW.md)
+- **視覺基線**：[PRAETOR_BRAND_SPEC.zh-TW.md](PRAETOR_BRAND_SPEC.zh-TW.md)
+- **多端策略**：[PRAETOR_SURFACES_SPEC.zh-TW.md](PRAETOR_SURFACES_SPEC.zh-TW.md)
 
-Praetor 的 UI 不是 agent playground，也不是 workflow builder。
+> 與 v0.1 的差異：v0.1 鉅細靡遺寫了 12 頁的 Jinja UI（Praetor / Overview / Tasks /
+> Meetings / Memory / Models / Settings 等），含 ASCII layout、欄位清單、按鈕命名。
+> 第一次 React 重建後，那些頁面被收斂為 5 條 SPA route，per-page layout 全部移到
+> `UI_REBUILD_PLAYBOOK`。本版只保留**不會隨重建而失效的原則**。
 
-它應該讓使用者感覺自己在使用：
-- 董事長控制台
-- AI CEO 指揮台
-- 公司決策與執行總覽
+---
 
-使用者要同時獲得三種感受：
-- 我知道公司在發生什麼
-- 我不用自己盯每個細節
-- 關鍵時刻我有最終決策權
+## 1. UX 北極星
 
-## 2. UX 核心原則
+Praetor 的 UI 不是 agent playground，不是 workflow builder，不是 chat app。它是
+**董事長控制台 / AI CEO 指揮台 / 公司決策與執行總覽**。
 
-### 2.1 只和 Praetor 對話
+使用者用完應同時得到三種感受：
 
-預設互動路徑應是：
+1. **我知道公司在發生什麼。**
+2. **我不用自己盯每個細節。**
+3. **關鍵時刻我有最終決策權。**
 
-`User -> Praetor -> internal roles`
+如果某次設計決策讓任一條變弱，就是錯的方向。
+
+## 2. 六條 UX 原則
+
+### 2.1 CEO 是預設互動路徑
+
+預設互動是：
+
+```
+User → Praetor → internal roles
+```
 
 不是：
 
-`User -> worker agents directly`
+```
+User → worker agents directly
+```
+
+不允許讓使用者直接和 Developer / Reviewer / PM 對話。若未來放開，必須是
+`Talk to X via Praetor`，且使用者要知道自己在對誰說話。
 
 ### 2.2 先摘要，再展開
 
-所有頁面先給：
+所有頁面進入時先給：
+
 - summary
 - decisions needed
 - risk
 - next step
 
-之後再允許使用者下鑽細節。
+之後才允許使用者下鑽到原始資料（payload、run ID、時間戳）。
 
-### 2.3 決策不能藏太深
+### 2.3 決策不能藏
 
-任何需要使用者批准的事情都必須：
-- 顯眼
-- 可追溯
-- 能快速處理
+需要使用者批准的事情必須**顯眼、可追溯、能快速處理**。
+
+實作上：
+
+- 永遠有右側 rail 或頂條 badge 顯示待批准數
+- 從任何頁面 ⌘K 一鍵跳到「待你決策」
+- 不允許把 approval UI 藏在 settings tab 裡
 
 ### 2.4 透明，但不噪音
 
-使用者能查到：
-- 誰在做
-- 做到哪
+使用者隨時能查到：
+
+- 誰在做（角色）
+- 做到哪（status / progress）
 - 用了什麼 model / executor
-- 產出什麼
+- 產出什麼檔案 / 決策
 
-但首頁不應該變成 log wall。
+但首頁不該是 log wall。raw payload、run ID、token 計數**只在主動下鑽時出現**。
 
-### 2.5 讓 CEO 在所有事情裡，但不把所有事情都丟給使用者
+### 2.5 把 CEO 放在每件事裡，但不把每件事丟給使用者
 
-Praetor 應該 system-wide involved。
+Praetor 是 system-wide involved，但 UI 只應呈現：
 
-但 UI 上只應該呈現：
-- Praetor 認為你需要知道的內容
-- 以及你主動要求下鑽的內容
+- Praetor 認為使用者需要知道的內容
+- 使用者主動要求下鑽的內容
+
+不要為了「透明」而把每個 audit 行硬塞進主頁。
+
+### 2.6 信任是可見的
+
+Safety、privacy、approvals、runtime health、audit context 必須出現在它們**影響到的工作旁邊**，不是埋在獨立的 Settings 頁。
+
+實作上：
+
+- mission 詳情頁要看得到「這個 mission 受哪些 standing order 限制」
+- CEO chat 旁邊要看得到 runtime 健康狀態
+- 任何寫檔動作要看得到 workspace scope 邊界
 
 ## 3. 使用者角色
 
-MVP 預設只有一個主要人類角色：
-- Owner / Founder / Chairman
+MVP 預設只有一個主要人類角色：**Owner / Founder / Chairman**。
 
-這個角色關心的是：
+這個角色關心：
+
 - 公司進度
 - 任務狀態
 - 需要批准的事項
 - 風險
 - 成本 / token / runtime 狀態
 
-而不是：
-- prompt 細節
+不關心（除非主動下鑽）：
+
+- prompt 內容
 - 個別 agent personality
 - skill 內部 wiring
+- agent 的「對話歷史」
 
-## 4. 資訊架構
+## 4. 資訊架構原則
 
-推薦一級導航：
+UI 的頁面數應該**少而清楚**，每一頁有單一身份。
 
-1. `Praetor`
-2. `Overview`
-3. `Tasks`
-4. `Meetings`
-5. `Memory`
-6. `Models`
-7. `Settings`
+判斷一頁是否該獨立的問題：
 
-推薦理由：
-- `Praetor`：主入口
-- `Overview`：公司總覽
-- `Tasks`：執行透明度
-- `Meetings`：結構化會議與 review
-- `Memory`：公司記憶
-- `Models`：model / token / executor / cost
-- `Settings`：治理與設定
+1. **這頁有獨立的「進入狀態」嗎？**（使用者打開瀏覽器、直接連到這頁，期待什麼？）
+2. **這頁失去後使用者會少做什麼？**（如果答案是「沒有」，這頁不該存在。）
+3. **這頁和另一頁的決策樹有 70% 重疊嗎？**（有的話，合併。）
 
-## 5. 全域布局
+實際的 v1 IA 是 5 條 route，見 [UI_REBUILD_PLAYBOOK §2](UI_REBUILD_PLAYBOOK.zh-TW.md#2-information-architecture)。下一次大改時，先回來檢視這三題。
 
-推薦使用三欄布局：
+## 5. Checkpoint 與 Paused State
 
-```txt
-┌──────────────────────────────────────────────────────────────┐
-│ Top Bar                                                     │
-│ Company | Runtime | Active Model | Alerts | User Menu       │
-├──────────────┬───────────────────────────────┬───────────────┤
-│ Left Nav     │ Main Workspace                │ Right Rail    │
-│ Praetor      │ current page                  │ approvals     │
-│ Overview     │                               │ checkpoints   │
-│ Tasks        │                               │ running jobs  │
-│ Meetings     │                               │ reminders     │
-│ Memory       │                               │ decisions     │
-│ Models       │                               │               │
-│ Settings     │                               │               │
-└──────────────┴───────────────────────────────┴───────────────┘
-```
+這是 Praetor 與一般 AI 工具最大的 UX 差異點。
 
-### 5.1 Top Bar
+當 mission 暫停時，UI **必須**顯示：
 
-應固定顯示：
-- company name
-- runtime mode
-- active primary model
-- health status
-- pending decisions count
-- notifications
-- owner menu
+- pause reason（人類可讀，不是 enum 縮寫）
+- 已完成的部分
+- 接下來可能的下一步
+- 目前累積的 cost / token
+- 等待的決策
 
-這能讓使用者一進來就知道：
-- 現在公司用什麼大腦
-- 有沒有東西卡住
-- 有沒有東西在等我
+UI **必須**提供至少這幾個動作：
 
-### 5.2 Right Rail
+- `Continue`
+- `Continue with larger budget`
+- `Stop`
+- `Ask Praetor`
+- `Change policy for this mission`
 
-右側 context panel 讓 UI 有持續運作感。
+**文案不能像錯誤訊息**。應讓使用者感覺：暫停是設計的一部分，是節奏，不是故障。
 
-預設顯示：
-- pending approvals
-- active checkpoints
-- running tasks
-- recent decisions
-- Praetor reminders
+## 6. 通知分類
 
-根據頁面不同動態變化。
+通知必須分三類，並有不同視覺優先級：
 
-## 6. Praetor 頁
+| 類別 | 例子 | 視覺 |
+|---|---|---|
+| **Informational** | mission completed / wiki updated / inbox processed | 中性色、不主動跳 |
+| **Actionable** | approval needed / paused due to budget / reviewer blocked | accent 色、右側 rail 上方、頂條 badge |
+| **Critical** | executor unhealthy / workspace path unavailable / mission failed after retries | warning 色、頂條 banner、不可關閉直到處理 |
 
-這是主入口，也是最重要的頁面。
+不要把三類都做成 toast。toast 只給 informational。actionable 必須 persistent，critical 必須 blocking。
 
-### 6.1 頁面目標
+## 7. Empty / Loading / Error / Degraded States
 
-讓使用者像老闆一樣：
-- 聽 briefing
-- 下方向
-- 批准事項
-- 請 Praetor 統整內部資訊
+完成度高低取決於這四種狀態做得多好。
 
-### 6.2 頁面結構
+### 7.1 Empty State
 
-#### A. Praetor Summary Card
+不能只有「No data」。必須有：
 
-內容：
-- active missions
-- tasks in progress
-- blocked items
-- approvals waiting
+- 友善 headline（「準備好開始第一個任務嗎？」）
+- 具體下一步 action（`[建立任務]` 按鈕）
 
-範例：
+### 7.2 Loading State
 
-```txt
-Praetor Briefing
-- 3 active missions
-- 2 items waiting for approval
-- 1 blocked development task
-- 4 tasks progressing normally
-```
+**不要只是 spinner**。應顯示：
 
-#### B. Praetor Chat
+- Praetor 正在做什麼（「正在請 CEO 規劃...」）
+- 進度估計（若可知）
 
-主對話區。
+實作上用 **skeleton block** 比 spinner 好——它告訴使用者「下一秒會出現的東西長這樣」。
 
-輸入快捷建議：
-- Start a new project
-- Review current priorities
-- Summarize the company state
-- Prepare a meeting
-- Show me decisions needed
+### 7.3 Error State
 
-#### C. Praetor Action Strip
+必須說清楚：
 
-顯示目前最建議的可執行動作：
-- Approve project plan
-- Review contract summary
-- Continue paused mission
-- Delay low-priority work
-
-每個 action 可快速選：
-- approve
-- ask
-- defer
-- redirect
-
-#### D. Escalation Queue
-
-只放真的需要 owner 的內容：
-- strategy change
-- spending
-- external communication
-- destructive write
-- mission budget extension
-
-### 6.3 使用者應能做什麼
-
-- 發起新 mission
-- 問公司目前狀態
-- 請 Praetor 解釋特定任務
-- 批准 / 拒絕 / 延後 decision
-- 改變任務方向
-- 開會
-
-### 6.4 不應該放什麼
-
-- 原始 agent prompt 編輯
-- 低層技術 logs 直接鋪滿
-- 讓使用者直接管理每個 agent 的 controls
-
-## 7. Overview 頁
-
-### 7.1 目標
-
-讓使用者用 10 秒看懂整間公司現在的狀態。
-
-### 7.2 頁面區塊
-
-#### KPI Row
-
-- Active Projects
-- Tasks Running
-- Pending Decisions
-- Blocked Items
-- This Week Outputs
-- Memory Updates
-
-#### Company State
-
-三欄摘要：
-- On Track
-- Needs Attention
-- Waiting For Owner
-
-#### Timeline
-
-顯示：
-- today
-- this week
-- upcoming deadlines
-- checkpoints
-
-#### Project Snapshot
-
-每個 project 卡片顯示：
-- name
-- status
-- risk level
-- next checkpoint
-- current owner role
-
-#### Recent Deliverables
-
-展示最近產出：
-- docs
-- plans
-- summaries
-- decisions
-
-#### Praetor Note
-
-固定顯示 Praetor 對當前公司狀態的一句話總結。
-
-## 8. Tasks 頁
-
-### 8.1 目標
-
-提供可檢查的執行透明度，但不破壞 Praetor-centered UX。
-
-### 8.2 視圖
-
-#### Board View
-
-欄位：
-- Planned
-- Assigned
-- Running
-- Review
-- Waiting Approval
-- Done
-
-#### List View
-
-可排序與篩選：
-- priority
-- mission
-- role
-- due date
-- state
-
-### 8.3 Task Detail
-
-點進任務應看到：
-- task title
-- related mission
-- requested by
-- role responsible
-- current executor / model
-- current status
-- progress summary
-- checkpoints
-- outputs
-- review notes
-- activity log
-- cost / token snapshot
-
-### 8.4 底部操作
-
-- Ask Praetor about this task
-- Open meeting
-- Approve checkpoint
-- Pause
-- Continue
-
-## 9. Meetings 頁
-
-### 9.1 產品意義
-
-Meeting 不是為了聊天，而是為了讓「AI 公司內部的討論」轉成老闆可理解、可決策的會議成果。
-
-### 9.2 頁面區塊
-
-#### Meeting Templates
-
-- Project Review
-- Risk Review
-- Weekly Planning
-- Budget Review
-- Decision Review
-
-#### Active / Recent Meetings
-
-每場會議卡片應顯示：
-- title
-- participants
-- agenda
-- summary
-- decisions needed
-- follow-ups
-
-#### Start Meeting
-
-輸入：
-- topic
-- participants requested
-- whether Praetor moderates
-
-### 9.3 會議輸出格式
-
-固定結構：
-- Summary
-- Risks
-- Decisions Needed
-- Approved Actions
-- Follow-ups
-
-### 9.4 重要 UX 原則
-
-不要顯示 agent 群聊 transcript 當主要結果。
-
-顯示結構化 meeting summary 才是正確做法。
-
-## 10. Memory 頁
-
-### 10.1 目標
-
-讓使用者理解公司到底記住了什麼，以及 AI 在用什麼記憶做事。
-
-### 10.2 分頁
-
-#### Wiki
-
-顯示：
-- Company DNA
-- Strategy
-- Operating Principles
-- Project Rules
-- Finance Rules
-- Agent Handbook
-
-#### Decisions
-
-顯示：
-- summary
-- approved by
-- impact
-- related mission / task
-
-#### Inbox / Source Files
-
-顯示使用者丟進來的原始資料：
-- PDFs
-- contracts
-- notes
-- screenshots
-
-#### Retrieval Preview
-
-顯示某次任務 / 回答使用了哪些上下文：
-- read wiki pages
-- read files
-- why selected
-
-### 10.3 為什麼 Retrieval Preview 重要
-
-這直接提高信任：
-- AI 不是亂答
-- 使用者看得到 Praetor 依據什麼做判斷
-
-## 11. Models 頁
-
-這是非常重要的頁面，不應該埋在 settings 裡。
-
-### 11.1 目標
-
-讓使用者清楚知道：
-- 現在在用哪些模型 / executors
-- token 用量
-- 成本
-- 哪些任務用了昂貴路徑
-- 系統是否健康
-
-### 11.2 頁面區塊
-
-#### Current Runtime Configuration
-
-- current mode
-- primary model
-- backup model
-- available executors
-- provider status
-
-#### Usage Overview
-
-- tokens used today
-- tokens used this week
-- estimated cost
-- average cost per mission
-- calls by provider
-
-#### Per-model Breakdown
-
-表格欄位建議：
-- Model
-- Used For
-- Calls
-- Input Tokens
-- Output Tokens
-- Estimated Cost
-
-#### Executor Activity
-
-- Codex CLI runs
-- Claude Code runs
-- OpenClaw runs
-- success / failure
-- average duration
-
-#### Budget & Policy
-
-- daily budget
-- per-mission budget
-- fallback rules
-- expensive model restrictions
-
-### 11.3 高價值設計
-
-這頁不能只是數字堆疊。
-
-要讓使用者可以看懂：
-- 哪種工作最花 token
-- 哪些任務該切到 cheaper route
-- 哪些 executor 最常卡住
-
-## 12. Settings 頁
-
-Settings 不應是一頁大雜燴。
-
-### 12.1 General
-
-- company name
-- language
-- timezone
-- owner profile
-
-### 12.2 Governance
-
-- autonomy mode
-- required approvals
-- never allow
-- checkpoint policy
-- pm creation policy
-
-### 12.3 Workspace
-
-- root path
-- allowed read paths
-- allowed write paths
-- archive rules
-- backup rules
-
-### 12.4 Roles
-
-重點是 role，不是 agent。
-
-應可編輯：
-- role name
-- responsibilities
-- outputs
-- constraints
-- style
-
-### 12.5 AI / Executors
-
-- provider selection
-- API keys
-- executor selection
-- Codex / Claude / OpenClaw connectivity
-- fallback behavior
-
-### 12.6 Security
-
-- local-only / remote mode
-- login settings
-- password rotation
-- session management
-
-### 12.7 Advanced
-
-- debug logs
-- shell policy
-- import / export config
-- experimental features
-
-## 13. Onboarding UX
-
-### 13.1 原則
-
-Onboarding 不能只是表單。
-
-它應該像 Praetor 帶你建立公司的第一場會議。
-
-### 13.2 建議流程
-
-1. owner account bootstrap
-2. welcome
-3. language
-4. leadership style
-5. decision style
-6. organization style
-7. autonomy
-8. risk preference
-9. runtime mode
-10. executor connection（conditional）
-11. workspace
-12. approvals
-13. first mission
-
-補充原則：
-- 即使 `Local-only` 也應有 owner account
-- trusted local device 可以降低之後登入摩擦，但不應完全無帳號
-- 若使用 `subscription_executor`，onboarding 必須檢查 host bridge 與 CLI login 狀態
-
-### 13.3 Onboarding 的最終產物
-
-不是只有設定完成而已，而是要落地產生：
-- Company DNA
-- workspace 結構
-- 初始 roles
-- 第一個 mission
-
-### 13.4 Onboarding 結尾
-
-Praetor 應該以一個明確的第一個行動結束：
-
-`What would you like your company to do first?`
-
-## 14. Checkpoint 與 Paused State UX
-
-這是 Praetor 很重要的頁面行為。
-
-### 14.1 必須出現的資訊
-
-當 mission 暫停時，應顯示：
-- pause reason
-- completed items
-- next possible steps
-- cost / token used so far
-- required decision
-
-### 14.2 必須出現的按鈕
-
-- Continue
-- Continue with larger budget
-- Stop
-- Ask Praetor
-- Change policy for this mission
-
-### 14.3 文案方向
-
-不要顯示像錯誤一樣。
-
-應該讓使用者感覺：
-- 系統有節奏
-- 暫停是設計的一部分
-- 不是故障
-
-## 15. Activity / Agent View
-
-### 15.1 這頁的定位
-
-這是透明度頁，不是主操作頁。
-
-### 15.2 顯示內容
-
-- current active roles
-- current active tasks
-- currently running executor
-- latest outputs
-- review status
-
-### 15.3 Direct chat 的取捨
-
-建議：
-- 預設不提供 direct raw chat with agent
-- 若提供，也應走 `Talk to X via Praetor`
-
-優點：
-- 保住治理層
-- 不破壞 executive UX
-
-缺點：
-- power users 會覺得少了一點直接操控感
-
-判斷：
-- 預設正確，debug / expert mode 可逐步放開
-
-## 16. 通知與提醒
-
-通知應分成三類：
-
-### 16.1 Informational
-
-例如：
-- mission completed
-- wiki updated
-- inbox processed
-
-### 16.2 Actionable
-
-例如：
-- approval needed
-- paused due to budget
-- reviewer blocked result
-
-### 16.3 Critical
-
-例如：
-- executor unhealthy
-- workspace path unavailable
-- mission failed after retries
-
-UI 上應該用不同顏色與優先級呈現。
-
-## 17. Empty / Loading / Error / Degraded States
-
-這些狀態會直接影響完成度。
-
-### 17.1 Empty State
-
-例如第一次使用：
-- no missions yet
-- no projects yet
-- no wiki yet
-
-應該搭配清楚的 next actions。
-
-### 17.2 Loading State
-
-不要只是一個 spinner。
-
-應顯示：
-- Praetor 正在做什麼
-- 目前進度大概在哪
-
-### 17.3 Error State
-
-應說清楚：
 - 問題在哪
 - 建議怎麼處理
-- 可以不要打斷其他 mission
+- **不要打斷其它正在進行的 mission**
 
-### 17.4 Degraded State
+### 7.4 Degraded State
 
-例如：
-- primary model unavailable
-- fallback model active
-- executor login expired
+例如 primary model unavailable、fallback model active、executor login expired。
 
-應在 top bar 與 Models 頁都明確呈現。
+必須在 **top bar 與 `/runtime` 頁都明確呈現**。不能只在 `/runtime` 出現否則使用者不會看到。
 
-## 18. Responsive 設計
+## 8. 視覺與語氣
 
-### 18.1 Desktop
+完整視覺基線見 [PRAETOR_BRAND_SPEC.zh-TW.md](PRAETOR_BRAND_SPEC.zh-TW.md)。原則摘要：
 
-完整三欄布局。
+**語氣**：冷靜 / 果斷 / 結構化 / 不討好 / 不拖泥帶水。
 
-### 18.2 Tablet
+**視覺**：權威感 / 清晰層級 / 高可掃描性 / 少量但有意義的強提示色。
 
-右欄可折疊成 drawer。
+**不允許**：
 
-### 18.3 Mobile
-
-不應把全部頁面硬塞。
-
-MVP mobile 重點應支援：
-- 查看 briefing
-- 批准 / 拒絕
-- 看關鍵狀態
-- 發簡短指令給 Praetor
-
-重度管理與設定仍以 desktop 為主。
-
-## 19. 視覺與語氣
-
-### 19.1 Praetor 的語氣
-
-建議：
-- 冷靜
-- 果斷
-- 結構化
-- 不討好
-- 不拖泥帶水
-
-### 19.2 視覺風格方向
-
-應偏向：
-- 權威感
-- 清晰層級
-- 高可掃描性
-- 少量但有意義的強提示色
-
-不應偏向：
 - 可愛 agent 遊戲感
-- 太像聊天工具
-- 太像複雜 enterprise ERP
+- chat app 風（氣泡密集對話流）
+- enterprise ERP 風（表格密度過高、無對比、無 hierarchy）
+- 過度科技霓虹 / glow / 漸層粒子
 
-## 20. 核心 UI 取捨
+## 9. 多端策略
 
-### 20.1 為什麼不讓使用者直接管理 agent
+詳見 [PRAETOR_SURFACES_SPEC.zh-TW.md](PRAETOR_SURFACES_SPEC.zh-TW.md)。摘要：
 
-優點：
-- 保持 executive UX
-- 降低認知負擔
-- 更符合產品哲學
+- **Web**：完整 control plane，所有功能都在這
+- **Mobile Web**：輕量 executive dashboard，做 briefing / 批准 / 簡短互動
+- **Telegram**：通知 + 簡短指令通道，不做高風險操作
 
-缺點：
-- 會讓部分 power users 想要更深控制
+不做三套平行產品。三端共享同一個 mission / decision / memory 真相來源（後端 JSON API）。
 
-判斷：
-- 預設不暴露，之後再加 expert mode
+## 10. 核心取捨（已決議）
 
-### 20.2 為什麼 Models 要獨立成頁
+### 10.1 不讓使用者直接管理 agent
 
-優點：
-- 成本與健康度是核心訊息
-- 更容易建立信任
+**Pro**：保持 executive UX、降低認知負擔、符合產品哲學
+**Con**：power users 會想要更深控制
 
-缺點：
-- 導覽多一頁
+**決議**：預設不暴露 agent 個體。未來可加 expert mode（在 `/runtime` 的 Executors tab 內）。
 
-判斷：
-- 值得獨立，因為這不是小設定，而是產品運營透明度
+### 10.2 `/runtime` 獨立成頁
 
-### 20.3 為什麼 Meetings 值得獨立
+**Pro**：成本與健康度是核心信任訊息，獨立呈現比埋在 settings 強
+**Con**：導覽多一頁
 
-優點：
-- 明確凸顯 Praetor 的公司組織差異化
-- 不讓所有 review 都塞進 chat
+**決議**：值得獨立。這不是設定頁，是運營透明度頁。
 
-缺點：
-- MVP 工作量增加
+### 10.3 Meetings 不獨立成頁
 
-判斷：
-- 若資源不足，可先藏在 Praetor page 的一種模式
+v0.1 主張 Meetings 獨立。v0.2 改為：meetings 是 `/missions/:id` 詳情頁的一個 tab（或一個 modal），不獨立。原因：
 
-## 21. MVP 頁面優先級
+- meetings 是 mission 內部事件，不是平行於 mission 的物件
+- 獨立頁會讓 IA 從 5 條變 6 條，違反「少而清楚」原則
+- chairman 不會想「我要看會議」，會想「Mission A 上次 review 結論」
 
-### P1
+### 10.4 `/memory` 合併 Wiki + Decisions + Open Questions
 
-- Praetor
-- Overview
-- Tasks
-- Settings
+v0.1 主張 Decisions、Memory、Inbox 分頁。v0.2 改為合併到 `/memory`，左側 tree 用群組區分。原因：
 
-### P2
+- 三者都是「公司不會忘記的事」，心智上同一個 surface
+- 合併後使用者要找「上次決議」與「下次提醒」是同一個動作
 
-- Memory
-- Models
-- Meetings
+## 11. 何時回來改這份文件
 
-### P3
+下列任一發生，就回來更新本文件而不是只改 playbook：
 
-- Activity / expert mode
-- richer audit views
-- deeper runtime diagnostics
+- 新增第二個人類角色（例如「Team Member」非 owner）
+- 預設互動模型從「使用者 → Praetor」改成其它
+- 通知三分類失效（出現第四類）
+- Checkpoint 暫停 UX 的必要欄位變更
+- 多端策略改變（例如 Telegram 開放高風險操作）
 
-## 22. 最後的 UI 結論
+不需要回來更新本文件的情況：
 
-Praetor 的 UI 核心不應該是：
+- 換配色 token（改 BRAND_SPEC）
+- 換頁面 layout（改 PLAYBOOK）
+- 換按鈕命名（不需要改任何 spec）
+- 加 / 刪一個 mission detail tab（改 PLAYBOOK）
 
-`讓你操作很多 agent`
+---
 
-而應該是：
+## 文件邊界備忘錄
 
-**讓你像董事長一樣，透過一個 AI CEO 看整間公司的狀態、介入關鍵決策、並確認工作持續推進。**
+| 想找什麼 | 看哪 |
+|---|---|
+| 為什麼這個 UI 該長這樣（價值判斷） | 本文件 |
+| 視覺 token、字體、配色、動效 | PRAETOR_BRAND_SPEC |
+| 頁面 layout、元件 API、commit 計畫 | UI_REBUILD_PLAYBOOK |
+| Web / Mobile / Telegram 邊界 | PRAETOR_SURFACES_SPEC |
+| 後端 API、資料模型 | PRAETOR_SYSTEM_SPEC |
+| 安全 / 部署 | DEPLOYMENT_SECURITY_SPEC |
+
+衝突時的權威順序：**PRODUCT_BRIEF > 本文件 > BRAND_SPEC > PLAYBOOK**。
+PLAYBOOK 的細節若與本文件衝突，本文件勝。

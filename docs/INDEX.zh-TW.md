@@ -1,111 +1,75 @@
 # Praetor 文件索引
 
-這個目錄是目前 Praetor 的產品與實作規格中心。
+Status: 2026-05-12 refreshed。
 
-建議閱讀順序：
+這個目錄是 Praetor 的產品與實作規格中心。文件依用途分四類，**讀的順序按目的，不是按字母**。
 
-1. [ROADMAP.md](../ROADMAP.md)
-2. [PRAETOR_PRODUCT_BRIEF.zh-TW.md](../PRAETOR_PRODUCT_BRIEF.zh-TW.md)
-3. [PRAETOR_SYSTEM_SPEC.zh-TW.md](PRAETOR_SYSTEM_SPEC.zh-TW.md)
-4. [PRAETOR_UI_SPEC.zh-TW.md](PRAETOR_UI_SPEC.zh-TW.md)
-5. [PRAETOR_SURFACES_SPEC.zh-TW.md](PRAETOR_SURFACES_SPEC.zh-TW.md)
-6. [PRAETOR_REPO_ARCHITECTURE.zh-TW.md](PRAETOR_REPO_ARCHITECTURE.zh-TW.md)
-7. [PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md](PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md)
-8. [PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md](PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md)
-9. [PRAETOR_MEMORY_PROMOTION.md](PRAETOR_MEMORY_PROMOTION.md)
-10. [PRAETOR_TEAM_PLANNING.md](PRAETOR_TEAM_PLANNING.md)
-11. [PRAETOR_ORGANIZATION_OPERATING_SYSTEM.md](PRAETOR_ORGANIZATION_OPERATING_SYSTEM.md)
-12. [PRAETOR_WORKSPACE_STEWARD.md](PRAETOR_WORKSPACE_STEWARD.md)
-13. [CHATGPT_SUBSCRIPTION_EXECUTOR.md](CHATGPT_SUBSCRIPTION_EXECUTOR.md)
-14. [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)
-15. [ADVANCED_DEPLOYMENT.md](ADVANCED_DEPLOYMENT.md)
-16. [INSTALL_CHECKLIST.md](INSTALL_CHECKLIST.md)
-17. [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)
-18. [DEPLOYMENT_SECURITY_SPEC.zh-TW.md](DEPLOYMENT_SECURITY_SPEC.zh-TW.md)
-19. [PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md)
-20. [PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md](PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md)
-21. [PRAETOR_BRAND_SPEC.zh-TW.md](PRAETOR_BRAND_SPEC.zh-TW.md)
-22. [PRAETOR_LOCAL_DEPLOY.md](PRAETOR_LOCAL_DEPLOY.md)
-23. [PRAETOR_REMOTE_PRIVATE_DEPLOY.md](PRAETOR_REMOTE_PRIVATE_DEPLOY.md)
-24. [PRAETOR_BACKUP_RESTORE.md](PRAETOR_BACKUP_RESTORE.md)
+---
 
-文件角色：
+## A. 從這裡開始（必讀）
 
-- `ROADMAP.md`
-  - 單一執行 roadmap、勾選清單、目前完成度、下一步里程碑
+1. [ROADMAP.md](../ROADMAP.md) — 三條 track 的當前狀態、MVP 定義、執行優先序
+2. [PRAETOR_PRODUCT_BRIEF.zh-TW.md](../PRAETOR_PRODUCT_BRIEF.zh-TW.md) — 產品北極星，市場定位，五條核心原則
 
-- `PRAETOR_PRODUCT_BRIEF.zh-TW.md`
-  - 產品定位、市場、方向、MVP、價值主張
+## B. 設計層（UI / 視覺 / 多端策略）
 
-- `PRAETOR_SYSTEM_SPEC.zh-TW.md`
-  - 核心概念、schema、治理、記憶、runtime、executor、安全策略
+| 文件 | 角色 |
+|---|---|
+| [UI_REBUILD_PLAYBOOK.zh-TW.md](UI_REBUILD_PLAYBOOK.zh-TW.md) **← Codex 執行用** | 當前 UI 重建工作的 source of truth：5 頁 layout、token、9-commit 計畫 |
+| [PRAETOR_UI_SPEC.zh-TW.md](PRAETOR_UI_SPEC.zh-TW.md) | 長期有效的 UI 原則（六條 UX 原則、checkpoint UX、通知分類、多端策略總綱、核心取捨） |
+| [PRAETOR_BRAND_SPEC.zh-TW.md](PRAETOR_BRAND_SPEC.zh-TW.md) | 視覺基線：配色 token、字體、logo、語氣、動效原則 |
+| [PRAETOR_SURFACES_SPEC.zh-TW.md](PRAETOR_SURFACES_SPEC.zh-TW.md) | Web / Mobile Web / Telegram 三端邊界、權限、interaction flow |
 
-- `PRAETOR_UI_SPEC.zh-TW.md`
-  - 資訊架構、頁面、元件、互動、onboarding、checkpoint 與可見性
+衝突權威順序：`PRODUCT_BRIEF > UI_SPEC > BRAND_SPEC > UI_REBUILD_PLAYBOOK`。
 
-- `PRAETOR_SURFACES_SPEC.zh-TW.md`
-  - Web / Mobile / Telegram 三端邊界、文字 wireframe、interaction flow
+## C. 系統層（後端 / 部署 / 安全）
 
-- `PRAETOR_REPO_ARCHITECTURE.zh-TW.md`
-  - 技術選型、repo 切分、部署形態、背景工作、測試、穩定性、實作順序
+| 文件 | 角色 |
+|---|---|
+| [PRAETOR_SYSTEM_SPEC.zh-TW.md](PRAETOR_SYSTEM_SPEC.zh-TW.md) | 核心概念、schema、治理、記憶、runtime、executor、安全策略 |
+| [PRAETOR_REPO_ARCHITECTURE.zh-TW.md](PRAETOR_REPO_ARCHITECTURE.zh-TW.md) | 技術選型、repo 切分（含 as-built 對照）、部署形態、背景工作 |
+| [PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md](PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md) | `praetor-execd` 主機側 bridge 的 API contract、事件模型、狀態機 |
+| [DEPLOYMENT_SECURITY_SPEC.zh-TW.md](DEPLOYMENT_SECURITY_SPEC.zh-TW.md) | Docker 部署模式、網路邊界、secrets、備份還原 |
+| [PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md](PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md) | 公開使用前的安全稽核、已完成控制、上線阻擋項 |
+| [PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md](PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md) | 使用者資料存放、檔案存取、外部 provider 與刪除說明 |
 
-- `DEPLOYMENT_SECURITY_SPEC.zh-TW.md`
-  - Docker 部署模式、網路邊界、資料持久化、備份還原、secrets、host executor bridge
+## D. 行為層（產品內的核心流程）
 
-- `PRAETOR_EXECUTOR_BRIDGE_SPEC.zh-TW.md`
-  - `praetor-execd` 的責任邊界、API contract、事件模型、狀態機、path mapping、安全規則、與 Praetor worker 的整合
+| 文件 | 角色 |
+|---|---|
+| [PRAETOR_MEMORY_PROMOTION.md](PRAETOR_MEMORY_PROMOTION.md) | 對話 → 決策 → 文件 → 長期 Wiki 記憶的沉澱流程 |
+| [PRAETOR_TEAM_PLANNING.md](PRAETOR_TEAM_PLANNING.md) | CEO 組隊、PM 交辦、董事長簡報、授權執行與升級邊界 |
+| [PRAETOR_ORGANIZATION_OPERATING_SYSTEM.md](PRAETOR_ORGANIZATION_OPERATING_SYSTEM.md) | mission lifecycle、agent employment contracts、permission profiles、work trace |
 
-- `PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md`
-  - 目前 codebase 現況、記憶與使用者流程盤點、開源定位落差、產品化與行銷執行規格
+## E. 安裝 / 部署 / 對外手冊
 
-- `PRAETOR_PUBLIC_SECURITY_REVIEW.zh-TW.md`
-  - 公開使用前安全稽核、已完成控制、上線前阻擋項
+| 文件 | 角色 |
+|---|---|
+| [PRAETOR_LOCAL_DEPLOY.md](PRAETOR_LOCAL_DEPLOY.md) | 本地 Docker 啟動方式 |
+| [PRAETOR_REMOTE_PRIVATE_DEPLOY.md](PRAETOR_REMOTE_PRIVATE_DEPLOY.md) | 私有遠端部署、reverse proxy |
+| [ADVANCED_DEPLOYMENT.md](ADVANCED_DEPLOYMENT.md) | 手動 Docker、production overlay、多服務 stack |
+| [INSTALL_CHECKLIST.md](INSTALL_CHECKLIST.md) | release candidate 前的乾淨安裝 checklist |
+| [PRAETOR_BACKUP_RESTORE.md](PRAETOR_BACKUP_RESTORE.md) | 備份還原、最小可行 backup script |
+| [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) | Pixi 本機開發、smoke tests、planner、bridge 開發 |
+| [CHATGPT_SUBSCRIPTION_EXECUTOR.md](CHATGPT_SUBSCRIPTION_EXECUTOR.md) | ChatGPT subscription 連接 Praetor 的設定流程 |
+| [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) | Telegram CEO 入口、webhook、配對碼 |
+| [GITHUB_SETUP.md](GITHUB_SETUP.md) | GitHub Pages 發布與 CI 相關設定 |
 
-- `PRAETOR_PRIVACY_BOUNDARIES.zh-TW.md`
-  - 使用者資料存放、檔案存取、外部 provider 與刪除資料說明
+## F. 對外行銷 / 開源定位
 
-- `PRAETOR_MEMORY_PROMOTION.md`
-  - 原始對話、AI 互動、決策、文件、未決問題與長期 Wiki 記憶之間的沉澱流程
+- [PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md](PRAETOR_OPEN_SOURCE_SUCCESS_SPEC.zh-TW.md) — codebase 現況盤點、開源定位落差、產品化與行銷執行
 
-- `PRAETOR_TEAM_PLANNING.md`
-  - CEO 組隊、PM 交辦、董事長簡報、授權執行與升級邊界
+## G. 歷史 / 延期（不在 v1 執行路徑）
 
-- `PRAETOR_ORGANIZATION_OPERATING_SYSTEM.md`
-  - mission lifecycle、agent employment contracts、permission profiles、skill review、work trace 與 executive cadence
+- [PRAETOR_WORKSPACE_STEWARD.md](PRAETOR_WORKSPACE_STEWARD.md) — Phase-2 設計，v1 已移除，等待真實使用者痛點再恢復
+- [../PRODUCT_INTAKE.md](../PRODUCT_INTAKE.md) — 原始討論材料，未經整理，保留作為來源紀錄
 
-- `PRAETOR_WORKSPACE_STEWARD.md`
-  - 檔案穩定 ID、manifest、整理計畫、資料夾重構與 Wiki 引用更新原則
+---
 
-- `CHATGPT_SUBSCRIPTION_EXECUTOR.md`
-  - ChatGPT subscription 透過 Codex CLI 與 host-side bridge 連接 Praetor 的設定流程
+## 目前共識（2026-05）
 
-- `DEVELOPER_SETUP.md`
-  - Pixi、本機開發、smoke tests、planner、bridge 開發流程
-
-- `ADVANCED_DEPLOYMENT.md`
-  - 手動 Docker、production overlay、多服務 stack、host executor bridge
-
-- `INSTALL_CHECKLIST.md`
-  - release candidate 前的乾淨安裝與 smoke test checklist
-
-- `TELEGRAM_SETUP.md`
-  - Telegram CEO 入口、webhook、配對碼、owner-only 安全設定與指令說明
-
-- `PRAETOR_BRAND_SPEC.zh-TW.md`
-  - 官方 logo、品牌語氣、色彩方向、產品內的使用原則
-
-- `PRAETOR_LOCAL_DEPLOY.md`
-  - 目前可直接使用的本地 Docker 啟動方式與 bridge 連接方式
-
-- `PRAETOR_REMOTE_PRIVATE_DEPLOY.md`
-  - 目前可行的私有遠端部署方式、reverse proxy 建議與 runtime 選擇說明
-
-- `PRAETOR_BACKUP_RESTORE.md`
-  - 備份與還原方式、狀態目錄說明、最小可行 backup script
-
-目前共識：
-
-- 方向已穩定，但實作細節仍可調整
-- 核心是 `role + governance + company memory + bounded autonomy`
-- 使用者管理的是 Praetor，不是多個 agent
-- MVP 先求可信、可部署、可用，不求功能最大
+- **產品方向已穩定**：core 是 `role + governance + company memory + bounded autonomy`
+- **使用者管理的是 Praetor（CEO 層），不是多個 agent**
+- **MVP 先求可信、可部署、可用，不求功能最大**
+- **執行優先序**：foundation cleanup（已完成）→ UI 重建（規劃中，Codex 執行）→ Docker app stack 收尾 → Telegram commands
+- **被 deferred 的**：workspace steward layer、skill marketplace、進階 role tuning

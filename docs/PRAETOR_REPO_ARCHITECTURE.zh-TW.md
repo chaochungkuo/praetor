@@ -1,8 +1,13 @@
-# Praetor Repo / Runtime / 部署架構 v0.1
+# Praetor Repo / Runtime / 部署架構 v0.2
 
-狀態：設計稿
+狀態：2026-05 更新，加上 as-built 對照。
 
-這份文件定義 Praetor 的技術選型、repo 結構、部署形態、背景工作模型、穩定性工程與實作順序。
+這份文件有兩層：
+
+- **設計層**（§1–2、§4 後半、§5–9）：repo 形態、模組切分、runtime 形態、部署的**設計目標**。這些目標仍有效。
+- **as-built 層**（§3）：repo 實際長相，與 §4 的「理想模組切分」差距較大。第 v1 仍是一個比較扁平的 layout，未來搬進 packages 是 phase-2 工作。
+
+衝突時：用 §3 描述當前狀態，§4 是未來方向。
 
 ## 1. 設計目標
 
@@ -79,37 +84,86 @@ Praetor 的工程架構要同時滿足：
 判斷：
 - 不建議
 
-## 3. 推薦 repo 形態
+## 3. As-built repo 形態（2026-05）
 
-建議使用 monorepo，但部署上維持簡單。
-
-推薦結構：
+實際 repo 與 v0.1 設計稿有偏差。以下為現況：
 
 ```txt
 praetor/
 ├── apps/
-│   ├── web/                    # Next.js UI
-│   └── api/                    # FastAPI
+│   ├── api/                    # FastAPI (praetor_api package)
+│   ├── web/                    # Vite + React SPA proxy (praetor_web + frontend/)
+│   └── worker/                 # FastAPI healthcheck (praetor_worker; runtime work
+│                                 actually happens via mission_worker.py in praetor_api)
 ├── workers/
-│   └── runtime/                # mission worker / executor orchestration
-├── packages/
-│   ├── docschemas/             # JSON Schema / contracts
-│   ├── prompts/                # system prompts / role templates
-│   └── ui/                     # optional shared UI primitives
-├── infra/
-│   ├── docker/
-│   ├── nginx/                  # optional reverse proxy configs
-│   └── scripts/
-├── docs/
-├── workspace.example/
-├── tests/
+│   └── runtime/                # bridge_client lib (praetor_runtime)
+├── bridges/
+│   └── praetor-execd/          # host-side subscription executor bridge (FastAPI)
+├── tools/                      # smoke + import-check scripts (pixi tasks point here)
+├── docs/                       # specs (zh-TW + en mix)
+├── branding/                   # logo assets
+├── scripts/                    # install / update / uninstall
+├── .github/                    # workflows
 ├── compose.yaml
 ├── compose.production.yaml
-├── .env.example
+├── compose.app.yaml
+├── compose.app.production.yaml
+├── pixi.toml                   # repo-local Python env baseline
+├── PRAETOR_PRODUCT_BRIEF.md
+├── PRAETOR_PRODUCT_BRIEF.zh-TW.md
+├── PRODUCT_INTAKE.md           # raw discussion material
+├── ROADMAP.md
 └── README.md
 ```
 
-## 4. 邏輯模組切分
+差異重點：
+
+| v0.1 設計稿 | 實際 | 備註 |
+|---|---|---|
+| `apps/web/` = Next.js | Vite + React 19 | React Router v6 + TanStack Query (規劃中) |
+| `packages/{docschemas,prompts,ui}` | 不存在 | schemas 在 `apps/api/praetor_api/schemas.py`；prompts 內嵌在 `service.py / planner.py`；UI primitives 待 Codex 重建時建立 |
+| `infra/` | 不存在 | docker compose 檔案直接放 repo root；`scripts/` 是 shell installer，不是 docker config |
+| `workspace.example/` | 不存在 | workspace bootstrap 由 `apps/api/praetor_api/workspace.py` 動態建立 |
+| `tests/` | 名為 `tools/` | smoke tests + import checks，命名沿用 |
+
+API 內部仍是**單一 Python package（`praetor_api`）的扁平 layout**：
+
+```txt
+apps/api/praetor_api/
+├── __init__.py
+├── main.py                 # FastAPI app, lifespan, top-level routes
+├── ui.py                   # Jinja UI routes + templates wrapper (約 1,500 行；UI 重建後會壓到 < 600 行)
+├── _translations.py        # Jinja-side i18n tables (zh-TW + en)
+├── service.py              # PraetorService god object (約 2,700 行；未來切分)
+├── service_agents.py       # AgentsMixin
+├── service_skills.py       # SkillsMixin
+├── storage.py              # SQLiteIndex + AppStorage facade
+├── _filesystem_store.py    # FilesystemStore + helpers (workspace markdown 寫入)
+├── models.py               # Pydantic models
+├── schemas.py              # JSON schema export
+├── planner.py              # CEO planner (LLM + offline test variant)
+├── runtime.py              # MissionRuntime (subscription_executor / api 兩條路)
+├── mission_worker.py       # background MissionWorker (mission_jobs queue 消費者)
+├── providers.py            # OpenAI / Anthropic SDK 包裝
+├── safety_policy.py        # prompt-time safety policy 組裝
+├── recommendations.py      # onboarding preview + mission complexity assessment
+├── run_registry.py         # in-memory async run register
+├── config.py               # env vars
+├── auth.py                 # owner password / bcrypt
+├── security.py             # CSRF + rate limit + setup token
+├── telegram.py             # Telegram bot integration
+├── workspace.py            # bootstrap_workspace
+├── templates/              # Jinja templates (UI 重建後會清掉大部分)
+└── static/                 # praetor.css + 圖片 (UI 重建後會大量縮減)
+```
+
+下一輪 refactor（**已知 backlog，不在 v1 阻擋路徑上**）：
+
+1. 把 `service.py` 拆成 `service_mission.py / service_governance.py / service_conversation.py / service_knowledge.py` 等 mixin（同 §4 規劃，但搬進 mixin 而非獨立 package）。
+2. 把 `storage.py` 拆成 `storage/{missions,governance,knowledge,organization}.py` repos。
+3. 視 UI 重建後的維護摩擦決定要不要拉 `packages/ui` 共用層（v1 不做）。
+
+## 4. 邏輯模組切分（未來方向，非 as-built）
 
 後端內部建議切成：
 

@@ -238,7 +238,6 @@ def main() -> int:
         mission_id = mission["data"]["id"]
         mission_knowledge = request("GET", f"/api/missions/{mission_id}/knowledge")
         mission_scope = request("GET", f"/api/missions/{mission_id}/workspace-scope")
-        steward_before = request("GET", f"/api/missions/{mission_id}/workspace-steward")
         workflow = request("GET", "/api/workflow")
         governance_review = request("GET", "/api/governance/review")
         governance_review_run = request("POST", "/api/governance/review")
@@ -248,9 +247,6 @@ def main() -> int:
         completion = request("GET", f"/api/missions/{mission_id}/completion-contract")
         board_briefing = request("POST", f"/api/missions/{mission_id}/board-briefings")
         board_briefing_list = request("GET", f"/api/missions/{mission_id}/board-briefings")
-        restructure_plan = request("POST", f"/api/missions/{mission_id}/workspace-restructure-plan")
-        reconciliation = request("POST", f"/api/missions/{mission_id}/workspace-reconcile")
-        steward_after = request("GET", f"/api/missions/{mission_id}/workspace-steward")
         promotion = request("POST", f"/api/missions/{mission_id}/memory-promotion")
         promotion_list = request("GET", f"/api/missions/{mission_id}/memory-promotion")
         meeting = request("POST", f"/missions/{mission_id}/meeting")
@@ -325,11 +321,6 @@ def main() -> int:
                     "knowledge_matters": len(mission_knowledge["data"]["matters"]),
                     "knowledge_open_questions": len(mission_knowledge["data"]["open_questions"]),
                     "workspace_scope_root": mission_scope["data"]["root"],
-                    "steward_assets_before": len(steward_before["data"]["assets"]),
-                    "steward_assets_after": len(steward_after["data"]["assets"]),
-                    "restructure_plan_moves": len(restructure_plan["data"]["moves"]),
-                    "reconciliation_scanned": reconciliation["data"]["scanned_files"],
-                    "reconciliation_reports": len(steward_after["data"]["reconciliation_reports"]),
                     "workflow_has_contract": "Completion Contract" in workflow["data"]["body"],
                     "governance_review_ok": governance_review["ok"],
                     "governance_review_items": len(governance_review_run["data"]["items"]),

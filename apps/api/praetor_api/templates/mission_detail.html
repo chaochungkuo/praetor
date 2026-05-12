@@ -2,16 +2,6 @@
 
 {% block content %}
   {% set latest_briefing = board_briefings[0] if board_briefings else none %}
-  {% set latest_reconciliation = workspace_steward.reconciliation_reports[0] if workspace_steward.reconciliation_reports else none %}
-  {% set file_health = namespace(issues=0) %}
-  {% for asset in workspace_steward.assets %}
-    {% if asset.sync_status != "tracked" %}
-      {% set file_health.issues = file_health.issues + 1 %}
-    {% endif %}
-  {% endfor %}
-  {% if latest_reconciliation %}
-    {% set file_health.issues = file_health.issues + latest_reconciliation.missing_assets|length + latest_reconciliation.changed_assets|length + latest_reconciliation.moved_candidates|length + latest_reconciliation.untracked_files|length + latest_reconciliation.git_changes|length %}
-  {% endif %}
 
   <section class="executive-hero glass-panel">
     <div class="executive-hero-main">
@@ -122,25 +112,6 @@
       {% endif %}
     </section>
 
-    <section class="glass-panel health-card">
-      <span class="eyebrow">{{ t("workspace_health") }}</span>
-      <h3>{{ t("needs_review") if file_health.issues else t("healthy") }}</h3>
-      <div class="health-metrics">
-        <div><strong>{{ workspace_steward.assets|length }}</strong><span>{{ t("file_assets") }}</span></div>
-        <div><strong>{{ file_health.issues }}</strong><span>{{ t("review_items") }}</span></div>
-        <div><strong>{{ latest_reconciliation.scanned_files if latest_reconciliation else 0 }}</strong><span>{{ t("files_scanned") }}</span></div>
-      </div>
-      <div class="mini-actions">
-        <form method="post" action="/app/missions/{{ mission.id }}/workspace-reconcile">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("reconcile_workspace") }}</button>
-        </form>
-        <form method="post" action="/app/missions/{{ mission.id }}/workspace-restructure-plan">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="secondary">{{ t("create_restructure_plan") }}</button>
-        </form>
-      </div>
-    </section>
   </section>
 
   <section class="glass-panel">
@@ -230,38 +201,6 @@
             </div>
           </section>
         </div>
-      </div>
-    </details>
-
-    <details class="glass-panel executive-details">
-      <summary>
-        <span>{{ t("workspace_steward") }}</span>
-        <small>{{ workspace_steward.assets|length }} {{ t("file_assets") }} · {{ workspace_steward.reconciliation_reports|length }} {{ t("reconciliation_reports") }}</small>
-      </summary>
-      <div class="detail-body">
-        <p>{{ t("workspace_steward_desc") }}</p>
-        <div class="list">
-          {% for asset in workspace_steward.assets[:8] %}
-            <div class="list-row soft-row">
-              <div>
-                <strong>{{ asset.title or asset.current_path }}</strong>
-                <div class="muted">{{ label(asset.source) }} · {{ label(asset.sensitivity) }} · {{ label(asset.sync_status) }}</div>
-              </div>
-              <span class="status">{{ label(asset.sync_status) }}</span>
-            </div>
-          {% else %}
-            <p class="muted">{{ t("no_file_assets") }}</p>
-          {% endfor %}
-        </div>
-        {% if latest_reconciliation %}
-          <div class="health-strip">
-            <span>{{ latest_reconciliation.scanned_files }} {{ t("files_scanned") }}</span>
-            <span>{{ latest_reconciliation.missing_assets|length }} missing</span>
-            <span>{{ latest_reconciliation.changed_assets|length }} changed</span>
-            <span>{{ latest_reconciliation.untracked_files|length }} untracked</span>
-            <span>{{ latest_reconciliation.git_changes|length }} git</span>
-          </div>
-        {% endif %}
       </div>
     </details>
 

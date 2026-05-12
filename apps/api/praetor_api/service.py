@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -32,8 +33,6 @@ from .models import (
     DocumentRecord,
     DocumentVersion,
     EscalationRecord,
-    FileAssetRecord,
-    FileMoveRecord,
     GovernanceReview,
     KnowledgeSnapshot,
     KnowledgeUpdate,
@@ -45,6 +44,7 @@ from .models import (
     MissionContinueRequest,
     MissionCreateRequest,
     MissionDefinition,
+    MissionJob,
     MissionTeam,
     MissionTimelineEvent,
     OfficeSnapshot,
@@ -68,11 +68,7 @@ from .models import (
     TelegramIntegrationSettings,
     WorkspaceConfig,
     WorkspacePermissions,
-    WorkspaceReconciliationIssue,
-    WorkspaceReconciliationReport,
-    WorkspaceRestructurePlan,
     WorkspaceScope,
-    WorkspaceStewardSnapshot,
     WorkSession,
     WorkSessionTurn,
     utc_now,
@@ -84,7 +80,6 @@ from .runtime import MissionRuntime
 from .safety_policy import append_safety_policy, build_prompt_safety_policy, contains_sensitive_material
 from .service_agents import AgentsMixin
 from .service_skills import SkillsMixin
-from .service_workspace import WorkspaceMixin
 from .storage import AppStorage
 from .telegram import generate_pairing_code, new_pairing_settings, process_update, send_approval_notification
 from .workspace import DEFAULT_WORKFLOW_CONTRACT, bootstrap_workspace
@@ -97,7 +92,7 @@ def parse_datetime(value: str | None) -> datetime:
 
 
 @dataclass
-class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
+class PraetorService(AgentsMixin, SkillsMixin):
     storage: AppStorage
     planner: CEOPlanner | None = None
 
@@ -450,7 +445,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         )
         self._ensure_mission_team(mission)
         self._transition_mission_stage(mission, "planning", "Mission team is active and ready to plan execution.")
-        self._register_requested_output_assets(mission)
         if mission.pm_required:
             self.storage.append_agent_message(
                 AgentMessage(
@@ -594,7 +588,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
         )
         for document in self._planned_documents_for_mission(mission, client, matter):
             self.storage.save_document(document)
-            self._register_document_assets(document)
 
     def _planned_documents_for_mission(
         self,
@@ -1400,7 +1393,66 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             recent_missions=missions[:5],
         )
 
-    def run_mission(self, mission_id: str) -> dict:
+    def run_mission(self, mission_id: str, *, wait_timeout: float = 900.0) -> dict:
+        """Enqueue a mission run and wait for the background worker to finish.
+
+        Keeps the synchronous API contract (callers get the final result dict)
+        while routing actual execution through the persistent mission_jobs
+        queue, so a process restart no longer silently drops in-flight work.
+        """
+        # Confirm the mission exists before enqueueing so callers see KeyError
+        # the same way they used to.
+        self.get_mission(mission_id)
+        job = self.enqueue_mission_job(mission_id)
+        deadline = time.monotonic() + wait_timeout
+        while time.monotonic() < deadline:
+            current = self.storage.get_mission_job(job.id)
+            if current is None:
+                raise RuntimeError(f"Mission job vanished: {job.id}")
+            if current.status == "completed":
+                return current.result or {}
+            if current.status in {"failed", "interrupted", "cancelled"}:
+                raise RuntimeError(current.error or f"Mission job ended: {current.status}")
+            time.sleep(0.1)
+        raise RuntimeError(f"Mission job timed out: {job.id}")
+
+    def enqueue_mission_job(self, mission_id: str) -> MissionJob:
+        self.get_mission(mission_id)
+        job = MissionJob(mission_id=mission_id)
+        self.storage.save_mission_job(job)
+        return job
+
+    def claim_next_mission_job(self) -> MissionJob | None:
+        return self.storage.claim_next_queued_mission_job()
+
+    def execute_mission_job(self, job_id: str) -> dict:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            raise KeyError(f"Mission job not found: {job_id}")
+        return self._execute_mission(job.mission_id)
+
+    def complete_mission_job(self, job_id: str, result: dict) -> None:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            return
+        job.status = "completed"
+        job.result = result
+        job.finished_at = utc_now()
+        self.storage.save_mission_job(job)
+
+    def fail_mission_job(self, job_id: str, error: str) -> None:
+        job = self.storage.get_mission_job(job_id)
+        if job is None:
+            return
+        job.status = "failed"
+        job.error = error
+        job.finished_at = utc_now()
+        self.storage.save_mission_job(job)
+
+    def recover_interrupted_mission_jobs(self) -> int:
+        return self.storage.reset_running_mission_jobs()
+
+    def _execute_mission(self, mission_id: str) -> dict:
         settings = self._require_settings()
         self._ensure_default_standing_orders()
         mission = self.get_mission(mission_id)
@@ -1573,7 +1625,6 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
                 ]
             ),
         )
-        self._register_runtime_output_assets(mission, final_result.run_record.changed_files)
         if mission.pm_required:
             self.storage.append_pm_report(
                 workspace_root,
@@ -1731,14 +1782,48 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
             intent=plan.intent,
         )
 
+    # Token-aware retrieval windowing for the CEO planner.
+    #
+    # The previous version stuffed the prompt with up to 10 missions, 8 wiki
+    # pages, 12 standing orders, and 10 conversation turns regardless of what
+    # the chairman just said. That breaks the brief's principle that the CEO
+    # should split context to mission-scoped PMs (PRODUCT_BRIEF section 13).
+    #
+    # Now we rank candidates by keyword overlap with the chairman's instruction
+    # and only keep the top ones. The pinned related_mission_id is always
+    # included, even if its keywords don't overlap, so explicit mission
+    # references survive the filter.
+    _CONTEXT_BUDGET = {
+        "missions": 3,
+        "wiki_pages": 3,
+        "standing_orders": 5,
+        "conversation_turns": 6,
+    }
+
+    @staticmethod
+    def _instruction_keywords(text: str) -> set[str]:
+        tokens = re.findall(r"[\w一-鿿]+", text.lower())
+        # Drop very short stop-words; keep CJK single characters since they
+        # often carry meaning.
+        return {token for token in tokens if len(token) > 2 or any(ord(c) > 127 for c in token)}
+
+    @classmethod
+    def _score_against_keywords(cls, candidate: str, keywords: set[str]) -> int:
+        if not keywords:
+            return 0
+        haystack = candidate.lower()
+        return sum(1 for word in keywords if word in haystack)
+
     def _ceo_planner_context(self, request: ConversationCreateRequest, text: str, safety_policy: str) -> CEOPlannerContext:
         settings = self._require_settings()
         workspace_root = Path(settings.workspace.root)
         missions = self.storage.list_missions(workspace_root)
         approvals = self.storage.list_approvals()
-        recent_conversation = self.storage.list_conversation_messages(limit=10)
+        recent_conversation = self.storage.list_conversation_messages(limit=20)
         wiki_pages = self.storage.list_wiki_pages(workspace_root)
         knowledge = self.knowledge_snapshot()
+        keywords = self._instruction_keywords(text)
+
         company_context = "\n".join(
             [
                 f"Owner/chairman: {settings.owner.name}",
@@ -1751,17 +1836,53 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
                 f"Runtime executor/provider: {settings.runtime.executor or settings.runtime.provider or 'none'}",
             ]
         )
+
+        # Standing orders: rank by overlap with instruction, fall back to recent.
+        orders = self.storage.list_standing_orders()
+        ranked_orders = sorted(
+            orders,
+            key=lambda item: (
+                -self._score_against_keywords(f"{item.scope} {item.effect} {item.instruction}", keywords),
+                -item.updated_at.timestamp(),
+            ),
+        )[: self._CONTEXT_BUDGET["standing_orders"]]
         standing_orders = "\n".join(
-            f"- {item.scope}/{item.effect}: {item.instruction}" for item in self.storage.list_standing_orders()[:12]
+            f"- {item.scope}/{item.effect}: {item.instruction}" for item in ranked_orders
         )
+
+        # Missions: always include the pinned mission, then top-ranked others.
+        pinned: list[MissionDefinition] = []
+        candidates: list[MissionDefinition] = []
+        for mission in missions:
+            if mission.id == request.related_mission_id:
+                pinned.append(mission)
+            else:
+                candidates.append(mission)
+        ranked_missions = sorted(
+            candidates,
+            key=lambda item: (
+                -self._score_against_keywords(f"{item.title} {item.summary or ''} {' '.join(item.domains)}", keywords),
+                -item.updated_at.timestamp(),
+            ),
+        )
+        keep = self._CONTEXT_BUDGET["missions"] - len(pinned)
+        chosen_missions = pinned + ranked_missions[: max(0, keep)]
         active_missions = "\n".join(
             f"- {mission.id}: {mission.title} [{mission.status}] {mission.summary or ''}"
-            for mission in missions[:10]
+            for mission in chosen_missions
         )
+
+        # Wiki pages: rank by overlap on name + preview.
+        ranked_pages = sorted(
+            wiki_pages,
+            key=lambda page: -self._score_against_keywords(
+                f"{page.get('name', '')} {page.get('preview', '')}", keywords
+            ),
+        )[: self._CONTEXT_BUDGET["wiki_pages"]]
         wiki_context = "\n\n".join(
-            f"## {page['name']}\n{page.get('preview', '')}"
-            for page in wiki_pages[:8]
+            f"## {page['name']}\n{page.get('preview', '')}" for page in ranked_pages
         )
+
         knowledge_context = "\n".join(
             [
                 f"Clients: {len(knowledge.clients)}",
@@ -1772,10 +1893,14 @@ class PraetorService(AgentsMixin, SkillsMixin, WorkspaceMixin):
                 f"Knowledge updates: {len(knowledge.knowledge_updates)}",
             ]
         )
+
+        # Conversation: always keep the most recent turns - they are the
+        # immediate continuation context. No ranking here, just trim.
         conversation_context = "\n".join(
             f"- {message.role}: {message.body[:500]}"
-            for message in recent_conversation[-10:]
+            for message in recent_conversation[-self._CONTEXT_BUDGET["conversation_turns"]:]
         )
+
         return CEOPlannerContext(
             instruction=text,
             related_mission_id=request.related_mission_id,
